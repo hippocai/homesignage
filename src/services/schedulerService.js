@@ -1,5 +1,6 @@
 const schedule = require('node-schedule');
 const reminderDao = require('../dao/reminderDao');
+const infoItemDao = require('../dao/infoItemDao');
 const socketService = require('./socketService');
 const logger = require('../utils/logger');
 
@@ -116,6 +117,17 @@ async function initScheduler() {
     for (const reminder of reminders) {
       scheduleReminder(reminder);
     }
+
+    // Clean up expired info items every hour
+    schedule.scheduleJob('info-items-cleanup', '0 * * * *', async () => {
+      try {
+        const count = await infoItemDao.deleteExpired();
+        if (count > 0) logger.info('Cleaned up expired info items', { count });
+      } catch (err) {
+        logger.error('Failed to clean up expired info items', { error: err.message });
+      }
+    });
+
     logger.info('Scheduler initialized successfully');
   } catch (err) {
     logger.error('Failed to initialize scheduler', { error: err.message });

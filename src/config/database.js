@@ -135,11 +135,21 @@ CREATE TABLE IF NOT EXISTS uploads (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS info_items (
+    id TEXT PRIMARY KEY,
+    text TEXT NOT NULL,
+    start_time TEXT,
+    end_time TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now'))
+);
+
 CREATE INDEX IF NOT EXISTS idx_devices_status ON devices(status);
 CREATE INDEX IF NOT EXISTS idx_devices_last_seen ON devices(last_seen);
 CREATE INDEX IF NOT EXISTS idx_components_scene_id ON components(scene_id);
 CREATE INDEX IF NOT EXISTS idx_timed_reminders_start_time ON timed_reminders(start_time);
 CREATE INDEX IF NOT EXISTS idx_emergency_alerts_status ON emergency_alerts(status);
+CREATE INDEX IF NOT EXISTS idx_info_items_end_time ON info_items(end_time);
 `;
 
 async function initDatabase() {

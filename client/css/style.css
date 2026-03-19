@@ -48,6 +48,26 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: #000; colo
 }
 .blink { animation: blink 1s ease-in-out infinite; }
 
+/* Info-list component */
+.info-list-component { display: block; }
+.info-list-wrapper { width: 100%; height: 100%; overflow: hidden; position: relative; }
+.info-list-scroller { display: flex; flex-direction: column; }
+.info-list-item {
+  display: flex; align-items: center;
+  overflow: hidden; white-space: nowrap; flex-shrink: 0;
+}
+.info-item-text { display: inline-block; white-space: nowrap; }
+.info-item-empty { text-align: center; opacity: 0.5; }
+
+@keyframes info-scroll-up {
+  0%   { transform: translateY(0); }
+  100% { transform: translateY(-50%); }
+}
+@keyframes info-marquee {
+  0%   { transform: translateX(100%); }
+  100% { transform: translateX(-100%); }
+}
+
 /* Emergency overlay */
 #emergency-overlay {
   position: fixed; top: 0; left: 0; width: 100%; height: 100%;

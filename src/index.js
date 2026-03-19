@@ -94,6 +94,7 @@ app.use('/api/v1/api-keys', require('./routes/apiKeys'));
 app.use('/api/v1/system', require('./routes/system'));
 app.use('/api/v1/uploads', require('./routes/uploads'));
 app.use('/api/v1/weather', require('./routes/weather'));
+app.use('/api/v1/info-items', require('./routes/infoItems'));
 
 // Root health check
 app.get('/', (req, res) => {

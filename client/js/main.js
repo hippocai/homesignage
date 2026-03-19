@@ -27,6 +27,7 @@ var socket         = null;
 var heartbeatTimer = null;
 var pollTimer      = null;
 var clockIntervals = [];
+var infoListIntervals = [];
 
 // Active emergency tracking
 var activeEmergency = null; // { id, audio }
@@ -252,8 +253,9 @@ function applyConfig(config) {
   currentConfig = config;
   cacheConfig(config);
 
-  // Clear clock intervals from old scene layers
+  // Clear clock and info-list intervals from old scene layers
   clearClockIntervals();
+  clearInfoListIntervals();
 
   // Remove existing scene layers from DOM
   var app = document.getElementById('app');
@@ -358,6 +360,10 @@ function renderComponent(component) {
 
     case 'iframe':
       renderIframe(el, cfg);
+      break;
+
+    case 'info-list':
+      renderInfoList(el, cfg);
       break;
 
     default:
@@ -1274,6 +1280,128 @@ function clearClockIntervals() {
     clearInterval(clockIntervals[i]);
   }
   clockIntervals = [];
+}
+
+/* ─────────────────────────────────────────────
+   INFO-LIST INTERVALS CLEANUP
+───────────────────────────────────────────── */
+function clearInfoListIntervals() {
+  for (var i = 0; i < infoListIntervals.length; i++) {
+    clearInterval(infoListIntervals[i]);
+  }
+  infoListIntervals = [];
+}
+
+/* ─────────────────────────────────────────────
+   INFO-LIST COMPONENT
+───────────────────────────────────────────── */
+function renderInfoList(el, cfg) {
+  var fontSize       = (cfg.fontSize    || 18) + 'px';
+  var color          = cfg.color        || '#ffffff';
+  var bgColor        = cfg.backgroundColor || 'rgba(0,0,0,0.5)';
+  var itemSpacing    = cfg.itemSpacing  !== undefined ? cfg.itemSpacing : 6;
+  var padding        = cfg.padding      !== undefined ? cfg.padding     : 10;
+  var scrollSpeed    = cfg.scrollSpeed  || 40; // px/sec
+
+  el.style.backgroundColor = bgColor;
+  el.style.padding          = padding + 'px';
+  el.style.boxSizing        = 'border-box';
+  el.style.overflow         = 'hidden';
+
+  var wrapper = document.createElement('div');
+  wrapper.className = 'info-list-wrapper';
+  el.appendChild(wrapper);
+
+  var scroller = document.createElement('div');
+  scroller.className = 'info-list-scroller';
+  wrapper.appendChild(scroller);
+
+  function buildItemEls(items) {
+    var frag = document.createDocumentFragment();
+    for (var i = 0; i < items.length; i++) {
+      var row = document.createElement('div');
+      row.className = 'info-list-item';
+      row.style.cssText = [
+        'font-size:' + fontSize,
+        'color:' + color,
+        'margin-bottom:' + itemSpacing + 'px',
+        'overflow:hidden',
+        'white-space:nowrap',
+        'flex-shrink:0',
+      ].join(';');
+
+      var span = document.createElement('span');
+      span.className = 'info-item-text';
+      span.textContent = items[i].text;
+      row.appendChild(span);
+      frag.appendChild(row);
+    }
+    return frag;
+  }
+
+  function applyScrollAnimations(items) {
+    // Must run after DOM paint so we can measure dimensions
+    setTimeout(function () {
+      var rows = scroller.querySelectorAll('.info-list-item');
+
+      // Horizontal: check each row for text overflow
+      for (var i = 0; i < rows.length; i++) {
+        var row = rows[i];
+        var span = row.querySelector('.info-item-text');
+        if (span && span.scrollWidth > row.clientWidth + 1) {
+          var totalDist = row.clientWidth + span.scrollWidth;
+          var dur = totalDist / scrollSpeed;
+          span.style.animation = 'info-marquee ' + dur + 's linear infinite';
+        }
+      }
+
+      // Vertical: check if list overflows the wrapper
+      var wrapH   = wrapper.clientHeight;
+      var listH   = scroller.scrollHeight;
+      if (listH > wrapH && items.length > 1) {
+        // Duplicate content for seamless vertical loop
+        scroller.appendChild(buildItemEls(items));
+        var totalH   = scroller.scrollHeight;
+        var dur = (totalH / 2) / scrollSpeed;
+        scroller.style.animation = 'info-scroll-up ' + dur + 's linear infinite';
+      }
+    }, 400);
+  }
+
+  function renderItems(items) {
+    scroller.innerHTML = '';
+    scroller.style.animation = '';
+
+    if (!items || items.length === 0) {
+      var empty = document.createElement('div');
+      empty.className = 'info-item-empty';
+      empty.textContent = '暂无信息';
+      empty.style.cssText = 'padding:20px;color:' + color + ';opacity:0.5;';
+      scroller.appendChild(empty);
+      return;
+    }
+
+    scroller.appendChild(buildItemEls(items));
+    applyScrollAnimations(items);
+  }
+
+  function fetchAndRender() {
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', '/api/v1/info-items/active', true);
+    xhr.onload = function () {
+      if (xhr.status === 200) {
+        var resp = safeParseJSON(xhr.responseText);
+        if (resp && resp.data) renderItems(resp.data);
+      }
+    };
+    xhr.send();
+  }
+
+  fetchAndRender();
+
+  // Refresh every 60 seconds so expired items disappear without a page reload
+  var intervalId = setInterval(fetchAndRender, 60000);
+  infoListIntervals.push(intervalId);
 }
 
 /* ─────────────────────────────────────────────
