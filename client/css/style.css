@@ -1,0 +1,103 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 100%; height: 100%; overflow: hidden; background: #000; color: #fff; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
+
+#app { position: relative; width: 100vw; height: 100vh; overflow: hidden; }
+
+/* Scene carousel layers */
+.scene-layer {
+  position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+  opacity: 0; transition: opacity 1s ease-in-out;
+  background: #111;
+}
+.scene-layer.active { opacity: 1; }
+
+/* Components */
+.component { position: absolute; overflow: hidden; }
+.clock-component { display: flex; flex-direction: column; justify-content: center; align-items: center; }
+.weather-component { display: flex; flex-direction: column; justify-content: center; align-items: center; }
+.text-component { overflow: auto; word-wrap: break-word; }
+.image-component img { width: 100%; height: 100%; object-fit: cover; }
+.iframe-component iframe { width: 100%; height: 100%; border: none; }
+
+/* Timed reminder overlays */
+.reminder-overlay-pos {
+  position: fixed; z-index: 100;
+  pointer-events: none;
+}
+.reminder-bar-top    { top: 0; left: 0; right: 0; }
+.reminder-bar-bottom { bottom: 0; left: 0; right: 0; }
+.reminder-center-pos {
+  top: 0; left: 0; width: 100%; height: 100%;
+  display: flex; align-items: center; justify-content: center;
+}
+.reminder-content {
+  padding: 16px 24px;
+  font-size: 1.4em;
+  font-weight: bold;
+  transition: opacity 0.5s ease-in-out;
+}
+.reminder-center-pos .reminder-content {
+  border-radius: 12px;
+  min-width: 300px;
+  text-align: center;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.2; }
+}
+.blink { animation: blink 1s ease-in-out infinite; }
+
+/* Emergency overlay */
+#emergency-overlay {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  z-index: 1000; display: none;
+  background: #FF0000;
+  justify-content: center; align-items: center; flex-direction: column;
+}
+#emergency-overlay.active { display: flex; }
+#emergency-text {
+  color: #fff; font-size: 3em; font-weight: bold;
+  text-align: center; padding: 40px;
+  animation: blink 0.8s ease-in-out infinite;
+}
+#emergency-confirm-btn {
+  margin-top: 40px; padding: 16px 48px;
+  font-size: 1.2em; background: #fff; color: #FF0000;
+  border: none; border-radius: 8px; cursor: pointer;
+  font-weight: bold;
+}
+
+/* Registration page */
+#registration-page {
+  display: flex; flex-direction: column;
+  justify-content: center; align-items: center;
+  height: 100vh; gap: 20px;
+  background: #1a1a2e; color: #fff;
+}
+#registration-page input {
+  padding: 12px 20px; font-size: 1.1em;
+  border-radius: 8px; border: 1px solid #444;
+  background: #222; color: #fff; width: 300px;
+}
+#registration-page button {
+  padding: 12px 32px; font-size: 1.1em;
+  background: #0066cc; color: #fff;
+  border: none; border-radius: 8px; cursor: pointer;
+}
+
+/* Status indicator */
+#status-indicator {
+  position: fixed; top: 8px; right: 8px; z-index: 50;
+  width: 10px; height: 10px; border-radius: 50%;
+  background: #00ff00; opacity: 0.5;
+}
+#status-indicator.offline { background: #ff4444; }
+
+/* Offline banner */
+#offline-banner {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 200;
+  background: #ff8800; color: #fff; text-align: center;
+  padding: 8px; font-size: 0.9em; display: none;
+}
+#offline-banner.visible { display: block; }

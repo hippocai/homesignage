@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-fullscreen">
+  <meta name="theme-color" content="#000000">
+  <title>HomeSignage</title>
+  <link rel="stylesheet" href="/client/css/style.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Scene layers will be dynamically inserted here -->
+  </div>
+
+  <!-- Overlays (rendered above scenes, below emergency) -->
+  <div id="reminder-overlay-top"    class="reminder-overlay-pos reminder-bar-top"    style="display:none"></div>
+  <div id="reminder-overlay-bottom" class="reminder-overlay-pos reminder-bar-bottom" style="display:none"></div>
+  <div id="reminder-overlay-center" class="reminder-overlay-pos reminder-center-pos" style="display:none"></div>
+
+  <!-- Emergency overlay (highest z-index) -->
+  <div id="emergency-overlay">
+    <div id="emergency-text"></div>
+    <button id="emergency-confirm-btn" onclick="handleEmergencyConfirm()">已确认</button>
+  </div>
+
+  <!-- Status indicators -->
+  <div id="status-indicator" title="Connection status"></div>
+  <div id="offline-banner">&#9888;&#65039; 网络断开 - 显示缓存内容</div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/client/js/main.js"></script>
+</body>
+</html>
