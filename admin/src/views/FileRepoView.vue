@@ -1,29 +1,29 @@
 <template>
   <div class="file-repo-page">
     <div class="page-header">
-      <h2 class="page-title">文件仓库</h2>
+      <h2 class="page-title">{{ $t('fileRepo.title') }}</h2>
       <el-upload
         :show-file-list="false"
         :before-upload="handleUpload"
         multiple
       >
-        <el-button type="primary" :icon="Upload">上传文件</el-button>
+        <el-button type="primary" :icon="Upload">{{ $t('fileRepo.uploadFile') }}</el-button>
       </el-upload>
     </div>
 
     <el-card shadow="never">
       <div class="filter-bar">
         <el-radio-group v-model="filterType" @change="loadFiles">
-          <el-radio-button value="">全部</el-radio-button>
-          <el-radio-button value="image">图片</el-radio-button>
-          <el-radio-button value="audio">音频</el-radio-button>
-          <el-radio-button value="video">视频</el-radio-button>
-          <el-radio-button value="other">其他</el-radio-button>
+          <el-radio-button value="">{{ $t('fileRepo.filterAll') }}</el-radio-button>
+          <el-radio-button value="image">{{ $t('fileRepo.filterImage') }}</el-radio-button>
+          <el-radio-button value="audio">{{ $t('fileRepo.filterAudio') }}</el-radio-button>
+          <el-radio-button value="video">{{ $t('fileRepo.filterVideo') }}</el-radio-button>
+          <el-radio-button value="other">{{ $t('fileRepo.filterOther') }}</el-radio-button>
         </el-radio-group>
       </div>
 
       <el-table :data="files" v-loading="loading" stripe size="default">
-        <el-table-column label="文件名" min-width="200">
+        <el-table-column :label="$t('fileRepo.fileName')" min-width="200">
           <template #default="{ row }">
             <div class="file-name-cell">
               <img v-if="row.type === 'image'" :src="row.url" class="file-thumb-sm" />
@@ -34,45 +34,45 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column label="类型" width="100">
+        <el-table-column :label="$t('fileRepo.type')" width="100">
           <template #default="{ row }">
             <el-tag size="small" :type="getTypeTagType(row.type)">{{ row.type }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="大小" width="100">
+        <el-table-column :label="$t('fileRepo.size')" width="100">
           <template #default="{ row }">
             {{ formatSize(row.size) }}
           </template>
         </el-table-column>
-        <el-table-column label="修改时间" width="170">
+        <el-table-column :label="$t('fileRepo.modifiedAt')" width="170">
           <template #default="{ row }">
             {{ formatDate(row.mtime) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="200" fixed="right">
+        <el-table-column :label="$t('common.actions')" width="200" fixed="right">
           <template #default="{ row }">
-            <el-button size="small" :icon="Download" @click="handleDownload(row)">下载</el-button>
-            <el-button size="small" :icon="Edit" @click="openRename(row)">重命名</el-button>
-            <el-button size="small" type="danger" :icon="Delete" @click="handleDelete(row)">删除</el-button>
+            <el-button size="small" :icon="Download" @click="handleDownload(row)">{{ $t('common.download') }}</el-button>
+            <el-button size="small" :icon="Edit" @click="openRename(row)">{{ $t('common.rename') }}</el-button>
+            <el-button size="small" type="danger" :icon="Delete" @click="handleDelete(row)">{{ $t('common.delete') }}</el-button>
           </template>
         </el-table-column>
       </el-table>
 
       <div v-if="files.length === 0 && !loading" class="empty-state">
-        <el-empty description="文件仓库为空，请上传文件" />
+        <el-empty :description="$t('fileRepo.emptyHint')" />
       </div>
     </el-card>
 
     <!-- Rename Dialog -->
-    <el-dialog v-model="renameDialogVisible" title="重命名文件" width="400px">
+    <el-dialog v-model="renameDialogVisible" :title="$t('fileRepo.renameDialog')" width="400px">
       <el-form @submit.prevent="confirmRename">
-        <el-form-item label="新文件名">
-          <el-input v-model="newName" placeholder="输入新文件名" autofocus />
+        <el-form-item :label="$t('fileRepo.newFileName')">
+          <el-input v-model="newName" :placeholder="$t('fileRepo.newFileNamePlaceholder')" autofocus />
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="renameDialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="renaming" @click="confirmRename">确认</el-button>
+        <el-button @click="renameDialogVisible = false">{{ $t('common.cancel') }}</el-button>
+        <el-button type="primary" :loading="renaming" @click="confirmRename">{{ $t('common.confirm') }}</el-button>
       </template>
     </el-dialog>
   </div>
@@ -83,6 +83,9 @@ import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Upload, Download, Edit, Delete, Headset, VideoPlay, Document } from '@element-plus/icons-vue'
 import { fileRepoApi } from '../api/index.js'
+import { useI18n } from 'vue-i18n'
+
+const { t, locale } = useI18n()
 
 const loading = ref(false)
 const files = ref([])
@@ -104,7 +107,7 @@ function formatSize(bytes) {
 
 function formatDate(iso) {
   if (!iso) return '—'
-  return new Date(iso).toLocaleString('zh-CN')
+  return new Date(iso).toLocaleString(locale.value === 'en' ? 'en-US' : 'zh-CN')
 }
 
 async function loadFiles() {
@@ -113,7 +116,7 @@ async function loadFiles() {
     const res = await fileRepoApi.list(filterType.value || undefined)
     files.value = res.data.data || []
   } catch (err) {
-    ElMessage.error('加载失败')
+    ElMessage.error(t('fileRepo.loadFailed'))
   } finally {
     loading.value = false
   }
@@ -124,10 +127,10 @@ async function handleUpload(file) {
   fd.append('file', file)
   try {
     await fileRepoApi.upload(fd)
-    ElMessage.success(`${file.name} 上传成功`)
+    ElMessage.success(t('fileRepo.uploadSuccess', { name: file.name }))
     await loadFiles()
   } catch (err) {
-    ElMessage.error(err.response?.data?.error || '上传失败')
+    ElMessage.error(err.response?.data?.error || t('fileRepo.uploadFailed'))
   }
   return false // prevent default upload behavior
 }
@@ -142,7 +145,7 @@ async function handleDownload(file) {
     a.click()
     URL.revokeObjectURL(url)
   } catch {
-    ElMessage.error('下载失败')
+    ElMessage.error(t('fileRepo.downloadFailed'))
   }
 }
 
@@ -160,11 +163,11 @@ async function confirmRename() {
   renaming.value = true
   try {
     await fileRepoApi.rename(renamingFile.value.name, newName.value.trim())
-    ElMessage.success('重命名成功')
+    ElMessage.success(t('fileRepo.renameSuccess'))
     renameDialogVisible.value = false
     await loadFiles()
   } catch (err) {
-    ElMessage.error(err.response?.data?.error || '重命名失败')
+    ElMessage.error(err.response?.data?.error || t('fileRepo.renameFailed'))
   } finally {
     renaming.value = false
   }
@@ -172,16 +175,20 @@ async function confirmRename() {
 
 async function handleDelete(file) {
   try {
-    await ElMessageBox.confirm(`确定删除文件 "${file.name}" 吗？`, '确认删除', {
-      confirmButtonText: '删除',
-      cancelButtonText: '取消',
-      type: 'warning'
-    })
+    await ElMessageBox.confirm(
+      t('fileRepo.deleteConfirm', { name: file.name }),
+      t('common.confirmDelete'),
+      {
+        confirmButtonText: t('common.delete'),
+        cancelButtonText: t('common.cancel'),
+        type: 'warning'
+      }
+    )
     await fileRepoApi.delete(file.name)
-    ElMessage.success('已删除')
+    ElMessage.success(t('fileRepo.deletedSuccess'))
     await loadFiles()
   } catch (err) {
-    if (err !== 'cancel') ElMessage.error(err.response?.data?.error || '删除失败')
+    if (err !== 'cancel') ElMessage.error(err.response?.data?.error || t('fileRepo.deleteFailed'))
   }
 }
 

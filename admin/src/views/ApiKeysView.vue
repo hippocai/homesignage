@@ -1,14 +1,14 @@
 <template>
   <div class="api-keys-page">
     <div class="page-header">
-      <h2 class="page-title">API密钥管理</h2>
-      <el-button type="primary" :icon="Plus" @click="openCreateDialog">生成新密钥</el-button>
+      <h2 class="page-title">{{ $t('apiKeys.title') }}</h2>
+      <el-button type="primary" :icon="Plus" @click="openCreateDialog">{{ $t('apiKeys.generateKey') }}</el-button>
     </div>
 
     <el-card shadow="never">
       <el-table :data="keys" v-loading="loading" stripe size="default">
-        <el-table-column prop="name" label="名称" min-width="160" />
-        <el-table-column label="密钥" min-width="260">
+        <el-table-column prop="name" :label="$t('apiKeys.keyName')" min-width="160" />
+        <el-table-column :label="$t('apiKeys.key')" min-width="260">
           <template #default="{ row }">
             <div class="key-cell">
               <el-input
@@ -32,17 +32,17 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column label="创建时间" width="170">
+        <el-table-column :label="$t('apiKeys.createdAt')" width="170">
           <template #default="{ row }">
             {{ formatDate(row.created_at) }}
           </template>
         </el-table-column>
-        <el-table-column label="最后使用" width="170">
+        <el-table-column :label="$t('apiKeys.lastUsed')" width="170">
           <template #default="{ row }">
-            <span class="text-muted">{{ formatDate(row.last_used_at) || '从未使用' }}</span>
+            <span class="text-muted">{{ formatDate(row.last_used_at) || $t('apiKeys.neverUsed') }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="100" fixed="right">
+        <el-table-column :label="$t('common.actions')" width="100" fixed="right">
           <template #default="{ row }">
             <el-button
               size="small"
@@ -50,7 +50,7 @@
               :icon="Delete"
               @click="handleDelete(row)"
             >
-              删除
+              {{ $t('common.delete') }}
             </el-button>
           </template>
         </el-table-column>
@@ -60,7 +60,7 @@
     <!-- Create Key Dialog -->
     <el-dialog
       v-model="createDialogVisible"
-      title="生成新API密钥"
+      :title="$t('apiKeys.generateDialog')"
       width="440px"
       @closed="resetForm"
     >
@@ -70,27 +70,27 @@
         :rules="rules"
         label-width="80px"
       >
-        <el-form-item label="密钥名称" prop="name">
-          <el-input v-model="form.name" placeholder="例如：HomeAssistant, N8N" />
+        <el-form-item :label="$t('apiKeys.keyNameLabel')" prop="name">
+          <el-input v-model="form.name" :placeholder="$t('apiKeys.keyNamePlaceholder')" />
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="createDialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="saving" @click="createKey">生成密钥</el-button>
+        <el-button @click="createDialogVisible = false">{{ $t('common.cancel') }}</el-button>
+        <el-button type="primary" :loading="saving" @click="createKey">{{ $t('apiKeys.generateBtn') }}</el-button>
       </template>
     </el-dialog>
 
     <!-- Show New Key Dialog -->
     <el-dialog
       v-model="newKeyDialogVisible"
-      title="密钥已生成"
+      :title="$t('apiKeys.newKeyTitle')"
       width="520px"
     >
       <el-alert type="warning" :closable="false" show-icon style="margin-bottom: 16px;">
-        <template #title>请立即复制并保存此密钥，关闭后将无法再次查看完整密钥！</template>
+        <template #title>{{ $t('apiKeys.newKeyWarning') }}</template>
       </el-alert>
       <div class="new-key-section">
-        <div class="new-key-label">密钥名称：<strong>{{ newKeyData?.name }}</strong></div>
+        <div class="new-key-label">{{ $t('apiKeys.newKeyNameLabel') }}<strong>{{ newKeyData?.name }}</strong></div>
         <div class="new-key-value">
           <el-input
             v-model="newKeyData.key"
@@ -98,23 +98,26 @@
             class="key-full-input"
           >
             <template #append>
-              <el-button :icon="CopyDocument" @click="copyKey(newKeyData.key)">复制</el-button>
+              <el-button :icon="CopyDocument" @click="copyKey(newKeyData.key)">{{ $t('apiKeys.copyBtn') }}</el-button>
             </template>
           </el-input>
         </div>
       </div>
       <template #footer>
-        <el-button type="primary" @click="newKeyDialogVisible = false">我已保存，关闭</el-button>
+        <el-button type="primary" @click="newKeyDialogVisible = false">{{ $t('apiKeys.savedClose') }}</el-button>
       </template>
     </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Delete, CopyDocument, View, Hide } from '@element-plus/icons-vue'
 import { apiKeysApi } from '../api/index.js'
+import { useI18n } from 'vue-i18n'
+
+const { t, locale } = useI18n()
 
 const loading = ref(false)
 const saving = ref(false)
@@ -129,9 +132,9 @@ const form = reactive({
   name: ''
 })
 
-const rules = {
-  name: [{ required: true, message: '请输入密钥名称', trigger: 'blur' }]
-}
+const rules = computed(() => ({
+  name: [{ required: true, message: t('apiKeys.keyNameRequired'), trigger: 'blur' }]
+}))
 
 function maskKey(key) {
   if (!key) return '—'
@@ -145,15 +148,15 @@ function toggleKeyVisibility(id) {
 
 function formatDate(dt) {
   if (!dt) return null
-  return new Date(dt).toLocaleString('zh-CN')
+  return new Date(dt).toLocaleString(locale.value === 'en' ? 'en-US' : 'zh-CN')
 }
 
 async function copyKey(key) {
   try {
     await navigator.clipboard.writeText(key)
-    ElMessage.success('密钥已复制到剪贴板')
+    ElMessage.success(t('apiKeys.copiedSuccess'))
   } catch {
-    ElMessage.error('复制失败，请手动复制')
+    ElMessage.error(t('apiKeys.copyFailed'))
   }
 }
 
@@ -179,7 +182,7 @@ async function createKey() {
     newKeyDialogVisible.value = true
     await loadKeys()
   } catch (error) {
-    ElMessage.error(error.response?.data?.message || '生成失败')
+    ElMessage.error(error.response?.data?.message || t('apiKeys.generateFailed'))
   } finally {
     saving.value = false
   }
@@ -188,20 +191,20 @@ async function createKey() {
 async function handleDelete(keyItem) {
   try {
     await ElMessageBox.confirm(
-      `确定要删除密钥 "${keyItem.name}" 吗？使用此密钥的服务将无法访问API。`,
-      '确认删除',
+      t('apiKeys.deleteConfirm', { name: keyItem.name }),
+      t('common.confirmDelete'),
       {
-        confirmButtonText: '确定删除',
-        cancelButtonText: '取消',
+        confirmButtonText: t('apiKeys.confirmDeleteBtn'),
+        cancelButtonText: t('common.cancel'),
         type: 'warning'
       }
     )
     await apiKeysApi.delete(keyItem.id)
-    ElMessage.success('密钥已删除')
+    ElMessage.success(t('apiKeys.deletedSuccess'))
     await loadKeys()
   } catch (error) {
     if (error !== 'cancel') {
-      ElMessage.error(error.response?.data?.message || '删除失败')
+      ElMessage.error(error.response?.data?.message || t('common.operationFailed'))
     }
   }
 }

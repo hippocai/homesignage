@@ -4,7 +4,7 @@
       <div class="login-header">
         <el-icon size="40" color="#409EFF"><Monitor /></el-icon>
         <h1 class="login-title">HomeSignage</h1>
-        <p class="login-subtitle">智能家庭信息展示系统</p>
+        <p class="login-subtitle">{{ $t('login.subtitle') }}</p>
       </div>
 
       <el-form
@@ -17,7 +17,7 @@
         <el-form-item prop="username">
           <el-input
             v-model="form.username"
-            placeholder="用户名"
+            :placeholder="$t('login.usernamePlaceholder')"
             size="large"
             :prefix-icon="User"
             autocomplete="username"
@@ -27,7 +27,7 @@
           <el-input
             v-model="form.password"
             type="password"
-            placeholder="密码"
+            :placeholder="$t('login.passwordPlaceholder')"
             size="large"
             :prefix-icon="Lock"
             show-password
@@ -42,7 +42,7 @@
             :loading="loading"
             @click="handleLogin"
           >
-            登录
+            {{ $t('login.loginBtn') }}
           </el-button>
         </el-form-item>
       </el-form>
@@ -60,12 +60,14 @@
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue'
+import { ref, reactive, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { User, Lock } from '@element-plus/icons-vue'
 import { useAuthStore } from '../stores/auth.js'
+import { useI18n } from 'vue-i18n'
 
+const { t } = useI18n()
 const router = useRouter()
 const authStore = useAuthStore()
 
@@ -78,10 +80,10 @@ const form = reactive({
   password: ''
 })
 
-const rules = {
-  username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
-  password: [{ required: true, message: '请输入密码', trigger: 'blur' }]
-}
+const rules = computed(() => ({
+  username: [{ required: true, message: t('login.usernameRequired'), trigger: 'blur' }],
+  password: [{ required: true, message: t('login.passwordRequired'), trigger: 'blur' }]
+}))
 
 async function handleLogin() {
   if (!formRef.value) return
@@ -92,10 +94,10 @@ async function handleLogin() {
   errorMessage.value = ''
   try {
     await authStore.login(form.username, form.password)
-    ElMessage.success('登录成功')
+    ElMessage.success(t('login.loginSuccess'))
     router.push('/dashboard')
   } catch (error) {
-    const msg = error.response?.data?.message || error.response?.data?.error || '用户名或密码错误'
+    const msg = error.response?.data?.message || error.response?.data?.error || t('login.loginFailed')
     errorMessage.value = msg
   } finally {
     loading.value = false

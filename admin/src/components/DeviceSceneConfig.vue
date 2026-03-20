@@ -1,6 +1,6 @@
 <template>
   <div class="scene-config" v-loading="loading">
-    <p class="config-hint">选择要在此设备上显示的画面，并设置每个画面的显示时长（秒）</p>
+    <p class="config-hint">{{ $t('deviceSceneConfig.hint') }}</p>
 
     <div class="available-scenes">
       <div
@@ -17,7 +17,7 @@
           <span class="scene-name">{{ scene.name }}</span>
         </div>
         <div class="scene-item-right" v-if="isSelected(scene.id)">
-          <span class="duration-label">时长：</span>
+          <span class="duration-label">{{ $t('deviceSceneConfig.duration') }}</span>
           <el-input-number
             v-model="getSelectedItem(scene.id).duration"
             :min="5"
@@ -27,16 +27,16 @@
             size="small"
             style="width: 120px"
           />
-          <span class="duration-unit">秒</span>
+          <span class="duration-unit">{{ $t('deviceSceneConfig.durationUnit') }}</span>
         </div>
       </div>
 
-      <el-empty v-if="allScenes.length === 0" description="暂无画面，请先创建画面" />
+      <el-empty v-if="allScenes.length === 0" :description="$t('deviceSceneConfig.noScenes')" />
     </div>
 
     <!-- Selected scenes order -->
     <div v-if="selectedScenes.length > 0" class="selected-order">
-      <el-divider content-position="left">显示顺序</el-divider>
+      <el-divider content-position="left">{{ $t('deviceSceneConfig.displayOrder') }}</el-divider>
       <div class="order-list">
         <div
           v-for="(item, index) in selectedScenes"
@@ -45,7 +45,7 @@
         >
           <span class="order-num">{{ index + 1 }}</span>
           <span class="order-name">{{ getSceneName(item.scene_id) }}</span>
-          <span class="order-duration">{{ item.duration }}秒</span>
+          <span class="order-duration">{{ item.duration }}{{ $t('deviceSceneConfig.durationUnit') }}</span>
           <div class="order-actions">
             <el-button
               :icon="ArrowUp"
@@ -67,9 +67,9 @@
     </div>
 
     <div class="config-footer">
-      <el-button @click="$emit('saved')">取消</el-button>
+      <el-button @click="$emit('saved')">{{ $t('common.cancel') }}</el-button>
       <el-button type="primary" :loading="saving" @click="saveConfig">
-        保存配置
+        {{ $t('common.save') }}
       </el-button>
     </div>
   </div>
@@ -80,6 +80,9 @@ import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { ArrowUp, ArrowDown } from '@element-plus/icons-vue'
 import { devicesApi, scenesApi } from '../api/index.js'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 const props = defineProps({
   deviceId: {
@@ -105,7 +108,7 @@ function getSelectedItem(sceneId) {
 
 function getSceneName(sceneId) {
   const scene = allScenes.value.find(s => s.id === sceneId)
-  return scene ? scene.name : `画面 #${sceneId}`
+  return scene ? scene.name : t('deviceSceneConfig.sceneLabel', { id: sceneId })
 }
 
 function toggleScene(sceneId, selected) {
@@ -138,10 +141,10 @@ async function saveConfig() {
   saving.value = true
   try {
     await devicesApi.setScenes(props.deviceId, scenes)
-    ElMessage.success('画面配置已保存')
+    ElMessage.success(t('deviceSceneConfig.savedSuccess'))
     emit('saved')
   } catch (error) {
-    ElMessage.error(error.response?.data?.message || '保存失败')
+    ElMessage.error(error.response?.data?.message || t('common.saveFailed'))
   } finally {
     saving.value = false
   }

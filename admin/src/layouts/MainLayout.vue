@@ -16,39 +16,39 @@
       >
         <el-menu-item index="/dashboard">
           <el-icon><DataAnalysis /></el-icon>
-          <span>仪表盘</span>
+          <span>{{ $t('nav.dashboard') }}</span>
         </el-menu-item>
         <el-menu-item index="/devices">
           <el-icon><Monitor /></el-icon>
-          <span>设备管理</span>
+          <span>{{ $t('nav.devices') }}</span>
         </el-menu-item>
         <el-menu-item index="/scenes">
           <el-icon><Picture /></el-icon>
-          <span>画面管理</span>
+          <span>{{ $t('nav.scenes') }}</span>
         </el-menu-item>
         <el-menu-item index="/reminders">
           <el-icon><AlarmClock /></el-icon>
-          <span>定时提示</span>
+          <span>{{ $t('nav.reminders') }}</span>
         </el-menu-item>
         <el-menu-item index="/emergency">
           <el-icon><Warning /></el-icon>
-          <span>紧急提示</span>
+          <span>{{ $t('nav.emergency') }}</span>
         </el-menu-item>
         <el-menu-item index="/info-items">
           <el-icon><List /></el-icon>
-          <span>信息列表</span>
+          <span>{{ $t('nav.infoItems') }}</span>
         </el-menu-item>
         <el-menu-item index="/file-repo">
           <el-icon><FolderOpened /></el-icon>
-          <span>文件仓库</span>
+          <span>{{ $t('nav.fileRepo') }}</span>
         </el-menu-item>
         <el-menu-item index="/api-keys">
           <el-icon><Key /></el-icon>
-          <span>API密钥</span>
+          <span>{{ $t('nav.apiKeys') }}</span>
         </el-menu-item>
         <el-menu-item index="/settings">
           <el-icon><Setting /></el-icon>
-          <span>系统设置</span>
+          <span>{{ $t('nav.settings') }}</span>
         </el-menu-item>
       </el-menu>
     </el-aside>
@@ -58,22 +58,27 @@
       <!-- Header -->
       <el-header class="main-header">
         <div class="header-left">
-          <span class="header-title">HomeSignage 管理后台</span>
+          <span class="header-title">{{ $t('header.title') }}</span>
         </div>
         <div class="header-right">
+          <el-button
+            size="small"
+            class="lang-toggle"
+            @click="toggleLocale"
+          >{{ locale === 'zh' ? 'EN' : '中文' }}</el-button>
           <el-dropdown @command="handleCommand">
             <span class="user-info">
               <el-icon><UserFilled /></el-icon>
-              <span class="username">{{ authStore.user?.username || '管理员' }}</span>
+              <span class="username">{{ authStore.user?.username || $t('header.admin') }}</span>
               <el-icon class="el-icon--right"><ArrowDown /></el-icon>
             </span>
             <template #dropdown>
               <el-dropdown-menu>
                 <el-dropdown-item command="settings">
-                  <el-icon><Setting /></el-icon>系统设置
+                  <el-icon><Setting /></el-icon>{{ $t('header.settings') }}
                 </el-dropdown-item>
                 <el-dropdown-item command="logout" divided>
-                  <el-icon><SwitchButton /></el-icon>退出登录
+                  <el-icon><SwitchButton /></el-icon>{{ $t('header.logout') }}
                 </el-dropdown-item>
               </el-dropdown-menu>
             </template>
@@ -95,24 +100,32 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth.js'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { List, FolderOpened } from '@element-plus/icons-vue'
+import { useI18n } from 'vue-i18n'
 
+const { t, locale } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
 
 const activeMenu = computed(() => route.path)
 
+function toggleLocale() {
+  const next = locale.value === 'zh' ? 'en' : 'zh'
+  locale.value = next
+  localStorage.setItem('hs_locale', next)
+}
+
 async function handleCommand(command) {
   if (command === 'logout') {
     try {
-      await ElMessageBox.confirm('确定要退出登录吗？', '提示', {
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
+      await ElMessageBox.confirm(t('header.logoutConfirm'), t('header.logoutHint'), {
+        confirmButtonText: t('header.logoutConfirmBtn'),
+        cancelButtonText: t('common.cancel'),
         type: 'warning'
       })
       authStore.logout()
       router.push('/login')
-      ElMessage.success('已退出登录')
+      ElMessage.success(t('header.logoutSuccess'))
     } catch {
       // cancelled
     }
@@ -199,6 +212,13 @@ async function handleCommand(command) {
 .header-right {
   display: flex;
   align-items: center;
+  gap: 12px;
+}
+
+.lang-toggle {
+  font-size: 13px;
+  padding: 4px 10px;
+  height: 28px;
 }
 
 .user-info {

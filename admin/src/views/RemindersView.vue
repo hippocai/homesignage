@@ -1,41 +1,41 @@
 <template>
   <div class="reminders-page">
     <div class="page-header">
-      <h2 class="page-title">定时提示</h2>
-      <el-button type="primary" :icon="Plus" @click="openCreateDialog">创建提示</el-button>
+      <h2 class="page-title">{{ $t('reminder.title') }}</h2>
+      <el-button type="primary" :icon="Plus" @click="openCreateDialog">{{ $t('reminder.createReminder') }}</el-button>
     </div>
 
     <el-card shadow="never">
       <el-table :data="reminders" v-loading="loading" stripe size="default">
-        <el-table-column prop="name" label="名称" min-width="140" />
-        <el-table-column label="开始时间" width="170">
+        <el-table-column prop="name" :label="$t('reminder.name')" min-width="140" />
+        <el-table-column :label="$t('reminder.startTime')" width="170">
           <template #default="{ row }">
             {{ formatDateTime(row, 'start_time') }}
           </template>
         </el-table-column>
-        <el-table-column label="结束时间" width="100">
+        <el-table-column :label="$t('reminder.endTime')" width="100">
           <template #default="{ row }">
             {{ formatDateTime(row, 'end_time') }}
           </template>
         </el-table-column>
-        <el-table-column label="重复" width="100">
+        <el-table-column :label="$t('reminder.repeat')" width="100">
           <template #default="{ row }">
             <el-tag size="small" :type="getRepeatType(row.repeat_rule)">
               {{ getRepeatLabel(row.repeat_rule) }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="优先级" width="80">
+        <el-table-column :label="$t('reminder.priority')" width="80">
           <template #default="{ row }">
             <el-tag size="small" type="warning">{{ row.priority || 5 }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="样式" width="120">
+        <el-table-column :label="$t('reminder.style')" width="120">
           <template #default="{ row }">
             <span class="text-muted">{{ getStyleLabel(row.content?.style) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="启用" width="80">
+        <el-table-column :label="$t('reminder.enabled')" width="80">
           <template #default="{ row }">
             <el-switch
               v-model="row.enabled"
@@ -43,11 +43,11 @@
             />
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="130" fixed="right">
+        <el-table-column :label="$t('common.actions')" width="130" fixed="right">
           <template #default="{ row }">
-            <el-button size="small" :icon="Edit" @click="openEditDialog(row)">编辑</el-button>
+            <el-button size="small" :icon="Edit" @click="openEditDialog(row)">{{ $t('common.edit') }}</el-button>
             <el-button size="small" type="danger" :icon="Delete" @click="handleDelete(row)">
-              删除
+              {{ $t('common.delete') }}
             </el-button>
           </template>
         </el-table-column>
@@ -57,7 +57,7 @@
     <!-- Create/Edit Reminder Drawer -->
     <el-drawer
       v-model="drawerVisible"
-      :title="editingReminder ? '编辑提示' : '创建提示'"
+      :title="editingReminder ? $t('reminder.editReminder') : $t('reminder.createReminder')"
       size="520px"
       @closed="resetForm"
     >
@@ -68,15 +68,15 @@
         label-width="100px"
         class="reminder-form"
       >
-        <el-form-item label="名称" prop="name">
-          <el-input v-model="form.name" placeholder="提示名称" />
+        <el-form-item :label="$t('reminder.name')" prop="name">
+          <el-input v-model="form.name" :placeholder="$t('reminder.namePlaceholder')" />
         </el-form-item>
 
-        <el-form-item label="目标设备" prop="device_ids">
+        <el-form-item :label="$t('reminder.targetDevices')" prop="device_ids">
           <el-select
             v-model="form.device_ids"
             multiple
-            placeholder="选择目标设备（留空=全部）"
+            :placeholder="$t('reminder.targetDevicesPlaceholder')"
             class="full-width"
           >
             <el-option
@@ -88,68 +88,68 @@
           </el-select>
         </el-form-item>
 
-        <el-form-item v-if="form.repeat_rule === 'none'" label="日期" prop="start_date">
+        <el-form-item v-if="form.repeat_rule === 'none'" :label="$t('reminder.date')" prop="start_date">
           <el-date-picker
             v-model="form.start_date"
             type="date"
-            placeholder="选择日期"
+            :placeholder="$t('reminder.datePlaceholder')"
             format="YYYY-MM-DD"
             value-format="YYYY-MM-DD"
             class="full-width"
           />
         </el-form-item>
 
-        <el-form-item label="开始时间" prop="start_time">
+        <el-form-item :label="$t('reminder.startTime')" prop="start_time">
           <el-time-picker
             v-model="form.start_time"
-            placeholder="选择开始时间"
+            :placeholder="$t('reminder.startTimePlaceholder')"
             format="HH:mm"
             value-format="HH:mm"
             class="full-width"
           />
         </el-form-item>
 
-        <el-form-item label="结束时间" prop="end_time">
+        <el-form-item :label="$t('reminder.endTime')" prop="end_time">
           <el-time-picker
             v-model="form.end_time"
-            placeholder="选择结束时间"
+            :placeholder="$t('reminder.endTimePlaceholder')"
             format="HH:mm"
             value-format="HH:mm"
             class="full-width"
           />
         </el-form-item>
 
-        <el-form-item label="重复规则">
+        <el-form-item :label="$t('reminder.repeatRule')">
           <el-select v-model="form.repeat_rule" class="full-width">
-            <el-option label="不重复" value="none" />
-            <el-option label="每天" value="daily" />
-            <el-option label="工作日" value="weekday" />
-            <el-option label="周末" value="weekend" />
+            <el-option :label="$t('reminder.repeatNone')" value="none" />
+            <el-option :label="$t('reminder.repeatDaily')" value="daily" />
+            <el-option :label="$t('reminder.repeatWeekday')" value="weekday" />
+            <el-option :label="$t('reminder.repeatWeekend')" value="weekend" />
           </el-select>
         </el-form-item>
 
-        <el-divider content-position="left">内容设置</el-divider>
+        <el-divider content-position="left">{{ $t('reminder.contentSection') }}</el-divider>
 
-        <el-form-item label="提示内容" prop="content">
+        <el-form-item :label="$t('reminder.content')" prop="content">
           <el-input
             v-model="form.content"
             type="textarea"
             :rows="3"
-            placeholder="输入提示文字"
+            :placeholder="$t('reminder.contentPlaceholder')"
           />
         </el-form-item>
 
-        <el-form-item label="显示样式">
+        <el-form-item :label="$t('reminder.displayStyle')">
           <el-select v-model="form.content_style" class="full-width">
-            <el-option label="闪烁" value="blink" />
-            <el-option label="高亮" value="highlight" />
-            <el-option label="顶部横幅" value="bar-top" />
-            <el-option label="底部横幅" value="bar-bottom" />
-            <el-option label="居中全屏" value="center" />
+            <el-option :label="$t('reminder.styleBlink')" value="blink" />
+            <el-option :label="$t('reminder.styleHighlight')" value="highlight" />
+            <el-option :label="$t('reminder.styleBarTop')" value="bar-top" />
+            <el-option :label="$t('reminder.styleBarBottom')" value="bar-bottom" />
+            <el-option :label="$t('reminder.styleCenter')" value="center" />
           </el-select>
         </el-form-item>
 
-        <el-form-item label="字体大小">
+        <el-form-item :label="$t('reminder.fontSize')">
           <el-input-number
             v-model="form.font_size"
             :min="12"
@@ -159,17 +159,17 @@
           <span class="unit-label">px</span>
         </el-form-item>
 
-        <el-form-item label="文字颜色">
+        <el-form-item :label="$t('reminder.textColor')">
           <el-color-picker v-model="form.text_color" />
           <span class="color-value">{{ form.text_color }}</span>
         </el-form-item>
 
-        <el-form-item label="背景颜色">
+        <el-form-item :label="$t('reminder.bgColor')">
           <el-color-picker v-model="form.background_color" show-alpha />
           <span class="color-value">{{ form.background_color }}</span>
         </el-form-item>
 
-        <el-form-item label="优先级">
+        <el-form-item :label="$t('reminder.priority')">
           <el-slider
             v-model="form.priority"
             :min="1"
@@ -180,25 +180,25 @@
           />
         </el-form-item>
 
-        <el-divider content-position="left">声音设置</el-divider>
+        <el-divider content-position="left">{{ $t('reminder.soundSection') }}</el-divider>
 
-        <el-form-item label="启用声音">
+        <el-form-item :label="$t('reminder.soundEnabled')">
           <el-switch v-model="form.sound_enabled" />
         </el-form-item>
 
-        <el-form-item label="声音文件" v-if="form.sound_enabled">
+        <el-form-item :label="$t('reminder.soundFile')" v-if="form.sound_enabled">
           <div class="url-with-picker">
-            <el-input v-model="form.sound_url" placeholder="声音文件URL" />
-            <el-button :icon="FolderOpened" @click="soundPickerVisible = true">从仓库选择</el-button>
+            <el-input v-model="form.sound_url" :placeholder="$t('reminder.soundUrlPlaceholder')" />
+            <el-button :icon="FolderOpened" @click="soundPickerVisible = true">{{ $t('common.selectFromRepo') }}</el-button>
           </div>
         </el-form-item>
       </el-form>
 
       <template #footer>
         <div class="drawer-footer">
-          <el-button @click="drawerVisible = false">取消</el-button>
+          <el-button @click="drawerVisible = false">{{ $t('common.cancel') }}</el-button>
           <el-button type="primary" :loading="saving" @click="saveReminder">
-            {{ editingReminder ? '保存修改' : '创建提示' }}
+            {{ editingReminder ? $t('reminder.saveChanges') : $t('reminder.createReminder') }}
           </el-button>
         </div>
       </template>
@@ -209,11 +209,14 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Edit, Delete, FolderOpened } from '@element-plus/icons-vue'
 import FilePicker from '../components/FilePicker.vue'
 import { remindersApi, devicesApi } from '../api/index.js'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 const loading = ref(false)
 const saving = ref(false)
@@ -241,15 +244,19 @@ const form = reactive({
   sound_url: ''
 })
 
-const rules = {
-  name: [{ required: true, message: '请输入提示名称', trigger: 'blur' }],
-  content: [{ required: true, message: '请输入提示内容', trigger: 'blur' }],
-  start_date: [{ required: true, message: '请选择日期', trigger: 'change' }],
-  start_time: [{ required: true, message: '请选择开始时间', trigger: 'change' }],
-  end_time: [{ required: true, message: '请选择结束时间', trigger: 'change' }]
-}
+const rules = computed(() => ({
+  name: [{ required: true, message: t('reminder.nameRequired'), trigger: 'blur' }],
+  content: [{ required: true, message: t('reminder.contentRequired'), trigger: 'blur' }],
+  start_date: [{ required: true, message: t('reminder.dateRequired'), trigger: 'change' }],
+  start_time: [{ required: true, message: t('reminder.startTimeRequired'), trigger: 'change' }],
+  end_time: [{ required: true, message: t('reminder.endTimeRequired'), trigger: 'change' }]
+}))
 
-const priorityMarks = { 1: '低', 5: '中', 10: '高' }
+const priorityMarks = computed(() => ({
+  1: t('reminder.priorityLow'),
+  5: t('reminder.priorityMid'),
+  10: t('reminder.priorityHigh')
+}))
 
 function formatDateTime(row, field) {
   const time = row[field]
@@ -261,8 +268,13 @@ function formatDateTime(row, field) {
 }
 
 function getRepeatLabel(rule) {
-  const map = { none: '不重复', daily: '每天', weekday: '工作日', weekend: '周末' }
-  return map[rule] || rule || '不重复'
+  const map = {
+    none: t('reminder.repeatNone'),
+    daily: t('reminder.repeatDaily'),
+    weekday: t('reminder.repeatWeekday'),
+    weekend: t('reminder.repeatWeekend')
+  }
+  return map[rule] || rule || t('reminder.repeatNone')
 }
 
 function getRepeatType(rule) {
@@ -271,13 +283,13 @@ function getRepeatType(rule) {
 
 function getStyleLabel(style) {
   const map = {
-    blink: '闪烁',
-    highlight: '高亮',
-    'bar-top': '顶部横幅',
-    'bar-bottom': '底部横幅',
-    center: '居中全屏'
+    blink: t('reminder.styleBlink'),
+    highlight: t('reminder.styleHighlight'),
+    'bar-top': t('reminder.styleBarTop'),
+    'bar-bottom': t('reminder.styleBarBottom'),
+    center: t('reminder.styleCenter')
   }
-  return map[style] || style || '底部横幅'
+  return map[style] || style || t('reminder.styleBarBottom')
 }
 
 function openCreateDialog() {
@@ -356,15 +368,15 @@ async function saveReminder() {
 
     if (editingReminder.value) {
       await remindersApi.updateTimed(editingReminder.value.id, data)
-      ElMessage.success('提示已更新')
+      ElMessage.success(t('reminder.updatedSuccess'))
     } else {
       await remindersApi.createTimed(data)
-      ElMessage.success('提示已创建')
+      ElMessage.success(t('reminder.createdSuccess'))
     }
     drawerVisible.value = false
     await loadReminders()
   } catch (error) {
-    ElMessage.error(error.response?.data?.message || '保存失败')
+    ElMessage.error(error.response?.data?.message || t('common.saveFailed'))
   } finally {
     saving.value = false
   }
@@ -373,26 +385,30 @@ async function saveReminder() {
 async function toggleEnabled(reminder) {
   try {
     await remindersApi.updateTimed(reminder.id, { enabled: reminder.enabled })
-    ElMessage.success(reminder.enabled ? '已启用' : '已禁用')
+    ElMessage.success(reminder.enabled ? t('reminder.enabledSuccess') : t('reminder.disabledSuccess'))
   } catch (error) {
     reminder.enabled = !reminder.enabled // revert
-    ElMessage.error('操作失败')
+    ElMessage.error(t('common.operationFailed'))
   }
 }
 
 async function handleDelete(reminder) {
   try {
-    await ElMessageBox.confirm(`确定删除提示 "${reminder.name}" 吗？`, '确认删除', {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
-      type: 'warning'
-    })
+    await ElMessageBox.confirm(
+      t('reminder.deleteConfirm', { name: reminder.name }),
+      t('common.confirmDelete'),
+      {
+        confirmButtonText: t('common.confirm'),
+        cancelButtonText: t('common.cancel'),
+        type: 'warning'
+      }
+    )
     await remindersApi.deleteTimed(reminder.id)
-    ElMessage.success('已删除')
+    ElMessage.success(t('reminder.deletedSuccess'))
     await loadReminders()
   } catch (error) {
     if (error !== 'cancel') {
-      ElMessage.error(error.response?.data?.message || '删除失败')
+      ElMessage.error(error.response?.data?.message || t('common.operationFailed'))
     }
   }
 }

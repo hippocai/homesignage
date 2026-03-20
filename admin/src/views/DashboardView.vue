@@ -1,8 +1,8 @@
 <template>
   <div class="dashboard">
     <div class="page-header">
-      <h2 class="page-title">仪表盘</h2>
-      <el-button :icon="Refresh" @click="loadData" :loading="loading">刷新</el-button>
+      <h2 class="page-title">{{ $t('dashboard.title') }}</h2>
+      <el-button :icon="Refresh" @click="loadData" :loading="loading">{{ $t('common.refresh') }}</el-button>
     </div>
 
     <!-- Stats cards -->
@@ -15,7 +15,7 @@
             </div>
             <div class="stat-info">
               <div class="stat-value">{{ onlineCount }}</div>
-              <div class="stat-label">在线设备</div>
+              <div class="stat-label">{{ $t('dashboard.onlineDevices') }}</div>
             </div>
           </div>
         </el-card>
@@ -28,7 +28,7 @@
             </div>
             <div class="stat-info">
               <div class="stat-value">{{ totalDevices }}</div>
-              <div class="stat-label">设备总数</div>
+              <div class="stat-label">{{ $t('dashboard.totalDevices') }}</div>
             </div>
           </div>
         </el-card>
@@ -41,7 +41,7 @@
             </div>
             <div class="stat-info">
               <div class="stat-value">{{ activeReminders }}</div>
-              <div class="stat-label">活跃提示</div>
+              <div class="stat-label">{{ $t('dashboard.activeReminders') }}</div>
             </div>
           </div>
         </el-card>
@@ -54,7 +54,7 @@
             </div>
             <div class="stat-info">
               <div class="stat-value">{{ uptime }}</div>
-              <div class="stat-label">系统运行时间</div>
+              <div class="stat-label">{{ $t('dashboard.uptime') }}</div>
             </div>
           </div>
         </el-card>
@@ -67,35 +67,35 @@
         <el-card shadow="hover">
           <template #header>
             <div class="card-header">
-              <span class="card-title">设备状态</span>
-              <el-tag type="info" size="small">实时</el-tag>
+              <span class="card-title">{{ $t('dashboard.deviceStatus') }}</span>
+              <el-tag type="info" size="small">{{ $t('common.realtime') }}</el-tag>
             </div>
           </template>
           <el-table :data="devices" v-loading="loading" size="default" stripe>
-            <el-table-column prop="name" label="设备名称" min-width="140">
+            <el-table-column prop="name" :label="$t('dashboard.deviceName')" min-width="140">
               <template #default="{ row }">
                 <span class="device-name">{{ row.name }}</span>
               </template>
             </el-table-column>
-            <el-table-column prop="group_name" label="分组" width="120">
+            <el-table-column prop="group_name" :label="$t('dashboard.group')" width="120">
               <template #default="{ row }">
                 <el-tag v-if="row.group_name" size="small" type="info">{{ row.group_name }}</el-tag>
                 <span v-else class="text-muted">—</span>
               </template>
             </el-table-column>
-            <el-table-column label="状态" width="100">
+            <el-table-column :label="$t('common.status')" width="100">
               <template #default="{ row }">
                 <el-tag :type="isOnline(row) ? 'success' : 'danger'" size="small">
-                  {{ isOnline(row) ? '在线' : '离线' }}
+                  {{ isOnline(row) ? $t('common.online') : $t('common.offline') }}
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column prop="ip_address" label="IP地址" width="140">
+            <el-table-column prop="ip_address" :label="$t('dashboard.ipAddress')" width="140">
               <template #default="{ row }">
                 <span class="text-mono">{{ row.ip_address || '—' }}</span>
               </template>
             </el-table-column>
-            <el-table-column label="最后活跃" min-width="160">
+            <el-table-column :label="$t('dashboard.lastSeen')" min-width="160">
               <template #default="{ row }">
                 <span class="text-muted">{{ formatTime(row.last_seen) }}</span>
               </template>
@@ -108,35 +108,35 @@
         <el-card shadow="hover" class="system-info-card">
           <template #header>
             <div class="card-header">
-              <span class="card-title">系统信息</span>
+              <span class="card-title">{{ $t('dashboard.systemInfo') }}</span>
             </div>
           </template>
           <div class="system-info" v-loading="systemLoading">
             <div class="info-item">
-              <span class="info-label">Node.js 版本</span>
+              <span class="info-label">{{ $t('dashboard.nodeVersion') }}</span>
               <span class="info-value">{{ systemStatus.node_version || '—' }}</span>
             </div>
             <div class="info-item">
-              <span class="info-label">平台</span>
+              <span class="info-label">{{ $t('dashboard.platform') }}</span>
               <span class="info-value">{{ systemStatus.platform || '—' }}</span>
             </div>
             <div class="info-item">
-              <span class="info-label">连接设备数</span>
+              <span class="info-label">{{ $t('dashboard.connectedDevices') }}</span>
               <span class="info-value">{{ systemStatus.connected_device_count ?? '—' }}</span>
             </div>
             <div class="info-item">
-              <span class="info-label">内存使用</span>
+              <span class="info-label">{{ $t('dashboard.memoryUsage') }}</span>
               <span class="info-value">{{ formatMemory(systemStatus.memory) }}</span>
             </div>
             <div class="info-item">
-              <span class="info-label">系统版本</span>
+              <span class="info-label">{{ $t('dashboard.systemVersion') }}</span>
               <span class="info-value">1.0.0</span>
             </div>
             <el-divider />
             <div class="info-item">
-              <span class="info-label">紧急警报</span>
+              <span class="info-label">{{ $t('dashboard.emergencyAlert') }}</span>
               <el-tag :type="activeEmergency ? 'danger' : 'success'" size="small">
-                {{ activeEmergency ? '有活跃警报' : '无警报' }}
+                {{ activeEmergency ? $t('dashboard.activeAlert') : $t('dashboard.noAlert') }}
               </el-tag>
             </div>
           </div>
@@ -144,20 +144,20 @@
 
         <el-card shadow="hover" class="quick-actions-card" style="margin-top: 20px;">
           <template #header>
-            <span class="card-title">快捷操作</span>
+            <span class="card-title">{{ $t('dashboard.quickActions') }}</span>
           </template>
           <div class="quick-actions">
             <el-button type="primary" plain class="action-btn" @click="$router.push('/devices')">
-              <el-icon><Monitor /></el-icon> 管理设备
+              <el-icon><Monitor /></el-icon> {{ $t('dashboard.manageDevices') }}
             </el-button>
             <el-button type="warning" plain class="action-btn" @click="$router.push('/emergency')">
-              <el-icon><Warning /></el-icon> 紧急提示
+              <el-icon><Warning /></el-icon> {{ $t('dashboard.emergencyNotice') }}
             </el-button>
             <el-button type="success" plain class="action-btn" @click="$router.push('/scenes')">
-              <el-icon><Picture /></el-icon> 画面管理
+              <el-icon><Picture /></el-icon> {{ $t('dashboard.manageScenes') }}
             </el-button>
             <el-button type="info" plain class="action-btn" @click="$router.push('/reminders')">
-              <el-icon><AlarmClock /></el-icon> 定时提示
+              <el-icon><AlarmClock /></el-icon> {{ $t('dashboard.timedReminders') }}
             </el-button>
           </div>
         </el-card>
@@ -170,6 +170,9 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { Refresh } from '@element-plus/icons-vue'
 import { devicesApi, systemApi, remindersApi } from '../api/index.js'
+import { useI18n } from 'vue-i18n'
+
+const { t, locale } = useI18n()
 
 const loading = ref(false)
 const systemLoading = ref(false)
@@ -188,9 +191,9 @@ const uptime = computed(() => {
   const days = Math.floor(seconds / 86400)
   const hours = Math.floor((seconds % 86400) / 3600)
   const minutes = Math.floor((seconds % 3600) / 60)
-  if (days > 0) return `${days}天${hours}小时`
-  if (hours > 0) return `${hours}小时${minutes}分钟`
-  return `${minutes}分钟`
+  if (days > 0) return locale.value === 'en' ? `${days}d ${hours}h` : `${days}天${hours}小时`
+  if (hours > 0) return locale.value === 'en' ? `${hours}h ${minutes}m` : `${hours}小时${minutes}分钟`
+  return locale.value === 'en' ? `${minutes}m` : `${minutes}分钟`
 })
 
 function isOnline(device) {
@@ -201,14 +204,14 @@ function isOnline(device) {
 }
 
 function formatTime(time) {
-  if (!time) return '从未'
+  if (!time) return t('common.never')
   const date = new Date(time)
   const now = new Date()
   const diff = now - date
-  if (diff < 60000) return '刚刚'
-  if (diff < 3600000) return `${Math.floor(diff / 60000)}分钟前`
-  if (diff < 86400000) return `${Math.floor(diff / 3600000)}小时前`
-  return date.toLocaleDateString('zh-CN')
+  if (diff < 60000) return t('common.justNow')
+  if (diff < 3600000) return locale.value === 'en' ? `${Math.floor(diff / 60000)}m ago` : `${Math.floor(diff / 60000)}分钟前`
+  if (diff < 86400000) return locale.value === 'en' ? `${Math.floor(diff / 3600000)}h ago` : `${Math.floor(diff / 3600000)}小时前`
+  return date.toLocaleDateString(locale.value === 'en' ? 'en-US' : 'zh-CN')
 }
 
 function formatMemory(mem) {

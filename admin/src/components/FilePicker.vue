@@ -2,17 +2,17 @@
   <el-dialog
     :model-value="modelValue"
     @update:model-value="$emit('update:modelValue', $event)"
-    title="从文件仓库选择"
+    :title="$t('filePicker.title')"
     width="680px"
     @open="loadFiles"
   >
     <div v-loading="loading">
       <div class="filter-bar">
         <el-radio-group v-model="filterType" size="small" @change="loadFiles">
-          <el-radio-button value="">全部</el-radio-button>
-          <el-radio-button value="image">图片</el-radio-button>
-          <el-radio-button value="audio">音频</el-radio-button>
-          <el-radio-button value="video">视频</el-radio-button>
+          <el-radio-button value="">{{ $t('filePicker.filterAll') }}</el-radio-button>
+          <el-radio-button value="image">{{ $t('filePicker.filterImage') }}</el-radio-button>
+          <el-radio-button value="audio">{{ $t('filePicker.filterAudio') }}</el-radio-button>
+          <el-radio-button value="video">{{ $t('filePicker.filterVideo') }}</el-radio-button>
         </el-radio-group>
       </div>
       <div class="file-grid" v-if="files.length > 0">
@@ -32,10 +32,10 @@
           <el-tag size="small" class="file-type-tag">{{ file.type }}</el-tag>
         </div>
       </div>
-      <el-empty v-else-if="!loading" description="文件仓库中暂无文件" />
+      <el-empty v-else-if="!loading" :description="$t('filePicker.noFiles')" />
     </div>
     <template #footer>
-      <el-button @click="$emit('update:modelValue', false)">取消</el-button>
+      <el-button @click="$emit('update:modelValue', false)">{{ $t('common.cancel') }}</el-button>
     </template>
   </el-dialog>
 </template>

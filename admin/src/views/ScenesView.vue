@@ -1,8 +1,8 @@
 <template>
   <div class="scenes-page">
     <div class="page-header">
-      <h2 class="page-title">画面管理</h2>
-      <el-button type="primary" :icon="Plus" @click="openCreateDialog">新建画面</el-button>
+      <h2 class="page-title">{{ $t('scene.title') }}</h2>
+      <el-button type="primary" :icon="Plus" @click="openCreateDialog">{{ $t('scene.createScene') }}</el-button>
     </div>
 
     <div v-loading="loading">
@@ -26,7 +26,7 @@
               <div class="scene-meta">
                 <span class="meta-item">
                   <el-icon><Grid /></el-icon>
-                  {{ scene.component_count || 0 }} 个组件
+                  {{ $t('scene.components', { n: scene.component_count || 0 }) }}
                 </span>
                 <span class="meta-item">
                   <el-icon><Calendar /></el-icon>
@@ -41,7 +41,7 @@
                 :icon="Edit"
                 @click="editScene(scene)"
               >
-                编辑
+                {{ $t('common.edit') }}
               </el-button>
               <el-button
                 size="small"
@@ -49,20 +49,20 @@
                 :icon="Delete"
                 @click="deleteScene(scene)"
               >
-                删除
+                {{ $t('common.delete') }}
               </el-button>
             </div>
           </el-card>
         </el-col>
       </el-row>
 
-      <el-empty v-else description="暂无画面，点击「新建画面」开始创建" />
+      <el-empty v-else :description="$t('scene.emptyHint')" />
     </div>
 
     <!-- Create Scene Dialog -->
     <el-dialog
       v-model="createDialogVisible"
-      title="新建画面"
+      :title="$t('scene.createScene')"
       width="480px"
       @closed="resetForm"
     >
@@ -72,33 +72,35 @@
         :rules="rules"
         label-width="80px"
       >
-        <el-form-item label="画面名称" prop="name">
-          <el-input v-model="form.name" placeholder="请输入画面名称" />
+        <el-form-item :label="$t('scene.sceneName')" prop="name">
+          <el-input v-model="form.name" :placeholder="$t('scene.sceneNamePlaceholder')" />
         </el-form-item>
-        <el-form-item label="描述" prop="description">
+        <el-form-item :label="$t('scene.description')" prop="description">
           <el-input
             v-model="form.description"
             type="textarea"
             :rows="3"
-            placeholder="可选描述"
+            :placeholder="$t('scene.descriptionPlaceholder')"
           />
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="createDialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="saving" @click="createScene">创建</el-button>
+        <el-button @click="createDialogVisible = false">{{ $t('common.cancel') }}</el-button>
+        <el-button type="primary" :loading="saving" @click="createScene">{{ $t('common.create') }}</el-button>
       </template>
     </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Edit, Delete, Grid, Calendar } from '@element-plus/icons-vue'
 import { scenesApi } from '../api/index.js'
+import { useI18n } from 'vue-i18n'
 
+const { t, locale } = useI18n()
 const router = useRouter()
 
 const loading = ref(false)
@@ -112,13 +114,13 @@ const form = reactive({
   description: ''
 })
 
-const rules = {
-  name: [{ required: true, message: '请输入画面名称', trigger: 'blur' }]
-}
+const rules = computed(() => ({
+  name: [{ required: true, message: t('scene.sceneNameRequired'), trigger: 'blur' }]
+}))
 
 function formatDate(date) {
   if (!date) return '—'
-  return new Date(date).toLocaleDateString('zh-CN')
+  return new Date(date).toLocaleDateString(locale.value === 'en' ? 'en-US' : 'zh-CN')
 }
 
 function openCreateDialog() {
@@ -148,10 +150,10 @@ async function createScene() {
     })
     const newScene = res.data.data
     createDialogVisible.value = false
-    ElMessage.success('画面已创建')
+    ElMessage.success(t('scene.createdSuccess'))
     router.push(`/scenes/${newScene.id}/edit`)
   } catch (error) {
-    ElMessage.error(error.response?.data?.message || '创建失败')
+    ElMessage.error(error.response?.data?.message || t('scene.createdFailed'))
   } finally {
     saving.value = false
   }
@@ -160,20 +162,20 @@ async function createScene() {
 async function deleteScene(scene) {
   try {
     await ElMessageBox.confirm(
-      `确定要删除画面 "${scene.name}" 吗？此操作不可恢复。`,
-      '确认删除',
+      t('scene.deleteConfirm', { name: scene.name }),
+      t('common.confirmDelete'),
       {
-        confirmButtonText: '确定删除',
-        cancelButtonText: '取消',
+        confirmButtonText: t('scene.confirmDeleteBtn'),
+        cancelButtonText: t('common.cancel'),
         type: 'warning'
       }
     )
     await scenesApi.delete(scene.id)
-    ElMessage.success('画面已删除')
+    ElMessage.success(t('scene.deletedSuccess'))
     await loadScenes()
   } catch (error) {
     if (error !== 'cancel') {
-      ElMessage.error(error.response?.data?.message || '删除失败')
+      ElMessage.error(error.response?.data?.message || t('common.operationFailed'))
     }
   }
 }

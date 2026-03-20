@@ -1,6 +1,6 @@
 <template>
   <div class="settings-page">
-    <h2 class="page-title">系统设置</h2>
+    <h2 class="page-title">{{ $t('settings.title') }}</h2>
 
     <el-row :gutter="24">
       <!-- Change password -->
@@ -9,7 +9,7 @@
           <template #header>
             <div class="card-header">
               <el-icon><Lock /></el-icon>
-              <span>修改管理员密码</span>
+              <span>{{ $t('settings.changePassword') }}</span>
             </div>
           </template>
           <el-form
@@ -18,35 +18,35 @@
             :rules="passwordRules"
             label-width="110px"
           >
-            <el-form-item label="当前密码" prop="currentPassword">
+            <el-form-item :label="$t('settings.currentPassword')" prop="currentPassword">
               <el-input
                 v-model="passwordForm.currentPassword"
                 type="password"
                 show-password
-                placeholder="请输入当前密码"
+                :placeholder="$t('settings.currentPasswordPlaceholder')"
               />
             </el-form-item>
-            <el-form-item label="新密码" prop="newPassword">
+            <el-form-item :label="$t('settings.newPassword')" prop="newPassword">
               <el-input
                 v-model="passwordForm.newPassword"
                 type="password"
                 show-password
-                placeholder="请输入新密码（至少6位）"
+                :placeholder="$t('settings.newPasswordPlaceholder')"
               />
             </el-form-item>
-            <el-form-item label="确认新密码" prop="confirmPassword">
+            <el-form-item :label="$t('settings.confirmPassword')" prop="confirmPassword">
               <el-input
                 v-model="passwordForm.confirmPassword"
                 type="password"
                 show-password
-                placeholder="再次输入新密码"
+                :placeholder="$t('settings.confirmPasswordPlaceholder')"
               />
             </el-form-item>
             <el-form-item>
               <el-button type="primary" :loading="changingPassword" @click="changePassword">
-                修改密码
+                {{ $t('settings.changePasswordBtn') }}
               </el-button>
-              <el-button @click="resetPasswordForm">重置</el-button>
+              <el-button @click="resetPasswordForm">{{ $t('settings.reset') }}</el-button>
             </el-form-item>
           </el-form>
         </el-card>
@@ -58,37 +58,37 @@
           <template #header>
             <div class="card-header">
               <el-icon><InfoFilled /></el-icon>
-              <span>系统信息</span>
+              <span>{{ $t('settings.systemInfo') }}</span>
             </div>
           </template>
           <div class="sys-info" v-loading="sysLoading">
             <div class="info-row">
-              <span class="info-label">Node.js 版本</span>
+              <span class="info-label">{{ $t('settings.nodeVersion') }}</span>
               <el-tag type="success" size="small">{{ systemInfo.node_version || '—' }}</el-tag>
             </div>
             <div class="info-row">
-              <span class="info-label">系统平台</span>
+              <span class="info-label">{{ $t('settings.platform') }}</span>
               <span class="info-value">{{ systemInfo.platform || '—' }}</span>
             </div>
             <div class="info-row">
-              <span class="info-label">系统运行时间</span>
+              <span class="info-label">{{ $t('settings.uptime') }}</span>
               <span class="info-value">{{ formatUptime(systemInfo.uptime) }}</span>
             </div>
             <div class="info-row">
-              <span class="info-label">内存使用</span>
+              <span class="info-label">{{ $t('settings.memoryUsage') }}</span>
               <span class="info-value">{{ formatMemory(systemInfo.memory) }}</span>
             </div>
             <div class="info-row">
-              <span class="info-label">在线设备</span>
-              <span class="info-value">{{ systemInfo.connected_device_count ?? '—' }} / {{ systemInfo.device_count ?? '—' }} 台</span>
+              <span class="info-label">{{ $t('settings.onlineDevices') }}</span>
+              <span class="info-value">{{ $t('settings.onlineDevicesValue', { connected: systemInfo.connected_device_count ?? '—', total: systemInfo.device_count ?? '—' }) }}</span>
             </div>
             <div class="info-row">
-              <span class="info-label">进程 PID</span>
+              <span class="info-label">{{ $t('settings.pid') }}</span>
               <span class="info-value info-mono">{{ systemInfo.pid || '—' }}</span>
             </div>
             <el-divider />
             <div class="refresh-row">
-              <el-button size="small" :icon="Refresh" @click="loadSystemInfo">刷新信息</el-button>
+              <el-button size="small" :icon="Refresh" @click="loadSystemInfo">{{ $t('settings.refreshInfo') }}</el-button>
             </div>
           </div>
         </el-card>
@@ -97,20 +97,20 @@
           <template #header>
             <div class="card-header">
               <el-icon><Setting /></el-icon>
-              <span>关于系统</span>
+              <span>{{ $t('settings.aboutSystem') }}</span>
             </div>
           </template>
           <div class="about-section">
             <div class="about-logo">
               <el-icon size="48" color="#409EFF"><Monitor /></el-icon>
               <h3>HomeSignage</h3>
-              <p>智能家庭信息展示系统</p>
+              <p>{{ $t('settings.subtitle') }}</p>
             </div>
             <el-descriptions :column="1" size="small" border>
-              <el-descriptions-item label="系统版本">
+              <el-descriptions-item :label="$t('settings.systemVersion')">
                 <el-tag size="small">v1.0.0</el-tag>
               </el-descriptions-item>
-              <el-descriptions-item label="许可证">MIT License</el-descriptions-item>
+              <el-descriptions-item :label="$t('settings.license')">MIT License</el-descriptions-item>
             </el-descriptions>
           </div>
         </el-card>
@@ -120,10 +120,13 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Lock, InfoFilled, Refresh } from '@element-plus/icons-vue'
 import { systemApi, authApi } from '../api/index.js'
+import { useI18n } from 'vue-i18n'
+
+const { t, locale } = useI18n()
 
 const changingPassword = ref(false)
 const sysLoading = ref(false)
@@ -138,25 +141,25 @@ const passwordForm = reactive({
 
 const validateConfirm = (rule, value, callback) => {
   if (value !== passwordForm.newPassword) {
-    callback(new Error('两次输入的密码不一致'))
+    callback(new Error(t('settings.passwordMismatch')))
   } else {
     callback()
   }
 }
 
-const passwordRules = {
+const passwordRules = computed(() => ({
   currentPassword: [
-    { required: true, message: '请输入当前密码', trigger: 'blur' }
+    { required: true, message: t('settings.currentPasswordRequired'), trigger: 'blur' }
   ],
   newPassword: [
-    { required: true, message: '请输入新密码', trigger: 'blur' },
-    { min: 6, message: '密码长度至少6位', trigger: 'blur' }
+    { required: true, message: t('settings.newPasswordRequired'), trigger: 'blur' },
+    { min: 6, message: t('settings.newPasswordMinLength'), trigger: 'blur' }
   ],
   confirmPassword: [
-    { required: true, message: '请确认新密码', trigger: 'blur' },
+    { required: true, message: t('settings.confirmPasswordRequired'), trigger: 'blur' },
     { validator: validateConfirm, trigger: 'blur' }
   ]
-}
+}))
 
 function resetPasswordForm() {
   passwordForm.currentPassword = ''
@@ -171,9 +174,15 @@ function formatUptime(seconds) {
   const hours = Math.floor((seconds % 86400) / 3600)
   const minutes = Math.floor((seconds % 3600) / 60)
   const parts = []
-  if (days > 0) parts.push(`${days}天`)
-  if (hours > 0) parts.push(`${hours}小时`)
-  if (minutes > 0 || parts.length === 0) parts.push(`${minutes}分钟`)
+  if (locale.value === 'en') {
+    if (days > 0) parts.push(`${days}d`)
+    if (hours > 0) parts.push(`${hours}h`)
+    if (minutes > 0 || parts.length === 0) parts.push(`${minutes}m`)
+  } else {
+    if (days > 0) parts.push(`${days}天`)
+    if (hours > 0) parts.push(`${hours}小时`)
+    if (minutes > 0 || parts.length === 0) parts.push(`${minutes}分钟`)
+  }
   return parts.join('')
 }
 
@@ -192,10 +201,10 @@ async function changePassword() {
   changingPassword.value = true
   try {
     await authApi.changePassword(passwordForm.currentPassword, passwordForm.newPassword)
-    ElMessage.success('密码已修改，请重新登录')
+    ElMessage.success(t('settings.changedSuccess'))
     resetPasswordForm()
   } catch (error) {
-    ElMessage.error(error.response?.data?.message || '密码修改失败')
+    ElMessage.error(error.response?.data?.message || t('settings.changeFailed'))
   } finally {
     changingPassword.value = false
   }

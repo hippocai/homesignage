@@ -1,15 +1,15 @@
 <template>
   <div class="emergency-page">
     <div class="page-header">
-      <h2 class="page-title">紧急提示</h2>
+      <h2 class="page-title">{{ $t('emergency.title') }}</h2>
     </div>
 
     <!-- Trigger button -->
     <el-card shadow="never" class="trigger-card">
       <div class="trigger-section">
         <div class="trigger-desc">
-          <h3>触发紧急警报</h3>
-          <p>紧急提示会立即推送到目标设备，覆盖所有正在显示的内容。请谨慎使用。</p>
+          <h3>{{ $t('emergency.triggerTitle') }}</h3>
+          <p>{{ $t('emergency.triggerDesc') }}</p>
         </div>
         <el-button
           type="danger"
@@ -18,7 +18,7 @@
           :icon="Warning"
           @click="openTriggerDialog"
         >
-          触发紧急提示
+          {{ $t('emergency.triggerBtn') }}
         </el-button>
       </div>
     </el-card>
@@ -27,9 +27,9 @@
     <el-card shadow="never" class="active-card">
       <template #header>
         <div class="card-header">
-          <span class="card-title">当前活跃警报</span>
+          <span class="card-title">{{ $t('emergency.activeAlerts') }}</span>
           <el-button size="small" :icon="Refresh" @click="loadActiveAlerts" :loading="activeLoading">
-            刷新
+            {{ $t('common.refresh') }}
           </el-button>
         </div>
       </template>
@@ -45,9 +45,9 @@
             <div class="alert-content">
               <div class="alert-text">{{ alert.content?.text || alert.content }}</div>
               <div class="alert-meta">
-                <el-tag size="small" type="danger">紧急</el-tag>
+                <el-tag size="small" type="danger">{{ $t('emergency.urgentTag') }}</el-tag>
                 <span class="alert-time">{{ formatTime(alert.triggered_at) }}</span>
-                <span>目标：{{ formatTargets(alert.device_ids) }}</span>
+                <span>{{ $t('emergency.targetDevices') }}：{{ formatTargets(alert.device_ids) }}</span>
               </div>
             </div>
             <el-button
@@ -56,46 +56,46 @@
               @click="clearAlert(alert)"
               :loading="clearingId === alert.id"
             >
-              解除警报
+              {{ $t('emergency.clearAlert') }}
             </el-button>
           </div>
         </div>
-        <el-empty v-else description="当前无活跃警报" />
+        <el-empty v-else :description="$t('emergency.noActiveAlerts')" />
       </div>
     </el-card>
 
     <!-- History -->
     <el-card shadow="never" class="history-card">
       <template #header>
-        <span class="card-title">历史记录（最近20条）</span>
+        <span class="card-title">{{ $t('emergency.history') }}</span>
       </template>
 
       <el-table :data="history" v-loading="historyLoading" stripe size="default">
-        <el-table-column label="警报内容" min-width="200">
+        <el-table-column :label="$t('emergency.alertContent')" min-width="200">
           <template #default="{ row }">
             <span class="alert-text-cell">{{ row.content?.text || row.content }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="目标设备" width="150">
+        <el-table-column :label="$t('emergency.targetDevices')" width="150">
           <template #default="{ row }">
             {{ formatTargets(row.device_ids) }}
           </template>
         </el-table-column>
-        <el-table-column label="触发时间" width="170">
+        <el-table-column :label="$t('emergency.triggeredAt')" width="170">
           <template #default="{ row }">
             {{ formatDateTime(row.created_at || row.triggered_at) }}
           </template>
         </el-table-column>
-        <el-table-column label="解除时间" width="170">
+        <el-table-column :label="$t('emergency.clearedAt')" width="170">
           <template #default="{ row }">
             <span v-if="row.cleared_at">{{ formatDateTime(row.cleared_at) }}</span>
-            <el-tag v-else size="small" type="danger">活跃中</el-tag>
+            <el-tag v-else size="small" type="danger">{{ $t('emergency.activeTag') }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="状态" width="90">
+        <el-table-column :label="$t('common.status')" width="90">
           <template #default="{ row }">
             <el-tag :type="row.cleared_at ? 'info' : 'danger'" size="small">
-              {{ row.cleared_at ? '已解除' : '活跃' }}
+              {{ row.cleared_at ? $t('emergency.cleared') : $t('emergency.active') }}
             </el-tag>
           </template>
         </el-table-column>
@@ -105,7 +105,7 @@
     <!-- Trigger Dialog -->
     <el-dialog
       v-model="triggerDialogVisible"
-      title="配置紧急提示"
+      :title="$t('emergency.configTitle')"
       width="560px"
     >
       <el-form
@@ -114,14 +114,14 @@
         :rules="triggerRules"
         label-width="100px"
       >
-        <el-form-item label="目标设备">
+        <el-form-item :label="$t('emergency.targetDevices')">
           <el-select
             v-model="triggerForm.target_devices"
             multiple
-            placeholder="留空表示全部设备"
+            :placeholder="$t('emergency.targetDevicesPlaceholder')"
             class="full-width"
           >
-            <el-option label="全部设备" value="all" />
+            <el-option :label="$t('emergency.allDevices')" value="all" />
             <el-option
               v-for="device in devices"
               :key="device.id"
@@ -131,50 +131,50 @@
           </el-select>
         </el-form-item>
 
-        <el-form-item label="警报文字" prop="text">
+        <el-form-item :label="$t('emergency.alertText')" prop="text">
           <el-input
             v-model="triggerForm.text"
             type="textarea"
             :rows="3"
-            placeholder="输入紧急警报内容"
+            :placeholder="$t('emergency.alertTextPlaceholder')"
           />
         </el-form-item>
 
-        <el-form-item label="背景颜色">
+        <el-form-item :label="$t('emergency.bgColor')">
           <el-color-picker v-model="triggerForm.background_color" />
           <span class="color-hint">{{ triggerForm.background_color }}</span>
         </el-form-item>
 
-        <el-form-item label="文字颜色">
+        <el-form-item :label="$t('emergency.textColor')">
           <el-color-picker v-model="triggerForm.text_color" />
           <span class="color-hint">{{ triggerForm.text_color }}</span>
         </el-form-item>
 
-        <el-form-item label="闪烁效果">
+        <el-form-item :label="$t('emergency.blinkEffect')">
           <el-switch v-model="triggerForm.blink" />
         </el-form-item>
 
-        <el-form-item label="声音循环">
+        <el-form-item :label="$t('emergency.soundLoop')">
           <el-switch v-model="triggerForm.sound_loop" />
         </el-form-item>
 
-        <el-form-item label="声音文件" v-if="triggerForm.sound_loop">
+        <el-form-item :label="$t('emergency.soundFile')" v-if="triggerForm.sound_loop">
           <div class="url-with-picker">
-            <el-input v-model="triggerForm.sound_url" placeholder="声音文件URL" />
-            <el-button :icon="FolderOpened" @click="soundPickerVisible = true">从仓库选择</el-button>
+            <el-input v-model="triggerForm.sound_url" :placeholder="$t('emergency.soundUrlPlaceholder')" />
+            <el-button :icon="FolderOpened" @click="soundPickerVisible = true">{{ $t('common.selectFromRepo') }}</el-button>
           </div>
         </el-form-item>
       </el-form>
 
       <template #footer>
-        <el-button @click="triggerDialogVisible = false">取消</el-button>
+        <el-button @click="triggerDialogVisible = false">{{ $t('common.cancel') }}</el-button>
         <el-button
           type="danger"
           :loading="triggering"
           :icon="Warning"
           @click="triggerEmergency"
         >
-          立即触发
+          {{ $t('emergency.triggerNow') }}
         </el-button>
       </template>
     </el-dialog>
@@ -184,11 +184,14 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Warning, Refresh, FolderOpened } from '@element-plus/icons-vue'
 import FilePicker from '../components/FilePicker.vue'
 import { remindersApi, devicesApi } from '../api/index.js'
+import { useI18n } from 'vue-i18n'
+
+const { t, locale } = useI18n()
 
 const activeLoading = ref(false)
 const historyLoading = ref(false)
@@ -211,31 +214,31 @@ const triggerForm = reactive({
   sound_url: ''
 })
 
-const triggerRules = {
-  text: [{ required: true, message: '请输入警报文字', trigger: 'blur' }]
-}
+const triggerRules = computed(() => ({
+  text: [{ required: true, message: t('emergency.alertTextRequired'), trigger: 'blur' }]
+}))
 
 function formatTime(time) {
   if (!time) return '—'
   const date = new Date(time)
   const now = new Date()
   const diff = now - date
-  if (diff < 60000) return '刚刚'
-  if (diff < 3600000) return `${Math.floor(diff / 60000)}分钟前`
-  return date.toLocaleString('zh-CN')
+  if (diff < 60000) return t('common.justNow')
+  if (diff < 3600000) return locale.value === 'en' ? `${Math.floor(diff / 60000)}m ago` : `${Math.floor(diff / 60000)}分钟前`
+  return date.toLocaleString(locale.value === 'en' ? 'en-US' : 'zh-CN')
 }
 
 function formatDateTime(dt) {
   if (!dt) return '—'
-  return new Date(dt).toLocaleString('zh-CN')
+  return new Date(dt).toLocaleString(locale.value === 'en' ? 'en-US' : 'zh-CN')
 }
 
 function formatTargets(targets) {
   if (!targets || targets === 'all' || (Array.isArray(targets) && targets.includes('all'))) {
-    return '全部设备'
+    return t('emergency.allDevices')
   }
   if (Array.isArray(targets)) {
-    return targets.length > 0 ? `${targets.length}台设备` : '全部设备'
+    return targets.length > 0 ? t('emergency.devicesCount', { n: targets.length }) : t('emergency.allDevices')
   }
   return String(targets)
 }
@@ -278,11 +281,11 @@ async function triggerEmergency() {
     }
 
     await remindersApi.triggerEmergency(data)
-    ElMessage.success('紧急警报已触发')
+    ElMessage.success(t('emergency.triggeredSuccess'))
     triggerDialogVisible.value = false
     await Promise.all([loadActiveAlerts(), loadHistory()])
   } catch (error) {
-    ElMessage.error(error.response?.data?.message || '触发失败')
+    ElMessage.error(error.response?.data?.message || t('emergency.triggerFailed'))
   } finally {
     triggering.value = false
   }
@@ -290,18 +293,22 @@ async function triggerEmergency() {
 
 async function clearAlert(alert) {
   try {
-    await ElMessageBox.confirm('确定要解除此紧急警报吗？', '确认解除', {
-      confirmButtonText: '确定解除',
-      cancelButtonText: '取消',
-      type: 'warning'
-    })
+    await ElMessageBox.confirm(
+      t('emergency.clearConfirm'),
+      t('emergency.clearConfirmTitle'),
+      {
+        confirmButtonText: t('emergency.clearConfirmBtn'),
+        cancelButtonText: t('common.cancel'),
+        type: 'warning'
+      }
+    )
     clearingId.value = alert.id
     await remindersApi.clearEmergency(alert.id)
-    ElMessage.success('警报已解除')
+    ElMessage.success(t('emergency.clearedSuccess'))
     await Promise.all([loadActiveAlerts(), loadHistory()])
   } catch (error) {
     if (error !== 'cancel') {
-      ElMessage.error(error.response?.data?.message || '解除失败')
+      ElMessage.error(error.response?.data?.message || t('emergency.clearFailed'))
     }
   } finally {
     clearingId.value = null

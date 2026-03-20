@@ -8,8 +8,8 @@
     <!-- Top bar -->
     <div class="editor-topbar">
       <div class="topbar-left">
-        <el-button :icon="ArrowLeft" @click="$router.push('/scenes')">返回</el-button>
-        <el-input v-model="sceneName" placeholder="画面名称" class="title-input" size="large" />
+        <el-button :icon="ArrowLeft" @click="$router.push('/scenes')">{{ $t('sceneEditor.back') }}</el-button>
+        <el-input v-model="sceneName" :placeholder="$t('sceneEditor.sceneNamePlaceholder')" class="title-input" size="large" />
       </div>
       <div class="topbar-right">
         <el-select v-model="resolutionKey" style="width: 190px" @change="onResolutionChange">
@@ -19,7 +19,7 @@
             :label="r.label"
             :value="r.key"
           />
-          <el-option label="自定义..." value="custom" />
+          <el-option :label="$t('sceneEditor.customResolution')" value="custom" />
         </el-select>
         <template v-if="resolutionKey === 'custom'">
           <el-input-number
@@ -27,7 +27,7 @@
             :min="100" :max="7680"
             controls-position="right"
             style="width: 90px"
-            placeholder="宽"
+            :placeholder="$t('sceneEditor.widthPlaceholder')"
             @change="applyCustomResolution"
           />
           <span style="color:#aaa;font-size:13px">×</span>
@@ -36,18 +36,18 @@
             :min="100" :max="4320"
             controls-position="right"
             style="width: 90px"
-            placeholder="高"
+            :placeholder="$t('sceneEditor.heightPlaceholder')"
             @change="applyCustomResolution"
           />
         </template>
         <div class="bg-picker-wrap">
-          <span class="bg-label">背景</span>
+          <span class="bg-label">{{ $t('sceneEditor.background') }}</span>
           <el-color-picker v-model="sceneBackground" show-alpha size="small" />
         </div>
-        <el-button :icon="View" @click="openPreview">预览</el-button>
-        <el-button :icon="Plus" type="primary" @click="openAddComponent">添加组件</el-button>
+        <el-button :icon="View" @click="openPreview">{{ $t('sceneEditor.preview') }}</el-button>
+        <el-button :icon="Plus" type="primary" @click="openAddComponent">{{ $t('sceneEditor.addComponent') }}</el-button>
         <el-button type="success" :icon="Check" :loading="saving" @click="saveScene">
-          保存画面
+          {{ $t('sceneEditor.saveScene') }}
         </el-button>
       </div>
     </div>
@@ -55,7 +55,7 @@
     <div class="editor-body">
       <!-- Left: Component list -->
       <div class="left-panel">
-        <div class="panel-header">组件列表</div>
+        <div class="panel-header">{{ $t('sceneEditor.componentList') }}</div>
         <div class="component-list" v-loading="loading">
           <div
             v-for="comp in components"
@@ -81,7 +81,7 @@
               />
             </div>
           </div>
-          <el-empty v-if="components.length === 0" description="暂无组件" :image-size="60" />
+          <el-empty v-if="components.length === 0" :description="$t('sceneEditor.noComponents')" :image-size="60" />
         </div>
       </div>
 
@@ -89,7 +89,7 @@
       <div class="center-panel" ref="centerPanelRef">
         <div class="panel-header canvas-header">
           <span>{{ canvasWidth }}×{{ canvasHeight }}</span>
-          <span class="canvas-hint">· 拖拽组件移动位置，拖拽边角调整大小</span>
+          <span class="canvas-hint">{{ $t('sceneEditor.canvasHint') }}</span>
         </div>
         <div class="preview-wrapper">
           <div
@@ -110,7 +110,7 @@
               <div class="comp-preview-content">
                 <template v-if="comp.type === 'text'">
                   <div :style="getTextStyle(comp)" class="text-preview">
-                    {{ comp.config?.content || '文字' }}
+                    {{ comp.config?.content || $t('sceneEditor.placeholders.text') }}
                   </div>
                 </template>
                 <template v-else-if="comp.type === 'image'">
@@ -121,13 +121,13 @@
                   />
                   <div v-else class="comp-placeholder">
                     <el-icon :size="18"><Picture /></el-icon>
-                    <span>图片</span>
+                    <span>{{ $t('sceneEditor.placeholders.image') }}</span>
                   </div>
                 </template>
                 <template v-else-if="comp.type === 'video'">
                   <div class="comp-placeholder">
                     <el-icon :size="18"><VideoPlay /></el-icon>
-                    <span>{{ comp.config?.url ? comp.config.url.split('/').pop() : '视频' }}</span>
+                    <span>{{ comp.config?.url ? comp.config.url.split('/').pop() : $t('sceneEditor.placeholders.video') }}</span>
                   </div>
                 </template>
                 <template v-else-if="comp.type === 'clock'">
@@ -136,7 +136,7 @@
                 <template v-else-if="comp.type === 'info-list'">
                   <div class="info-list-preview" :style="{ backgroundColor: comp.config?.backgroundColor || 'rgba(0,0,0,0.5)', padding: (comp.config?.padding || 10) + 'px' }">
                     <div v-for="n in 3" :key="n" class="info-list-preview-row" :style="{ fontSize: Math.min(comp.config?.fontSize || 18, 14) + 'px', color: comp.config?.color || '#fff', marginBottom: (comp.config?.itemSpacing || 6) + 'px' }">
-                      信息条目示例 {{ n }}
+                      {{ $t('sceneEditor.placeholders.infoListItem', { n }) }}
                     </div>
                   </div>
                 </template>
@@ -163,10 +163,10 @@
 
       <!-- Right: Properties -->
       <div class="right-panel">
-        <div class="panel-header">属性设置</div>
+        <div class="panel-header">{{ $t('sceneEditor.properties') }}</div>
         <div class="property-editor" v-if="selectedComponent">
           <div class="prop-section">
-            <div class="prop-section-title">位置与大小（百分比）</div>
+            <div class="prop-section-title">{{ $t('sceneEditor.positionAndSize') }}</div>
             <el-form label-width="50px" size="small">
               <el-row :gutter="8">
                 <el-col :span="12">
@@ -192,7 +192,7 @@
                   </el-form-item>
                 </el-col>
                 <el-col :span="12">
-                  <el-form-item label="宽">
+                  <el-form-item label="W">
                     <el-input-number
                       v-model="editForm.width"
                       :min="1" :max="100" :precision="1"
@@ -203,7 +203,7 @@
                   </el-form-item>
                 </el-col>
                 <el-col :span="12">
-                  <el-form-item label="高">
+                  <el-form-item label="H">
                     <el-input-number
                       v-model="editForm.height"
                       :min="1" :max="100" :precision="1"
@@ -218,154 +218,154 @@
           </div>
 
           <div class="prop-section">
-            <div class="prop-section-title">组件配置</div>
+            <div class="prop-section-title">{{ $t('sceneEditor.componentConfig') }}</div>
 
             <el-form v-if="selectedComponent.type === 'clock'" label-width="80px" size="small">
-              <el-form-item label="时间格式">
+              <el-form-item :label="$t('sceneEditor.clock.timeFormat')">
                 <el-select v-model="editForm.config.format">
                   <el-option label="HH:mm" value="HH:mm" />
                   <el-option label="HH:mm:ss" value="HH:mm:ss" />
                 </el-select>
               </el-form-item>
-              <el-form-item label="显示日期">
+              <el-form-item :label="$t('sceneEditor.clock.showDate')">
                 <el-switch v-model="editForm.config.showDate" />
               </el-form-item>
-              <el-form-item label="时区">
+              <el-form-item :label="$t('sceneEditor.clock.timezone')">
                 <el-input v-model="editForm.config.timezone" placeholder="Asia/Shanghai" />
               </el-form-item>
             </el-form>
 
             <el-form v-else-if="selectedComponent.type === 'weather'" label-width="80px" size="small">
-              <el-form-item label="城市">
-                <el-input v-model="editForm.config.city" placeholder="例如：Beijing" />
+              <el-form-item :label="$t('sceneEditor.weather.city')">
+                <el-input v-model="editForm.config.city" :placeholder="$t('sceneEditor.weather.cityPlaceholder')" />
               </el-form-item>
-              <el-form-item label="温度单位">
+              <el-form-item :label="$t('sceneEditor.weather.tempUnit')">
                 <el-select v-model="editForm.config.unit">
-                  <el-option label="摄氏度 (°C)" value="C" />
-                  <el-option label="华氏度 (°F)" value="F" />
+                  <el-option :label="$t('sceneEditor.weather.celsius')" value="C" />
+                  <el-option :label="$t('sceneEditor.weather.fahrenheit')" value="F" />
                 </el-select>
               </el-form-item>
             </el-form>
 
             <el-form v-else-if="selectedComponent.type === 'text'" label-width="80px" size="small">
-              <el-form-item label="文字内容">
+              <el-form-item :label="$t('sceneEditor.text.content')">
                 <el-input
                   v-model="editForm.config.content"
                   type="textarea"
                   :rows="3"
-                  placeholder="输入文字内容"
+                  :placeholder="$t('sceneEditor.text.contentPlaceholder')"
                 />
               </el-form-item>
-              <el-form-item label="字体大小">
+              <el-form-item :label="$t('sceneEditor.text.fontSize')">
                 <el-input-number
                   v-model="editForm.config.fontSize"
                   :min="8" :max="200"
                   controls-position="right"
                 />
               </el-form-item>
-              <el-form-item label="文字颜色">
+              <el-form-item :label="$t('sceneEditor.text.textColor')">
                 <el-color-picker v-model="editForm.config.color" />
               </el-form-item>
-              <el-form-item label="背景颜色">
+              <el-form-item :label="$t('sceneEditor.text.bgColor')">
                 <el-color-picker v-model="editForm.config.backgroundColor" show-alpha />
               </el-form-item>
-              <el-form-item label="对齐方式">
+              <el-form-item :label="$t('sceneEditor.text.textAlign')">
                 <el-select v-model="editForm.config.textAlign">
-                  <el-option label="左对齐" value="left" />
-                  <el-option label="居中" value="center" />
-                  <el-option label="右对齐" value="right" />
+                  <el-option :label="$t('sceneEditor.text.alignLeft')" value="left" />
+                  <el-option :label="$t('sceneEditor.text.alignCenter')" value="center" />
+                  <el-option :label="$t('sceneEditor.text.alignRight')" value="right" />
                 </el-select>
               </el-form-item>
             </el-form>
 
             <el-form v-else-if="selectedComponent.type === 'image'" label-width="80px" size="small">
-              <el-form-item label="图片URL">
+              <el-form-item :label="$t('sceneEditor.image.url')">
                 <div class="url-with-picker">
-                  <el-input v-model="editForm.config.url" placeholder="输入图片地址" />
-                  <el-button :icon="FolderOpened" @click="imagePickerVisible = true">从仓库选择</el-button>
+                  <el-input v-model="editForm.config.url" :placeholder="$t('sceneEditor.image.urlPlaceholder')" />
+                  <el-button :icon="FolderOpened" @click="imagePickerVisible = true">{{ $t('common.selectFromRepo') }}</el-button>
                 </div>
               </el-form-item>
-              <el-form-item label="填充方式">
+              <el-form-item :label="$t('sceneEditor.image.objectFit')">
                 <el-select v-model="editForm.config.objectFit">
-                  <el-option label="覆盖 (cover)" value="cover" />
-                  <el-option label="包含 (contain)" value="contain" />
-                  <el-option label="填充 (fill)" value="fill" />
-                  <el-option label="原始大小 (none)" value="none" />
+                  <el-option :label="$t('sceneEditor.image.cover')" value="cover" />
+                  <el-option :label="$t('sceneEditor.image.contain')" value="contain" />
+                  <el-option :label="$t('sceneEditor.image.fill')" value="fill" />
+                  <el-option :label="$t('sceneEditor.image.none')" value="none" />
                 </el-select>
               </el-form-item>
             </el-form>
 
             <el-form v-else-if="selectedComponent.type === 'video'" label-width="80px" size="small">
-              <el-form-item label="视频URL">
+              <el-form-item :label="$t('sceneEditor.video.url')">
                 <div class="url-with-picker">
-                  <el-input v-model="editForm.config.url" placeholder="输入视频地址" />
-                  <el-button :icon="FolderOpened" @click="videoPickerVisible = true">从仓库选择</el-button>
+                  <el-input v-model="editForm.config.url" :placeholder="$t('sceneEditor.video.urlPlaceholder')" />
+                  <el-button :icon="FolderOpened" @click="videoPickerVisible = true">{{ $t('common.selectFromRepo') }}</el-button>
                 </div>
               </el-form-item>
-              <el-form-item label="填充方式">
+              <el-form-item :label="$t('sceneEditor.video.objectFit')">
                 <el-select v-model="editForm.config.objectFit">
-                  <el-option label="覆盖 (cover)" value="cover" />
-                  <el-option label="包含 (contain)" value="contain" />
-                  <el-option label="原始大小 (none)" value="none" />
+                  <el-option :label="$t('sceneEditor.video.cover')" value="cover" />
+                  <el-option :label="$t('sceneEditor.video.contain')" value="contain" />
+                  <el-option :label="$t('sceneEditor.video.none')" value="none" />
                 </el-select>
               </el-form-item>
-              <el-form-item label="自动播放">
+              <el-form-item :label="$t('sceneEditor.video.autoplay')">
                 <el-switch v-model="editForm.config.autoplay" />
               </el-form-item>
-              <el-form-item label="循环播放">
+              <el-form-item :label="$t('sceneEditor.video.loop')">
                 <el-switch v-model="editForm.config.loop" />
               </el-form-item>
-              <el-form-item label="静音播放">
+              <el-form-item :label="$t('sceneEditor.video.muted')">
                 <el-switch v-model="editForm.config.muted" />
-                <div style="font-size:11px;color:#909399;margin-top:2px">浏览器要求自动播放时必须静音</div>
+                <div style="font-size:11px;color:#909399;margin-top:2px">{{ $t('sceneEditor.video.mutedHint') }}</div>
               </el-form-item>
             </el-form>
 
             <el-form v-else-if="selectedComponent.type === 'iframe'" label-width="80px" size="small">
-              <el-form-item label="网页URL">
+              <el-form-item :label="$t('sceneEditor.iframe.url')">
                 <el-input v-model="editForm.config.url" placeholder="https://..." />
               </el-form-item>
             </el-form>
 
             <el-form v-else-if="selectedComponent.type === 'info-list'" label-width="90px" size="small">
-              <el-form-item label="字体大小">
+              <el-form-item :label="$t('sceneEditor.infoList.fontSize')">
                 <el-input-number v-model="editForm.config.fontSize" :min="10" :max="120" controls-position="right" />
               </el-form-item>
-              <el-form-item label="文字颜色">
+              <el-form-item :label="$t('sceneEditor.infoList.textColor')">
                 <el-color-picker v-model="editForm.config.color" />
               </el-form-item>
-              <el-form-item label="背景颜色">
+              <el-form-item :label="$t('sceneEditor.infoList.bgColor')">
                 <el-color-picker v-model="editForm.config.backgroundColor" show-alpha />
               </el-form-item>
-              <el-form-item label="行间距(px)">
+              <el-form-item :label="$t('sceneEditor.infoList.itemSpacing')">
                 <el-input-number v-model="editForm.config.itemSpacing" :min="0" :max="40" controls-position="right" />
               </el-form-item>
-              <el-form-item label="内边距(px)">
+              <el-form-item :label="$t('sceneEditor.infoList.padding')">
                 <el-input-number v-model="editForm.config.padding" :min="0" :max="60" controls-position="right" />
               </el-form-item>
-              <el-form-item label="横向滚速">
+              <el-form-item :label="$t('sceneEditor.infoList.scrollSpeed')">
                 <el-input-number v-model="editForm.config.scrollSpeed" :min="10" :max="200" controls-position="right" />
-                <div style="font-size:11px;color:#909399;margin-top:2px">像素/秒，值越大滚动越快</div>
+                <div style="font-size:11px;color:#909399;margin-top:2px">{{ $t('sceneEditor.infoList.scrollSpeedHint') }}</div>
               </el-form-item>
-              <el-form-item label="翻页间隔">
+              <el-form-item :label="$t('sceneEditor.infoList.pageInterval')">
                 <el-input-number v-model="editForm.config.pageInterval" :min="1" :max="60" controls-position="right" />
-                <div style="font-size:11px;color:#909399;margin-top:2px">秒，内容超出组件高度时分页显示</div>
+                <div style="font-size:11px;color:#909399;margin-top:2px">{{ $t('sceneEditor.infoList.pageIntervalHint') }}</div>
               </el-form-item>
             </el-form>
           </div>
 
           <div class="prop-actions">
-            <el-button type="primary" size="small" @click="applyComponentEdit">应用更改</el-button>
+            <el-button type="primary" size="small" @click="applyComponentEdit">{{ $t('sceneEditor.applyChanges') }}</el-button>
           </div>
         </div>
-        <el-empty v-else description="请选择一个组件" :image-size="60" />
+        <el-empty v-else :description="$t('sceneEditor.selectComponent')" :image-size="60" />
       </div>
     </div>
 
     <!-- Preview Dialog -->
     <el-dialog
       v-model="previewVisible"
-      title="画面预览"
+      :title="$t('sceneEditor.previewTitle')"
       width="92vw"
       top="2vh"
       destroy-on-close
@@ -395,7 +395,7 @@
                 />
               </template>
               <template v-else-if="comp.type === 'video'">
-                <div class="dialog-iframe">🎬 {{ comp.config?.url?.split('/').pop() || '视频' }}</div>
+                <div class="dialog-iframe">🎬 {{ comp.config?.url?.split('/').pop() || $t('sceneEditor.placeholders.video') }}</div>
               </template>
               <template v-else-if="comp.type === 'clock'">
                 <div class="clock-preview dialog-clock">{{ getClockDisplay(comp) }}</div>
@@ -408,7 +408,7 @@
               </template>
               <template v-else-if="comp.type === 'info-list'">
                 <div class="dialog-info-list" :style="{ backgroundColor: comp.config?.backgroundColor || 'rgba(0,0,0,0.5)', padding: (comp.config?.padding || 10) + 'px', fontSize: (comp.config?.fontSize || 18) + 'px', color: comp.config?.color || '#fff' }">
-                  <div v-for="n in 3" :key="n" :style="{ marginBottom: (comp.config?.itemSpacing || 6) + 'px' }">信息条目示例 {{ n }}</div>
+                  <div v-for="n in 3" :key="n" :style="{ marginBottom: (comp.config?.itemSpacing || 6) + 'px' }">{{ $t('sceneEditor.placeholders.infoListItem', { n }) }}</div>
                 </div>
               </template>
             </div>
@@ -418,7 +418,7 @@
     </el-dialog>
 
     <!-- Add Component Dialog -->
-    <el-dialog v-model="addCompDialogVisible" title="添加组件" width="400px">
+    <el-dialog v-model="addCompDialogVisible" :title="$t('sceneEditor.addComponentTitle')" width="400px">
       <div class="comp-type-grid">
         <div
           v-for="type in componentTypes"
@@ -446,17 +446,20 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowLeft, Plus, Check, Delete, View, Clock, Cloudy, Document, Picture, VideoPlay, Link, List, FolderOpened } from '@element-plus/icons-vue'
 import FilePicker from '../components/FilePicker.vue'
 import { scenesApi } from '../api/index.js'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 const route = useRoute()
 const sceneId = computed(() => route.params.id)
 
-const RESOLUTION_PRESETS = [
-  { key: '1920x1080', label: '1920×1080 横屏FHD', width: 1920, height: 1080 },
-  { key: '1280x720',  label: '1280×720 横屏HD',   width: 1280, height: 720 },
-  { key: '1080x1920', label: '1080×1920 竖屏FHD', width: 1080, height: 1920 },
-  { key: '768x1024',  label: '768×1024 iPad',     width: 768,  height: 1024 },
-  { key: '390x844',   label: '390×844 手机',       width: 390,  height: 844 },
-]
+const RESOLUTION_PRESETS = computed(() => [
+  { key: '1920x1080', label: t('resolutionPresets.r1920x1080'), width: 1920, height: 1080 },
+  { key: '1280x720',  label: t('resolutionPresets.r1280x720'),  width: 1280, height: 720 },
+  { key: '1080x1920', label: t('resolutionPresets.r1080x1920'), width: 1080, height: 1920 },
+  { key: '768x1024',  label: t('resolutionPresets.r768x1024'),  width: 768,  height: 1024 },
+  { key: '390x844',   label: t('resolutionPresets.r390x844'),   width: 390,  height: 844 },
+])
 const RESIZE_HANDLES = ['nw', 'n', 'ne', 'w', 'e', 'sw', 's', 'se']
 
 // State
@@ -491,24 +494,25 @@ const resizeState = ref(null)
 
 const editForm = reactive({ x: 0, y: 0, width: 30, height: 20, config: {} })
 
-const componentTypes = [
-  { value: 'clock',     label: '时钟',   icon: 'Clock',    color: '#409EFF' },
-  { value: 'weather',   label: '天气',   icon: 'Cloudy',   color: '#67C23A' },
-  { value: 'text',      label: '文字',   icon: 'Document', color: '#E6A23C' },
-  { value: 'image',     label: '图片',   icon: 'Picture',    color: '#F56C6C' },
-  { value: 'video',     label: '视频',   icon: 'VideoPlay', color: '#E040FB' },
-  { value: 'iframe',    label: '网页',   icon: 'Link',      color: '#909399' },
-  { value: 'info-list', label: '信息列表', icon: 'List',   color: '#9B59B6' },
-]
-const defaultConfigs = {
+const componentTypes = computed(() => [
+  { value: 'clock',     label: t('sceneEditor.componentTypes.clock'),     icon: 'Clock',    color: '#409EFF' },
+  { value: 'weather',   label: t('sceneEditor.componentTypes.weather'),   icon: 'Cloudy',   color: '#67C23A' },
+  { value: 'text',      label: t('sceneEditor.componentTypes.text'),      icon: 'Document', color: '#E6A23C' },
+  { value: 'image',     label: t('sceneEditor.componentTypes.image'),     icon: 'Picture',  color: '#F56C6C' },
+  { value: 'video',     label: t('sceneEditor.componentTypes.video'),     icon: 'VideoPlay',color: '#E040FB' },
+  { value: 'iframe',    label: t('sceneEditor.componentTypes.iframe'),    icon: 'Link',     color: '#909399' },
+  { value: 'info-list', label: t('sceneEditor.componentTypes.infoList'), icon: 'List', color: '#9B59B6' },
+])
+
+const defaultConfigs = computed(() => ({
   clock:     { format: 'HH:mm', showDate: true, timezone: 'Asia/Shanghai' },
   weather:   { city: 'Beijing', unit: 'C' },
-  text:      { content: '文字内容', fontSize: 24, color: '#ffffff', backgroundColor: 'transparent', textAlign: 'center' },
+  text:      { content: t('sceneEditor.placeholders.text'), fontSize: 24, color: '#ffffff', backgroundColor: 'transparent', textAlign: 'center' },
   image:     { url: '', objectFit: 'cover' },
   video:     { url: '', objectFit: 'cover', autoplay: true, loop: true, muted: true },
   iframe:    { url: 'https://example.com' },
   'info-list': { fontSize: 18, color: '#ffffff', backgroundColor: 'rgba(0,0,0,0.5)', itemSpacing: 6, padding: 10, scrollSpeed: 40, pageInterval: 5 },
-}
+}))
 
 // Computed styles
 const canvasStyle = computed(() => ({
@@ -558,7 +562,7 @@ function onResolutionChange(key) {
     customHeight.value = canvasHeight.value
     return
   }
-  const preset = RESOLUTION_PRESETS.find(r => r.key === key)
+  const preset = RESOLUTION_PRESETS.value.find(r => r.key === key)
   if (preset) {
     canvasWidth.value = preset.width
     canvasHeight.value = preset.height
@@ -579,17 +583,26 @@ function getComponentIcon(type) {
   return { clock: 'Clock', weather: 'Cloudy', text: 'Document', image: 'Picture', video: 'VideoPlay', iframe: 'Link', 'info-list': 'List' }[type] || 'Grid'
 }
 function getComponentLabel(type) {
-  return { clock: '时钟', weather: '天气', text: '文字', image: '图片', video: '视频', iframe: '网页', 'info-list': '信息列表' }[type] || type
+  const labels = {
+    clock: t('sceneEditor.componentTypes.clock'),
+    weather: t('sceneEditor.componentTypes.weather'),
+    text: t('sceneEditor.componentTypes.text'),
+    image: t('sceneEditor.componentTypes.image'),
+    video: t('sceneEditor.componentTypes.video'),
+    iframe: t('sceneEditor.componentTypes.iframe'),
+    'info-list': t('sceneEditor.componentTypes.infoList'),
+  }
+  return labels[type] || type
 }
 function getComponentSummary(comp) {
   const cfg = comp.config || {}
   if (comp.type === 'clock')     return cfg.format || 'HH:mm'
-  if (comp.type === 'weather')   return cfg.city || '未设置城市'
-  if (comp.type === 'text')      return (cfg.content || '').slice(0, 20) || '空文字'
-  if (comp.type === 'image')     return cfg.url ? cfg.url.split('/').pop() : '未设置URL'
-  if (comp.type === 'video')     return cfg.url ? cfg.url.split('/').pop() : '未设置URL'
-  if (comp.type === 'iframe')    return cfg.url || '未设置URL'
-  if (comp.type === 'info-list') return `字号${cfg.fontSize || 18}px · 滚动速度${cfg.scrollSpeed || 40}`
+  if (comp.type === 'weather')   return cfg.city || t('sceneEditor.summaries.noCity')
+  if (comp.type === 'text')      return (cfg.content || '').slice(0, 20) || t('sceneEditor.summaries.emptyText')
+  if (comp.type === 'image')     return cfg.url ? cfg.url.split('/').pop() : t('sceneEditor.summaries.noUrl')
+  if (comp.type === 'video')     return cfg.url ? cfg.url.split('/').pop() : t('sceneEditor.summaries.noUrl')
+  if (comp.type === 'iframe')    return cfg.url || t('sceneEditor.summaries.noUrl')
+  if (comp.type === 'info-list') return t('sceneEditor.summaries.infoList', { size: cfg.fontSize || 18, speed: cfg.scrollSpeed || 40 })
   return ''
 }
 
@@ -755,7 +768,7 @@ async function onGlobalMouseUp() {
           }
         }
       } catch {
-        ElMessage.error('保存位置失败')
+        ElMessage.error(t('sceneEditor.saveFailed'))
       }
     }
   }
@@ -770,15 +783,15 @@ async function addComponent(type) {
     const res = await scenesApi.createComponent(sceneId.value, {
       type,
       position: { x: 10, y: 10, width: 30, height: 20 },
-      config: { ...defaultConfigs[type] },
+      config: { ...defaultConfigs.value[type] },
       style: {},
     })
     const comp = res.data.data
     components.value.push(comp)
     selectComponent(comp)
-    ElMessage.success('组件已添加')
+    ElMessage.success(t('sceneEditor.componentAdded'))
   } catch (error) {
-    ElMessage.error(error.response?.data?.error || '添加失败')
+    ElMessage.error(error.response?.data?.error || t('sceneEditor.componentAddFailed'))
   }
 }
 
@@ -796,38 +809,43 @@ async function applyComponentEdit() {
       components.value[idx] = updated
       selectedComponent.value = updated
     }
-    ElMessage.success('已应用更改')
+    ElMessage.success(t('sceneEditor.applySuccess'))
   } catch (error) {
-    ElMessage.error(error.response?.data?.error || '更新失败')
+    ElMessage.error(error.response?.data?.error || t('sceneEditor.applyFailed'))
   }
 }
 
 async function deleteComponent(comp) {
   try {
-    await ElMessageBox.confirm('确定要删除此组件吗？', '确认删除', {
-      confirmButtonText: '确定', cancelButtonText: '取消', type: 'warning',
-    })
+    await ElMessageBox.confirm(
+      t('sceneEditor.componentDeleteConfirm'),
+      t('common.confirmDelete'),
+      {
+        confirmButtonText: t('common.confirm'),
+        cancelButtonText: t('common.cancel'),
+        type: 'warning',
+      }
+    )
     await scenesApi.deleteComponent(sceneId.value, comp.id)
     components.value = components.value.filter(c => c.id !== comp.id)
     if (selectedComponent.value?.id === comp.id) selectedComponent.value = null
-    ElMessage.success('组件已删除')
+    ElMessage.success(t('sceneEditor.componentDeleted'))
   } catch (error) {
-    if (error !== 'cancel') ElMessage.error(error.response?.data?.message || '删除失败')
+    if (error !== 'cancel') ElMessage.error(error.response?.data?.message || t('common.operationFailed'))
   }
 }
 
 async function saveScene() {
   saving.value = true
   try {
-    const preset = RESOLUTION_PRESETS.find(r => r.key === resolutionKey.value)
     await scenesApi.update(sceneId.value, {
       name: sceneName.value,
       description: sceneDescription.value,
       config: { resolution: { width: canvasWidth.value, height: canvasHeight.value }, backgroundColor: sceneBackground.value },
     })
-    ElMessage.success('画面已保存')
+    ElMessage.success(t('sceneEditor.savedSuccess'))
   } catch (error) {
-    ElMessage.error(error.response?.data?.message || '保存失败')
+    ElMessage.error(error.response?.data?.message || t('sceneEditor.saveFailed'))
   } finally {
     saving.value = false
   }
@@ -854,7 +872,7 @@ async function loadScene() {
     if (resolution?.width && resolution?.height) {
       canvasWidth.value = resolution.width
       canvasHeight.value = resolution.height
-      const matchKey = RESOLUTION_PRESETS.find(r => r.width === resolution.width && r.height === resolution.height)?.key
+      const matchKey = RESOLUTION_PRESETS.value.find(r => r.width === resolution.width && r.height === resolution.height)?.key
       if (matchKey) {
         resolutionKey.value = matchKey
       } else {
@@ -866,7 +884,7 @@ async function loadScene() {
 
     components.value = compRes.data.data || []
   } catch (error) {
-    ElMessage.error('加载画面失败')
+    ElMessage.error(t('sceneEditor.loadFailed'))
   } finally {
     loading.value = false
     updatePreviewScale()

@@ -1,8 +1,8 @@
 <template>
   <div class="devices-page">
     <div class="page-header">
-      <h2 class="page-title">设备管理</h2>
-      <el-button type="primary" :icon="Plus" @click="openAddDialog">添加设备</el-button>
+      <h2 class="page-title">{{ $t('device.title') }}</h2>
+      <el-button type="primary" :icon="Plus" @click="openAddDialog">{{ $t('device.addDevice') }}</el-button>
     </div>
 
     <el-card shadow="never">
@@ -13,42 +13,42 @@
         size="default"
         row-key="id"
       >
-        <el-table-column prop="name" label="设备名称" min-width="160">
+        <el-table-column prop="name" :label="$t('device.deviceName')" min-width="160">
           <template #default="{ row }">
             <span class="device-name device-name-link" @click="openDeviceClient(row)">{{ row.name }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="group_name" label="分组" width="130">
+        <el-table-column prop="group_name" :label="$t('device.deviceGroup')" width="130">
           <template #default="{ row }">
             <el-tag v-if="row.group_name" size="small" type="info">{{ row.group_name }}</el-tag>
-            <span v-else class="text-muted">未分组</span>
+            <span v-else class="text-muted">{{ $t('device.noGroup') }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="状态" width="90">
+        <el-table-column :label="$t('common.status')" width="90">
           <template #default="{ row }">
             <el-tag :type="isOnline(row) ? 'success' : 'danger'" size="small">
-              {{ isOnline(row) ? '在线' : '离线' }}
+              {{ isOnline(row) ? $t('common.online') : $t('common.offline') }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="最后活跃" width="160">
+        <el-table-column :label="$t('dashboard.lastSeen')" width="160">
           <template #default="{ row }">
             <span class="text-muted">{{ formatTime(row.last_seen) }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="ip_address" label="IP地址" width="140">
+        <el-table-column prop="ip_address" :label="$t('dashboard.ipAddress')" width="140">
           <template #default="{ row }">
             <span class="text-mono">{{ row.ip_address || '—' }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="260" fixed="right">
+        <el-table-column :label="$t('common.actions')" width="260" fixed="right">
           <template #default="{ row }">
-            <el-button size="small" :icon="Edit" @click="openEditDialog(row)">编辑</el-button>
+            <el-button size="small" :icon="Edit" @click="openEditDialog(row)">{{ $t('common.edit') }}</el-button>
             <el-button size="small" type="success" :icon="Connection" @click="openSceneConfig(row)">
-              画面
+              {{ $t('device.sceneBtn') }}
             </el-button>
             <el-button size="small" type="warning" :icon="Refresh" @click="forceRefresh(row)">
-              刷新
+              {{ $t('common.refresh') }}
             </el-button>
             <el-button
               size="small"
@@ -56,7 +56,7 @@
               :icon="Delete"
               @click="handleDelete(row)"
             >
-              删除
+              {{ $t('common.delete') }}
             </el-button>
           </template>
         </el-table-column>
@@ -66,7 +66,7 @@
     <!-- Add/Edit Device Dialog -->
     <el-dialog
       v-model="deviceDialogVisible"
-      :title="editingDevice ? '编辑设备' : '添加设备'"
+      :title="editingDevice ? $t('device.editDevice') : $t('device.addDevice')"
       width="500px"
       @closed="resetDeviceForm"
     >
@@ -76,17 +76,17 @@
         :rules="deviceRules"
         label-width="90px"
       >
-        <el-form-item label="设备名称" prop="name">
-          <el-input v-model="deviceForm.name" placeholder="请输入设备名称" />
+        <el-form-item :label="$t('device.deviceName')" prop="name">
+          <el-input v-model="deviceForm.name" :placeholder="$t('device.deviceNamePlaceholder')" />
         </el-form-item>
-        <el-form-item label="设备分组" prop="group_name">
-          <el-input v-model="deviceForm.group_name" placeholder="请输入分组名称（可选）" />
+        <el-form-item :label="$t('device.deviceGroup')" prop="group_name">
+          <el-input v-model="deviceForm.group_name" :placeholder="$t('device.deviceGroupPlaceholder')" />
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="deviceDialogVisible = false">取消</el-button>
+        <el-button @click="deviceDialogVisible = false">{{ $t('common.cancel') }}</el-button>
         <el-button type="primary" :loading="saving" @click="saveDevice">
-          {{ editingDevice ? '保存修改' : '添加设备' }}
+          {{ editingDevice ? $t('device.saveChanges') : $t('device.addDevice') }}
         </el-button>
       </template>
     </el-dialog>
@@ -94,24 +94,24 @@
     <!-- Created Device Info Dialog -->
     <el-dialog
       v-model="createdDeviceDialogVisible"
-      title="设备创建成功"
+      :title="$t('device.createdSuccess')"
       width="560px"
     >
       <el-alert type="success" :closable="false" show-icon class="mb-4">
-        <template #title>设备已创建，请保存以下信息用于客户端连接</template>
+        <template #title>{{ $t('device.createdHint') }}</template>
       </el-alert>
       <div class="device-url-section" v-if="createdDevice">
         <div class="info-row">
-          <span class="info-label">设备ID：</span>
+          <span class="info-label">{{ $t('device.deviceId') }}</span>
           <el-tag>{{ createdDevice.id }}</el-tag>
         </div>
         <div class="info-row">
-          <span class="info-label">设备密钥：</span>
+          <span class="info-label">{{ $t('device.deviceKey') }}</span>
           <el-tag type="warning">{{ createdDevice.device_key }}</el-tag>
         </div>
         <el-divider />
         <div class="info-row">
-          <span class="info-label">客户端URL：</span>
+          <span class="info-label">{{ $t('device.clientUrl') }}</span>
         </div>
         <el-input
           v-model="createdDeviceUrl"
@@ -119,20 +119,20 @@
           class="url-input"
         >
           <template #append>
-            <el-button :icon="CopyDocument" @click="copyUrl">复制</el-button>
+            <el-button :icon="CopyDocument" @click="copyUrl">{{ $t('device.copyUrl') }}</el-button>
           </template>
         </el-input>
-        <p class="url-hint">将此URL配置到客户端设备的浏览器中</p>
+        <p class="url-hint">{{ $t('device.clientUrlHint') }}</p>
       </div>
       <template #footer>
-        <el-button type="primary" @click="createdDeviceDialogVisible = false">我已保存，关闭</el-button>
+        <el-button type="primary" @click="createdDeviceDialogVisible = false">{{ $t('device.savedClose') }}</el-button>
       </template>
     </el-dialog>
 
     <!-- Scene Config Dialog -->
     <el-dialog
       v-model="sceneConfigVisible"
-      title="画面配置"
+      :title="$t('device.sceneConfig')"
       width="700px"
       top="5vh"
       @closed="sceneConfigDevice = null"
@@ -153,7 +153,9 @@ import { Plus, Edit, Delete, Refresh, Connection, CopyDocument } from '@element-
 import { useDevicesStore } from '../stores/devices.js'
 import { devicesApi } from '../api/index.js'
 import DeviceSceneConfig from '../components/DeviceSceneConfig.vue'
+import { useI18n } from 'vue-i18n'
 
+const { t, locale } = useI18n()
 const devicesStore = useDevicesStore()
 
 const deviceDialogVisible = ref(false)
@@ -170,9 +172,9 @@ const deviceForm = reactive({
   group_name: ''
 })
 
-const deviceRules = {
-  name: [{ required: true, message: '请输入设备名称', trigger: 'blur' }]
-}
+const deviceRules = computed(() => ({
+  name: [{ required: true, message: t('device.deviceNameRequired'), trigger: 'blur' }]
+}))
 
 const createdDeviceUrl = computed(() => {
   if (!createdDevice.value) return ''
@@ -188,14 +190,14 @@ function isOnline(device) {
 }
 
 function formatTime(time) {
-  if (!time) return '从未'
+  if (!time) return t('common.never')
   const date = new Date(time)
   const now = new Date()
   const diff = now - date
-  if (diff < 60000) return '刚刚'
-  if (diff < 3600000) return `${Math.floor(diff / 60000)}分钟前`
-  if (diff < 86400000) return `${Math.floor(diff / 3600000)}小时前`
-  return date.toLocaleString('zh-CN')
+  if (diff < 60000) return t('common.justNow')
+  if (diff < 3600000) return locale.value === 'en' ? `${Math.floor(diff / 60000)}m ago` : `${Math.floor(diff / 60000)}分钟前`
+  if (diff < 86400000) return locale.value === 'en' ? `${Math.floor(diff / 3600000)}h ago` : `${Math.floor(diff / 3600000)}小时前`
+  return date.toLocaleString(locale.value === 'en' ? 'en-US' : 'zh-CN')
 }
 
 function openAddDialog() {
@@ -236,7 +238,7 @@ async function saveDevice() {
 
     if (editingDevice.value) {
       await devicesStore.updateDevice(editingDevice.value.id, data)
-      ElMessage.success('设备已更新')
+      ElMessage.success(t('device.updatedSuccess'))
       deviceDialogVisible.value = false
     } else {
       const result = await devicesStore.createDevice(data)
@@ -245,7 +247,7 @@ async function saveDevice() {
       createdDeviceDialogVisible.value = true
     }
   } catch (error) {
-    ElMessage.error(error.response?.data?.message || '操作失败')
+    ElMessage.error(error.response?.data?.message || t('common.operationFailed'))
   } finally {
     saving.value = false
   }
@@ -254,20 +256,20 @@ async function saveDevice() {
 async function handleDelete(device) {
   try {
     await ElMessageBox.confirm(
-      `确定要删除设备 "${device.name}" 吗？此操作不可恢复。`,
-      '确认删除',
+      t('device.deleteConfirm', { name: device.name }),
+      t('common.confirmDelete'),
       {
-        confirmButtonText: '确定删除',
-        cancelButtonText: '取消',
+        confirmButtonText: t('device.confirmDeleteBtn'),
+        cancelButtonText: t('common.cancel'),
         type: 'warning',
         confirmButtonClass: 'el-button--danger'
       }
     )
     await devicesStore.deleteDevice(device.id)
-    ElMessage.success('设备已删除')
+    ElMessage.success(t('device.deletedSuccess'))
   } catch (error) {
     if (error !== 'cancel') {
-      ElMessage.error(error.response?.data?.message || '删除失败')
+      ElMessage.error(error.response?.data?.message || t('device.deleteFailed'))
     }
   }
 }
@@ -280,18 +282,18 @@ function openDeviceClient(device) {
 async function forceRefresh(device) {
   try {
     await devicesApi.forceRefresh(device.id)
-    ElMessage.success(`已向设备 "${device.name}" 发送刷新指令`)
+    ElMessage.success(t('device.refreshSent', { name: device.name }))
   } catch (error) {
-    ElMessage.error(error.response?.data?.message || '发送失败')
+    ElMessage.error(error.response?.data?.message || t('device.sendFailed'))
   }
 }
 
 async function copyUrl() {
   try {
     await navigator.clipboard.writeText(createdDeviceUrl.value)
-    ElMessage.success('已复制到剪贴板')
+    ElMessage.success(t('device.copySuccess'))
   } catch {
-    ElMessage.error('复制失败，请手动复制')
+    ElMessage.error(t('device.copyFailed'))
   }
 }
 
