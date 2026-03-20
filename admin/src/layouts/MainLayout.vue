@@ -38,6 +38,10 @@
           <el-icon><List /></el-icon>
           <span>信息列表</span>
         </el-menu-item>
+        <el-menu-item index="/file-repo">
+          <el-icon><FolderOpened /></el-icon>
+          <span>文件仓库</span>
+        </el-menu-item>
         <el-menu-item index="/api-keys">
           <el-icon><Key /></el-icon>
           <span>API密钥</span>
@@ -90,7 +94,7 @@ import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth.js'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { List } from '@element-plus/icons-vue'
+import { List, FolderOpened } from '@element-plus/icons-vue'
 
 const route = useRoute()
 const router = useRouter()

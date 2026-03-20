@@ -4,6 +4,7 @@ const express = require('express');
 const cors = require('cors');
 const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('./config/swagger');
+const { ensureRepoDir, getRepoPath } = require('./config/fileRepo');
 
 const app = express();
 
@@ -33,6 +34,7 @@ app.get('/api/docs.json', (req, res) => res.json(swaggerSpec));
 
 // --- Static file serving ---
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+app.use('/file-repo', express.static(getRepoPath()));
 
 const adminDistPath = path.join(process.cwd(), 'admin-dist');
 if (fs.existsSync(adminDistPath)) {
@@ -61,6 +63,7 @@ app.use('/api/v1/system', require('./routes/system'));
 app.use('/api/v1/uploads', require('./routes/uploads'));
 app.use('/api/v1/weather', require('./routes/weather'));
 app.use('/api/v1/info-items', require('./routes/infoItems'));
+app.use('/api/v1/file-repo', require('./routes/fileRepo'));
 
 // Root health check
 app.get('/', (req, res) => {

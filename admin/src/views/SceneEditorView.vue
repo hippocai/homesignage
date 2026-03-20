@@ -274,7 +274,10 @@
 
             <el-form v-else-if="selectedComponent.type === 'image'" label-width="80px" size="small">
               <el-form-item label="图片URL">
-                <el-input v-model="editForm.config.url" placeholder="输入图片地址" />
+                <div class="url-with-picker">
+                  <el-input v-model="editForm.config.url" placeholder="输入图片地址" />
+                  <el-button :icon="FolderOpened" @click="imagePickerVisible = true">从仓库选择</el-button>
+                </div>
               </el-form-item>
               <el-form-item label="填充方式">
                 <el-select v-model="editForm.config.objectFit">
@@ -395,6 +398,8 @@
         </div>
       </div>
     </el-dialog>
+
+  <FilePicker v-model="imagePickerVisible" type="image" @select="(url) => editForm.config.url = url" />
   </div>
 </template>
 
@@ -402,7 +407,8 @@
 import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { ArrowLeft, Plus, Check, Delete, View, Clock, Cloudy, Document, Picture, Link, List } from '@element-plus/icons-vue'
+import { ArrowLeft, Plus, Check, Delete, View, Clock, Cloudy, Document, Picture, Link, List, FolderOpened } from '@element-plus/icons-vue'
+import FilePicker from '../components/FilePicker.vue'
 import { scenesApi } from '../api/index.js'
 
 const route = useRoute()
@@ -435,6 +441,7 @@ const customHeight = ref(720)
 const sceneBackground = ref('#1a1a2e')
 const previewScale = ref(0.5)
 const dialogScale = ref(0.5)
+const imagePickerVisible = ref(false)
 
 // Refs
 const centerPanelRef = ref(null)
@@ -1168,5 +1175,11 @@ onUnmounted(() => {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.url-with-picker {
+  display: flex;
+  gap: 8px;
+  width: 100%;
 }
 </style>

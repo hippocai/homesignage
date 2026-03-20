@@ -310,6 +310,24 @@ const swaggerSpec = {
           end_time: { type: 'string', format: 'date-time', nullable: true, example: '2026-03-21T12:00:00', description: '到期时间，null 表示永久' },
         },
       },
+      // ── 文件仓库 ──
+      FileRepoFile: {
+        type: 'object',
+        properties: {
+          name: { type: 'string', example: 'photo.jpg', description: '文件名' },
+          size: { type: 'integer', example: 204800, description: '文件大小（字节）' },
+          type: { type: 'string', enum: ['image', 'audio', 'video', 'other'], example: 'image' },
+          url: { type: 'string', example: '/file-repo/photo.jpg', description: '静态访问 URL' },
+          mtime: { type: 'string', format: 'date-time', description: '最后修改时间' },
+        },
+      },
+      RenameFileRequest: {
+        type: 'object',
+        required: ['newName'],
+        properties: {
+          newName: { type: 'string', example: 'new-name.jpg', description: '新文件名' },
+        },
+      },
       // ── 定时提醒 ──
       TimedReminder: {
         type: 'object',
@@ -1174,6 +1192,129 @@ const swaggerSpec = {
       },
     },
 
+    // ── File Repo ──
+    '/file-repo': {
+      get: {
+        tags: ['文件仓库'],
+        summary: '列出文件仓库中的所有文件',
+        description: '返回文件仓库目录中所有文件的元数据列表，支持按类型过滤。',
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: 'type', in: 'query', schema: { type: 'string', enum: ['image', 'audio', 'video', 'other'] }, description: '按文件类型过滤' },
+        ],
+        responses: {
+          200: {
+            description: '文件列表',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    data: { type: 'array', items: { $ref: '#/components/schemas/FileRepoFile' } },
+                  },
+                },
+              },
+            },
+          },
+          401: { $ref: '#/components/responses/Unauthorized' },
+        },
+      },
+      post: {
+        tags: ['文件仓库'],
+        summary: '上传文件到仓库',
+        description: '将文件上传到文件仓库目录（最大 200MB）。',
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            'multipart/form-data': {
+              schema: {
+                type: 'object',
+                required: ['file'],
+                properties: {
+                  file: { type: 'string', format: 'binary', description: '要上传的文件' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          201: {
+            description: '上传成功',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    data: { $ref: '#/components/schemas/FileRepoFile' },
+                    message: { type: 'string', example: '文件上传成功' },
+                  },
+                },
+              },
+            },
+          },
+          400: { description: '未上传文件', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } },
+          401: { $ref: '#/components/responses/Unauthorized' },
+        },
+      },
+    },
+    '/file-repo/{filename}/download': {
+      get: {
+        tags: ['文件仓库'],
+        summary: '下载文件',
+        security: [{ bearerAuth: [] }],
+        parameters: [{ name: 'filename', in: 'path', required: true, schema: { type: 'string' }, example: 'photo.jpg' }],
+        responses: {
+          200: { description: '文件内容（二进制流）' },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          404: { $ref: '#/components/responses/NotFound' },
+        },
+      },
+    },
+    '/file-repo/{filename}': {
+      patch: {
+        tags: ['文件仓库'],
+        summary: '重命名文件',
+        security: [{ bearerAuth: [] }],
+        parameters: [{ name: 'filename', in: 'path', required: true, schema: { type: 'string' }, example: 'photo.jpg' }],
+        requestBody: {
+          required: true,
+          content: { 'application/json': { schema: { $ref: '#/components/schemas/RenameFileRequest' } } },
+        },
+        responses: {
+          200: {
+            description: '重命名成功',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    data: { $ref: '#/components/schemas/FileRepoFile' },
+                    message: { type: 'string', example: '文件已重命名' },
+                  },
+                },
+              },
+            },
+          },
+          400: { description: 'newName 缺失', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          404: { $ref: '#/components/responses/NotFound' },
+          409: { description: '目标文件名已存在', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } },
+        },
+      },
+      delete: {
+        tags: ['文件仓库'],
+        summary: '删除文件',
+        security: [{ bearerAuth: [] }],
+        parameters: [{ name: 'filename', in: 'path', required: true, schema: { type: 'string' }, example: 'photo.jpg' }],
+        responses: {
+          200: { description: '删除成功' },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          404: { $ref: '#/components/responses/NotFound' },
+        },
+      },
+    },
+
     // ── Weather ──
     '/weather': {
       get: {
@@ -1238,6 +1379,7 @@ const swaggerSpec = {
     { name: '紧急警报', description: '紧急警报的触发和解除（< 2 秒端到端推送）' },
     { name: 'API 密钥', description: '外部系统集成密钥管理' },
     { name: '文件上传', description: '图片和音频文件上传' },
+    { name: '文件仓库', description: '文件仓库管理：上传、下载、重命名、删除（支持图片/音频/视频）' },
     { name: '天气', description: '实时天气数据查询（wttr.in）' },
     { name: '系统', description: '系统运行状态监控' },
   ],

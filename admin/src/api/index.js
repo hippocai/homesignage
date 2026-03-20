@@ -99,4 +99,14 @@ export const uploadsApi = {
   delete: (filename) => api.delete(`/uploads/${filename}`)
 }
 
+export const fileRepoApi = {
+  list: (type) => api.get('/file-repo', { params: type ? { type } : {} }),
+  upload: (formData) => api.post('/file-repo', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }),
+  download: (filename) => api.get(`/file-repo/${encodeURIComponent(filename)}/download`, { responseType: 'blob' }),
+  rename: (filename, newName) => api.patch(`/file-repo/${encodeURIComponent(filename)}`, { newName }),
+  delete: (filename) => api.delete(`/file-repo/${encodeURIComponent(filename)}`)
+}
+
 export default api

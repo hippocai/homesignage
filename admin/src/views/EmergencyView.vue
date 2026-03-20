@@ -159,7 +159,10 @@
         </el-form-item>
 
         <el-form-item label="声音文件" v-if="triggerForm.sound_loop">
-          <el-input v-model="triggerForm.sound_url" placeholder="声音文件URL" />
+          <div class="url-with-picker">
+            <el-input v-model="triggerForm.sound_url" placeholder="声音文件URL" />
+            <el-button :icon="FolderOpened" @click="soundPickerVisible = true">从仓库选择</el-button>
+          </div>
         </el-form-item>
       </el-form>
 
@@ -175,13 +178,16 @@
         </el-button>
       </template>
     </el-dialog>
+
+    <FilePicker v-model="soundPickerVisible" type="audio" @select="(url) => triggerForm.sound_url = url" />
   </div>
 </template>
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Warning, Refresh } from '@element-plus/icons-vue'
+import { Warning, Refresh, FolderOpened } from '@element-plus/icons-vue'
+import FilePicker from '../components/FilePicker.vue'
 import { remindersApi, devicesApi } from '../api/index.js'
 
 const activeLoading = ref(false)
@@ -193,6 +199,7 @@ const activeAlerts = ref([])
 const history = ref([])
 const devices = ref([])
 const triggerFormRef = ref(null)
+const soundPickerVisible = ref(false)
 
 const triggerForm = reactive({
   target_devices: [],
@@ -461,5 +468,11 @@ onMounted(() => {
   margin-left: 10px;
   font-size: 13px;
   color: #606266;
+}
+
+.url-with-picker {
+  display: flex;
+  gap: 8px;
+  width: 100%;
 }
 </style>

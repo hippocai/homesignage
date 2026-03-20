@@ -53,6 +53,11 @@ const routes = [
         component: () => import('../views/InfoItemsView.vue')
       },
       {
+        path: 'file-repo',
+        name: 'FileRepo',
+        component: () => import('../views/FileRepoView.vue')
+      },
+      {
         path: 'api-keys',
         name: 'ApiKeys',
         component: () => import('../views/ApiKeysView.vue')
