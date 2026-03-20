@@ -124,6 +124,12 @@
                     <span>图片</span>
                   </div>
                 </template>
+                <template v-else-if="comp.type === 'video'">
+                  <div class="comp-placeholder">
+                    <el-icon :size="18"><VideoPlay /></el-icon>
+                    <span>{{ comp.config?.url ? comp.config.url.split('/').pop() : '视频' }}</span>
+                  </div>
+                </template>
                 <template v-else-if="comp.type === 'clock'">
                   <div class="clock-preview">{{ getClockDisplay(comp) }}</div>
                 </template>
@@ -289,6 +295,32 @@
               </el-form-item>
             </el-form>
 
+            <el-form v-else-if="selectedComponent.type === 'video'" label-width="80px" size="small">
+              <el-form-item label="视频URL">
+                <div class="url-with-picker">
+                  <el-input v-model="editForm.config.url" placeholder="输入视频地址" />
+                  <el-button :icon="FolderOpened" @click="videoPickerVisible = true">从仓库选择</el-button>
+                </div>
+              </el-form-item>
+              <el-form-item label="填充方式">
+                <el-select v-model="editForm.config.objectFit">
+                  <el-option label="覆盖 (cover)" value="cover" />
+                  <el-option label="包含 (contain)" value="contain" />
+                  <el-option label="原始大小 (none)" value="none" />
+                </el-select>
+              </el-form-item>
+              <el-form-item label="自动播放">
+                <el-switch v-model="editForm.config.autoplay" />
+              </el-form-item>
+              <el-form-item label="循环播放">
+                <el-switch v-model="editForm.config.loop" />
+              </el-form-item>
+              <el-form-item label="静音播放">
+                <el-switch v-model="editForm.config.muted" />
+                <div style="font-size:11px;color:#909399;margin-top:2px">浏览器要求自动播放时必须静音</div>
+              </el-form-item>
+            </el-form>
+
             <el-form v-else-if="selectedComponent.type === 'iframe'" label-width="80px" size="small">
               <el-form-item label="网页URL">
                 <el-input v-model="editForm.config.url" placeholder="https://..." />
@@ -362,6 +394,9 @@
                   :style="{ objectFit: comp.config.objectFit || 'cover', width: '100%', height: '100%' }"
                 />
               </template>
+              <template v-else-if="comp.type === 'video'">
+                <div class="dialog-iframe">🎬 {{ comp.config?.url?.split('/').pop() || '视频' }}</div>
+              </template>
               <template v-else-if="comp.type === 'clock'">
                 <div class="clock-preview dialog-clock">{{ getClockDisplay(comp) }}</div>
               </template>
@@ -400,6 +435,7 @@
     </el-dialog>
 
   <FilePicker v-model="imagePickerVisible" type="image" @select="(url) => editForm.config.url = url" />
+  <FilePicker v-model="videoPickerVisible" type="video" @select="(url) => editForm.config.url = url" />
   </div>
 </template>
 
@@ -407,7 +443,7 @@
 import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { ArrowLeft, Plus, Check, Delete, View, Clock, Cloudy, Document, Picture, Link, List, FolderOpened } from '@element-plus/icons-vue'
+import { ArrowLeft, Plus, Check, Delete, View, Clock, Cloudy, Document, Picture, VideoPlay, Link, List, FolderOpened } from '@element-plus/icons-vue'
 import FilePicker from '../components/FilePicker.vue'
 import { scenesApi } from '../api/index.js'
 
@@ -442,6 +478,7 @@ const sceneBackground = ref('#1a1a2e')
 const previewScale = ref(0.5)
 const dialogScale = ref(0.5)
 const imagePickerVisible = ref(false)
+const videoPickerVisible = ref(false)
 
 // Refs
 const centerPanelRef = ref(null)
@@ -458,8 +495,9 @@ const componentTypes = [
   { value: 'clock',     label: '时钟',   icon: 'Clock',    color: '#409EFF' },
   { value: 'weather',   label: '天气',   icon: 'Cloudy',   color: '#67C23A' },
   { value: 'text',      label: '文字',   icon: 'Document', color: '#E6A23C' },
-  { value: 'image',     label: '图片',   icon: 'Picture',  color: '#F56C6C' },
-  { value: 'iframe',    label: '网页',   icon: 'Link',     color: '#909399' },
+  { value: 'image',     label: '图片',   icon: 'Picture',    color: '#F56C6C' },
+  { value: 'video',     label: '视频',   icon: 'VideoPlay', color: '#E040FB' },
+  { value: 'iframe',    label: '网页',   icon: 'Link',      color: '#909399' },
   { value: 'info-list', label: '信息列表', icon: 'List',   color: '#9B59B6' },
 ]
 const defaultConfigs = {
@@ -467,6 +505,7 @@ const defaultConfigs = {
   weather:   { city: 'Beijing', unit: 'C' },
   text:      { content: '文字内容', fontSize: 24, color: '#ffffff', backgroundColor: 'transparent', textAlign: 'center' },
   image:     { url: '', objectFit: 'cover' },
+  video:     { url: '', objectFit: 'cover', autoplay: true, loop: true, muted: true },
   iframe:    { url: 'https://example.com' },
   'info-list': { fontSize: 18, color: '#ffffff', backgroundColor: 'rgba(0,0,0,0.5)', itemSpacing: 6, padding: 10, scrollSpeed: 40, pageInterval: 5 },
 }
@@ -537,10 +576,10 @@ function applyCustomResolution() {
 
 // Component helpers
 function getComponentIcon(type) {
-  return { clock: 'Clock', weather: 'Cloudy', text: 'Document', image: 'Picture', iframe: 'Link', 'info-list': 'List' }[type] || 'Grid'
+  return { clock: 'Clock', weather: 'Cloudy', text: 'Document', image: 'Picture', video: 'VideoPlay', iframe: 'Link', 'info-list': 'List' }[type] || 'Grid'
 }
 function getComponentLabel(type) {
-  return { clock: '时钟', weather: '天气', text: '文字', image: '图片', iframe: '网页', 'info-list': '信息列表' }[type] || type
+  return { clock: '时钟', weather: '天气', text: '文字', image: '图片', video: '视频', iframe: '网页', 'info-list': '信息列表' }[type] || type
 }
 function getComponentSummary(comp) {
   const cfg = comp.config || {}
@@ -548,6 +587,7 @@ function getComponentSummary(comp) {
   if (comp.type === 'weather')   return cfg.city || '未设置城市'
   if (comp.type === 'text')      return (cfg.content || '').slice(0, 20) || '空文字'
   if (comp.type === 'image')     return cfg.url ? cfg.url.split('/').pop() : '未设置URL'
+  if (comp.type === 'video')     return cfg.url ? cfg.url.split('/').pop() : '未设置URL'
   if (comp.type === 'iframe')    return cfg.url || '未设置URL'
   if (comp.type === 'info-list') return `字号${cfg.fontSize || 18}px · 滚动速度${cfg.scrollSpeed || 40}`
   return ''

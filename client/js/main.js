@@ -364,6 +364,10 @@ function renderComponent(component) {
       renderIframe(el, cfg);
       break;
 
+    case 'video':
+      renderVideo(el, cfg);
+      break;
+
     case 'info-list':
       renderInfoList(el, cfg);
       break;
@@ -615,6 +619,34 @@ function renderImage(el, cfg) {
   };
 
   el.appendChild(img);
+}
+
+/* ── Video ── */
+function renderVideo(el, cfg) {
+  var src = cfg.url || cfg.src || '';
+  el.style.overflow = 'hidden';
+
+  var video = document.createElement('video');
+  video.src      = src;
+  video.style.width     = '100%';
+  video.style.height    = '100%';
+  video.style.objectFit = cfg.objectFit || 'cover';
+  video.autoplay = cfg.autoplay !== false; // default true
+  video.loop     = cfg.loop     !== false; // default true
+  video.muted    = cfg.muted    !== false; // default true (required for autoplay on most browsers)
+  video.playsInline = true;               // iOS Safari
+  video.setAttribute('playsinline', '');  // extra compatibility
+
+  video.onerror = function () {
+    el.style.background = '#111';
+    video.style.display = 'none';
+    var ph = document.createElement('div');
+    ph.style.cssText = 'display:flex;align-items:center;justify-content:center;height:100%;color:#555;font-size:0.9em;';
+    ph.textContent = '视频加载失败';
+    el.appendChild(ph);
+  };
+
+  el.appendChild(video);
 }
 
 /* ── Iframe ── */

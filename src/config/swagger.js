@@ -214,7 +214,7 @@ const swaggerSpec = {
           scene_id: { type: 'string', format: 'uuid' },
           type: {
             type: 'string',
-            enum: ['clock', 'weather', 'text', 'image', 'iframe', 'info-list'],
+            enum: ['clock', 'weather', 'text', 'image', 'video', 'iframe', 'info-list'],
             example: 'clock',
           },
           position: {
@@ -245,7 +245,7 @@ const swaggerSpec = {
         properties: {
           type: {
             type: 'string',
-            enum: ['clock', 'weather', 'text', 'image', 'iframe', 'info-list'],
+            enum: ['clock', 'weather', 'text', 'image', 'video', 'iframe', 'info-list'],
             example: 'clock',
           },
           position: {
@@ -261,7 +261,7 @@ const swaggerSpec = {
           config: {
             type: 'object',
             example: { format: '24h', showDate: true },
-            description: '根据组件类型不同：clock={format,showDate,timezone}; weather={city,unit}; text={content,align}; image={url}; iframe={url}; info-list={fontSize,color,backgroundColor,scrollSpeed,pageInterval}',
+            description: '根据组件类型不同：clock={format,showDate,timezone}; weather={city,unit}; text={content,align}; image={url,objectFit}; video={url,objectFit,autoplay,loop,muted}; iframe={url}; info-list={fontSize,color,backgroundColor,scrollSpeed,pageInterval}',
           },
           style: {
             type: 'object',
