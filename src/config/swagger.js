@@ -83,6 +83,14 @@ const swaggerSpec = {
           message: { type: 'string', example: 'Login successful' },
         },
       },
+      ChangePasswordRequest: {
+        type: 'object',
+        required: ['currentPassword', 'newPassword'],
+        properties: {
+          currentPassword: { type: 'string', example: 'admin123' },
+          newPassword: { type: 'string', minLength: 6, example: 'newSecret123' },
+        },
+      },
       // ── 设备 ──
       Device: {
         type: 'object',
@@ -101,6 +109,7 @@ const swaggerSpec = {
             },
           },
           status: { type: 'string', enum: ['online', 'offline'], example: 'online' },
+          connected: { type: 'boolean', example: true, description: '是否当前通过 WebSocket 连接（实时）' },
           last_seen: { type: 'string', format: 'date-time', nullable: true },
           ip_address: { type: 'string', example: '192.168.1.100', nullable: true },
           created_at: { type: 'string', format: 'date-time' },
@@ -117,23 +126,44 @@ const swaggerSpec = {
       },
       DeviceConfig: {
         type: 'object',
+        description: '设备完整配置，供显示客户端使用',
         properties: {
           device: {
             type: 'object',
             properties: {
-              id: { type: 'string' },
+              id: { type: 'string', format: 'uuid' },
               name: { type: 'string' },
-              configVersion: { type: 'integer' },
+              group_name: { type: 'string', nullable: true },
+              config: { type: 'object', nullable: true },
             },
           },
           scenes: {
             type: 'array',
-            items: { $ref: '#/components/schemas/SceneWithComponents' },
+            items: {
+              type: 'object',
+              properties: {
+                deviceSceneConfig: {
+                  type: 'object',
+                  properties: {
+                    duration: { type: 'integer', example: 15, description: '显示时长（秒）' },
+                    sort_order: { type: 'integer', example: 0 },
+                    enabled: { type: 'boolean', example: true },
+                  },
+                },
+                scene: {
+                  type: 'object',
+                  properties: {
+                    id: { type: 'string', format: 'uuid' },
+                    name: { type: 'string' },
+                    description: { type: 'string', nullable: true },
+                    thumbnail: { type: 'string', nullable: true },
+                  },
+                },
+                components: { type: 'array', items: { $ref: '#/components/schemas/Component' } },
+              },
+            },
           },
-          transition: { type: 'string', example: 'fade' },
-          activeReminders: { type: 'array', items: { $ref: '#/components/schemas/TimedReminder' } },
-          emergencyAlert: { $ref: '#/components/schemas/EmergencyAlert', nullable: true },
-          timestamp: { type: 'integer', example: 1698400000 },
+          emergency_alerts: { type: 'array', items: { $ref: '#/components/schemas/EmergencyAlert' } },
         },
       },
       DeviceSceneItem: {
@@ -165,7 +195,6 @@ const swaggerSpec = {
             type: 'object',
             properties: {
               components: { type: 'array', items: { $ref: '#/components/schemas/Component' } },
-              duration: { type: 'integer', example: 15, description: '轮播时长（秒），来自设备分配配置' },
             },
           },
         ],
@@ -183,7 +212,11 @@ const swaggerSpec = {
         properties: {
           id: { type: 'string', format: 'uuid' },
           scene_id: { type: 'string', format: 'uuid' },
-          type: { type: 'string', enum: ['clock', 'weather', 'text', 'image', 'iframe'], example: 'clock' },
+          type: {
+            type: 'string',
+            enum: ['clock', 'weather', 'text', 'image', 'iframe', 'info-list'],
+            example: 'clock',
+          },
           position: {
             type: 'object',
             properties: {
@@ -212,7 +245,7 @@ const swaggerSpec = {
         properties: {
           type: {
             type: 'string',
-            enum: ['clock', 'weather', 'text', 'image', 'iframe'],
+            enum: ['clock', 'weather', 'text', 'image', 'iframe', 'info-list'],
             example: 'clock',
           },
           position: {
@@ -228,7 +261,7 @@ const swaggerSpec = {
           config: {
             type: 'object',
             example: { format: '24h', showDate: true },
-            description: '根据组件类型不同：clock={format,showDate,timezone}; weather={city,unit}; text={content,align}; image={url}; iframe={url}',
+            description: '根据组件类型不同：clock={format,showDate,timezone}; weather={city,unit}; text={content,align}; image={url}; iframe={url}; info-list={fontSize,color,backgroundColor,scrollSpeed,pageInterval}',
           },
           style: {
             type: 'object',
@@ -238,10 +271,43 @@ const swaggerSpec = {
       },
       UpdateTextContentRequest: {
         type: 'object',
-        required: ['componentId', 'content'],
+        required: ['componentId', 'text'],
         properties: {
           componentId: { type: 'string', format: 'uuid', description: '要更新的文本组件 ID' },
-          content: { type: 'string', example: '今日购物清单：牛奶、鸡蛋、面包' },
+          text: { type: 'string', example: '今日购物清单：牛奶、鸡蛋、面包' },
+        },
+      },
+      // ── 信息列表 ──
+      InfoItem: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', format: 'uuid' },
+          type: {
+            type: 'string',
+            enum: ['info', 'important', 'urgent'],
+            example: 'info',
+            description: 'info=提示（蓝）, important=重要（黄）, urgent=紧急（红）',
+          },
+          text: { type: 'string', example: '明天上午 10 点楼道消毒，请勿外出' },
+          start_time: { type: 'string', format: 'date-time', nullable: true, description: '开始显示时间，null 表示立即' },
+          end_time: { type: 'string', format: 'date-time', nullable: true, description: '到期时间，null 表示永久' },
+          created_at: { type: 'string', format: 'date-time' },
+          updated_at: { type: 'string', format: 'date-time' },
+        },
+      },
+      CreateInfoItemRequest: {
+        type: 'object',
+        required: ['text'],
+        properties: {
+          type: {
+            type: 'string',
+            enum: ['info', 'important', 'urgent'],
+            default: 'info',
+            description: 'info=提示（蓝）, important=重要（黄）, urgent=紧急（红）',
+          },
+          text: { type: 'string', example: '明天上午 10 点楼道消毒，请勿外出' },
+          start_time: { type: 'string', format: 'date-time', nullable: true, example: null, description: '开始显示时间，null 表示立即' },
+          end_time: { type: 'string', format: 'date-time', nullable: true, example: '2026-03-21T12:00:00', description: '到期时间，null 表示永久' },
         },
       },
       // ── 定时提醒 ──
@@ -358,13 +424,13 @@ const swaggerSpec = {
       },
       TriggerEmergencyRequest: {
         type: 'object',
-        required: ['device_ids', 'content', 'sound'],
+        required: ['content'],
         properties: {
           device_ids: {
             type: 'array',
             items: { type: 'string' },
             example: ['all'],
-            description: '目标设备 ID 列表，传 ["all"] 表示所有设备',
+            description: '目标设备 ID 列表，传 ["all"] 表示所有设备。也可写作 deviceIds（camelCase）',
           },
           content: {
             type: 'object',
@@ -378,7 +444,6 @@ const swaggerSpec = {
           },
           sound: {
             type: 'object',
-            required: ['file'],
             properties: {
               file: { type: 'string', example: 'alarm.mp3' },
               volume: { type: 'number', minimum: 0, maximum: 1, default: 0.8 },
@@ -428,19 +493,22 @@ const swaggerSpec = {
         type: 'object',
         properties: {
           uptime: { type: 'integer', example: 3600, description: '运行时间（秒）' },
-          uptime_human: { type: 'string', example: '1h' },
+          uptime_human: { type: 'string', example: '1h 0m 0s' },
           device_count: { type: 'integer', example: 3 },
           online_device_count: { type: 'integer', example: 2 },
           connected_device_count: { type: 'integer', example: 2 },
+          connected_device_ids: { type: 'array', items: { type: 'string', format: 'uuid' }, description: '当前通过 WebSocket 连接的设备 ID 列表' },
           active_reminder_count: { type: 'integer', example: 1 },
           active_emergency_count: { type: 'integer', example: 0 },
           node_version: { type: 'string', example: 'v18.12.0' },
+          platform: { type: 'string', example: 'linux', description: 'Node.js process.platform' },
           memory: {
             type: 'object',
             properties: {
               rss: { type: 'integer' },
               heapTotal: { type: 'integer' },
               heapUsed: { type: 'integer' },
+              external: { type: 'integer' },
             },
           },
           pid: { type: 'integer', example: 1234 },
@@ -491,7 +559,27 @@ const swaggerSpec = {
         summary: '验证 JWT Token 有效性',
         security: [{ bearerAuth: [] }],
         responses: {
-          200: { description: 'Token 有效', content: { 'application/json': { schema: { type: 'object', properties: { data: { type: 'object', properties: { valid: { type: 'boolean' }, user: { type: 'object' } } } } } } } },
+          200: {
+            description: 'Token 有效',
+            content: { 'application/json': { schema: { type: 'object', properties: { data: { type: 'object', properties: { user: { type: 'object', properties: { id: { type: 'string' }, username: { type: 'string' }, role: { type: 'string' } } } } }, message: { type: 'string' } } } } },
+          },
+          401: { $ref: '#/components/responses/Unauthorized' },
+        },
+      },
+    },
+    '/auth/change-password': {
+      post: {
+        tags: ['认证'],
+        summary: '修改密码',
+        description: '修改当前登录用户的密码，新密码至少 6 位。',
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: { 'application/json': { schema: { $ref: '#/components/schemas/ChangePasswordRequest' } } },
+        },
+        responses: {
+          200: { description: '密码修改成功', content: { 'application/json': { schema: { type: 'object', properties: { message: { type: 'string', example: '密码已修改成功' } } } } } },
+          400: { $ref: '#/components/responses/BadRequest' },
           401: { $ref: '#/components/responses/Unauthorized' },
         },
       },
@@ -552,7 +640,7 @@ const swaggerSpec = {
           content: { 'application/json': { schema: { $ref: '#/components/schemas/CreateDeviceRequest' } } },
         },
         responses: {
-          200: { description: '更新成功' },
+          200: { description: '更新成功', content: { 'application/json': { schema: { type: 'object', properties: { data: { $ref: '#/components/schemas/Device' }, message: { type: 'string' } } } } } },
           401: { $ref: '#/components/responses/Unauthorized' },
           404: { $ref: '#/components/responses/NotFound' },
         },
@@ -573,7 +661,7 @@ const swaggerSpec = {
       get: {
         tags: ['设备管理'],
         summary: '获取设备完整配置',
-        description: '供显示客户端调用，返回设备绑定的画面列表、组件、活跃的定时提醒和紧急警报。使用 X-Device-Key 而非 JWT 认证。',
+        description: '供显示客户端调用，返回设备绑定的画面列表、各画面组件，以及当前活跃的紧急警报。使用 X-Device-Key 而非 JWT 认证。',
         parameters: [
           { name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' }, description: '设备 ID' },
           { name: 'X-Device-Key', in: 'header', required: true, schema: { type: 'string' }, description: '设备专属密钥' },
@@ -617,19 +705,36 @@ const swaggerSpec = {
                     data: {
                       type: 'object',
                       properties: {
-                        status: { type: 'string', example: 'ok' },
+                        status: { type: 'string', example: 'online' },
                         emergency_alerts: { type: 'array', items: { $ref: '#/components/schemas/EmergencyAlert' } },
                       },
                     },
+                    message: { type: 'string', example: 'Heartbeat received' },
                   },
                 },
               },
             },
           },
+          404: { $ref: '#/components/responses/NotFound' },
         },
       },
     },
     '/devices/{id}/scenes': {
+      get: {
+        tags: ['设备管理'],
+        summary: '获取设备绑定的画面列表',
+        description: '返回设备当前分配的画面及其轮播配置（时长、顺序、是否启用）。',
+        security: [{ bearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+        responses: {
+          200: {
+            description: '设备画面列表',
+            content: { 'application/json': { schema: { type: 'object', properties: { data: { type: 'array', items: { type: 'object' } } } } } },
+          },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          404: { $ref: '#/components/responses/NotFound' },
+        },
+      },
       put: {
         tags: ['设备管理'],
         summary: '配置设备的轮播画面',
@@ -662,7 +767,7 @@ const swaggerSpec = {
       post: {
         tags: ['设备管理'],
         summary: '强制切换设备当前画面',
-        description: '立即通过 WebSocket 通知设备切换到指定画面。',
+        description: '立即通过 WebSocket 通知设备切换到指定画面（发送 force-scene 事件）。',
         security: [{ bearerAuth: [] }, { apiKeyAuth: [] }],
         parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
         requestBody: {
@@ -670,7 +775,21 @@ const swaggerSpec = {
           content: { 'application/json': { schema: { type: 'object', required: ['sceneId'], properties: { sceneId: { type: 'string', format: 'uuid' } } } } },
         },
         responses: {
-          200: { description: '切换成功' },
+          200: { description: '切换指令已发送' },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          404: { $ref: '#/components/responses/NotFound' },
+        },
+      },
+    },
+    '/devices/{id}/refresh': {
+      post: {
+        tags: ['设备管理'],
+        summary: '强制设备刷新页面',
+        description: '通过 WebSocket 发送 force-refresh 事件，设备将立即重新加载整个页面。',
+        security: [{ bearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+        responses: {
+          200: { description: '刷新指令已发送', content: { 'application/json': { schema: { type: 'object', properties: { message: { type: 'string', example: 'Force refresh command sent' } } } } } },
           401: { $ref: '#/components/responses/Unauthorized' },
           404: { $ref: '#/components/responses/NotFound' },
         },
@@ -778,12 +897,82 @@ const swaggerSpec = {
       patch: {
         tags: ['画面管理'],
         summary: '动态更新文本组件内容',
-        description: '外部系统（如家庭自动化系统）用于动态更新指定画面中文本组件的内容，无需重新配置整个画面。更新后会通过 WebSocket 推送 config-updated 事件通知所有相关设备。',
+        description: '外部系统（如家庭自动化系统）用于动态更新指定画面中文本组件的内容，无需重新配置整个画面。更新后会通过 WebSocket 推送 config-updated 事件通知所有相关设备。请求体字段为 `text`（非 content）。',
         security: [{ bearerAuth: [] }, { apiKeyAuth: [] }],
         parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' }, description: '画面 ID' }],
         requestBody: { required: true, content: { 'application/json': { schema: { $ref: '#/components/schemas/UpdateTextContentRequest' } } } },
         responses: {
           200: { description: '更新成功，已通知相关设备刷新' },
+          400: { $ref: '#/components/responses/BadRequest' },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          404: { $ref: '#/components/responses/NotFound' },
+        },
+      },
+    },
+
+    // ── Info Items ──
+    '/info-items': {
+      get: {
+        tags: ['信息列表'],
+        summary: '获取所有信息条目',
+        description: '返回全部信息条目（含已过期），按创建时间降序排列。',
+        security: [{ bearerAuth: [] }, { apiKeyAuth: [] }],
+        responses: {
+          200: { description: '信息条目列表', content: { 'application/json': { schema: { type: 'object', properties: { data: { type: 'array', items: { $ref: '#/components/schemas/InfoItem' } } } } } } },
+          401: { $ref: '#/components/responses/Unauthorized' },
+        },
+      },
+      post: {
+        tags: ['信息列表'],
+        summary: '创建信息条目',
+        description: '创建后通过 Socket.IO 实时推送 info-items-updated 事件到所有显示设备。',
+        security: [{ bearerAuth: [] }, { apiKeyAuth: [] }],
+        requestBody: {
+          required: true,
+          content: { 'application/json': { schema: { $ref: '#/components/schemas/CreateInfoItemRequest' } } },
+        },
+        responses: {
+          201: { description: '创建成功', content: { 'application/json': { schema: { type: 'object', properties: { data: { $ref: '#/components/schemas/InfoItem' }, message: { type: 'string' } } } } } },
+          400: { $ref: '#/components/responses/BadRequest' },
+          401: { $ref: '#/components/responses/Unauthorized' },
+        },
+      },
+    },
+    '/info-items/active': {
+      get: {
+        tags: ['信息列表'],
+        summary: '获取当前有效的信息条目',
+        description: '返回 start_time 已到且 end_time 未到期（或永久）的条目，供显示客户端调用，无需认证。',
+        responses: {
+          200: { description: '有效信息条目', content: { 'application/json': { schema: { type: 'object', properties: { data: { type: 'array', items: { $ref: '#/components/schemas/InfoItem' } } } } } } },
+        },
+      },
+    },
+    '/info-items/{id}': {
+      put: {
+        tags: ['信息列表'],
+        summary: '更新信息条目',
+        description: '支持部分更新，只传需要修改的字段。更新后实时推送到所有显示设备。',
+        security: [{ bearerAuth: [] }, { apiKeyAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+        requestBody: {
+          required: true,
+          content: { 'application/json': { schema: { $ref: '#/components/schemas/CreateInfoItemRequest' } } },
+        },
+        responses: {
+          200: { description: '更新成功', content: { 'application/json': { schema: { type: 'object', properties: { data: { $ref: '#/components/schemas/InfoItem' }, message: { type: 'string' } } } } } },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          404: { $ref: '#/components/responses/NotFound' },
+        },
+      },
+      delete: {
+        tags: ['信息列表'],
+        summary: '删除信息条目',
+        description: '删除后实时推送到所有显示设备。',
+        security: [{ bearerAuth: [] }, { apiKeyAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+        responses: {
+          200: { description: '删除成功' },
           401: { $ref: '#/components/responses/Unauthorized' },
           404: { $ref: '#/components/responses/NotFound' },
         },
@@ -858,7 +1047,7 @@ const swaggerSpec = {
       post: {
         tags: ['紧急警报'],
         summary: '触发紧急警报',
-        description: '**立即**通过 WebSocket 推送到目标设备（端到端延迟 < 2 秒）。设备将全屏显示警报内容并循环播放警示音，直至手动解除。',
+        description: '**立即**通过 WebSocket 推送到目标设备（端到端延迟 < 2 秒）。设备将全屏显示警报内容并循环播放警示音，直至手动解除。`device_ids` 字段也可写作 `deviceIds`（camelCase）。',
         security: [{ bearerAuth: [] }, { apiKeyAuth: [] }],
         requestBody: { required: true, content: { 'application/json': { schema: { $ref: '#/components/schemas/TriggerEmergencyRequest' } } } },
         responses: {
@@ -904,7 +1093,7 @@ const swaggerSpec = {
       get: {
         tags: ['API 密钥'],
         summary: '获取所有 API 密钥',
-        description: '列表中的密钥字段已脱敏（仅显示前 8 位），完整密钥仅在创建时返回一次。',
+        description: '列表中的密钥字段已脱敏（仅显示前后几位），完整密钥仅在创建时返回一次。',
         security: [{ bearerAuth: [] }],
         responses: {
           200: { description: 'API 密钥列表', content: { 'application/json': { schema: { type: 'object', properties: { data: { type: 'array', items: { $ref: '#/components/schemas/ApiKey' } } } } } } },
@@ -939,7 +1128,11 @@ const swaggerSpec = {
       get: {
         tags: ['文件上传'],
         summary: '获取已上传文件列表',
+        description: '可通过 type 查询参数过滤文件类型。',
         security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: 'type', in: 'query', required: false, schema: { type: 'string', enum: ['image', 'audio', 'video'] }, description: '按文件类型过滤' },
+        ],
         responses: {
           200: { description: '文件列表', content: { 'application/json': { schema: { type: 'object', properties: { data: { type: 'array', items: { $ref: '#/components/schemas/Upload' } } } } } } },
           401: { $ref: '#/components/responses/Unauthorized' },
@@ -981,6 +1174,46 @@ const swaggerSpec = {
       },
     },
 
+    // ── Weather ──
+    '/weather': {
+      get: {
+        tags: ['天气'],
+        summary: '获取城市天气数据',
+        description: '通过 wttr.in 获取实时天气，无需 API Key，无需认证。',
+        parameters: [
+          { name: 'city', in: 'query', required: false, schema: { type: 'string', example: 'Beijing' }, description: '城市名（英文或中文），默认 Beijing' },
+          { name: 'unit', in: 'query', required: false, schema: { type: 'string', enum: ['C', 'F'], default: 'C' }, description: '温度单位（当前仅用于前端展示，后端同时返回摄氏和华氏）' },
+        ],
+        responses: {
+          200: {
+            description: '天气数据',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    data: {
+                      type: 'object',
+                      properties: {
+                        city: { type: 'string', example: 'Beijing' },
+                        tempC: { type: 'integer', example: 22 },
+                        tempF: { type: 'integer', example: 72 },
+                        weatherCode: { type: 'integer', example: 113 },
+                        description: { type: 'string', example: '晴' },
+                        humidity: { type: 'string', example: '45' },
+                        windKmph: { type: 'string', example: '15' },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          502: { description: '上游天气服务不可用', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } },
+        },
+      },
+    },
+
     // ── System ──
     '/system/status': {
       get: {
@@ -997,13 +1230,15 @@ const swaggerSpec = {
   },
 
   tags: [
-    { name: '认证', description: '管理员登录和 Token 验证' },
+    { name: '认证', description: '管理员登录、Token 验证和密码修改' },
     { name: '设备管理', description: '显示设备的注册、配置和状态管理' },
     { name: '画面管理', description: '画面和组件的 CRUD 操作' },
+    { name: '信息列表', description: '全局信息公告条目管理（实时推送到所有显示设备）' },
     { name: '定时提醒', description: '定时提醒任务的创建和调度' },
     { name: '紧急警报', description: '紧急警报的触发和解除（< 2 秒端到端推送）' },
     { name: 'API 密钥', description: '外部系统集成密钥管理' },
     { name: '文件上传', description: '图片和音频文件上传' },
+    { name: '天气', description: '实时天气数据查询（wttr.in）' },
     { name: '系统', description: '系统运行状态监控' },
   ],
 };

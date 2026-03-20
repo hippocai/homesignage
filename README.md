@@ -64,6 +64,7 @@ npm start
 Once running:
 - Admin UI → `http://localhost:3000/admin`
 - Display client → `http://localhost:3000/client`
+- API docs (Swagger) → `http://localhost:3000/api/docs`
 
 ---
 
@@ -401,6 +402,7 @@ npm start
 服务启动后访问：
 - 管理后台：`http://localhost:3000/admin`
 - 显示客户端：`http://localhost:3000/client`
+- API 文档（Swagger）：`http://localhost:3000/api/docs`
 
 ---
 
