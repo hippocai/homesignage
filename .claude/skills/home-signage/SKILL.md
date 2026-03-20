@@ -1,7 +1,7 @@
 ---
 name: home-signage
-description: 控制 HomeSignage 家庭数字标牌系统。管理设备、画面、定时提醒和紧急警报。触发词：home-signage、标牌、显示屏、紧急警报、定时提醒。
-argument-hint: "[操作描述] 例如：触发煤气泄漏警报 / 显示所有在线设备 / 在客厅屏幕创建出门提醒"
+description: 控制 HomeSignage 家庭数字标牌系统。管理设备、画面、信息列表、定时提醒和紧急警报。触发词：home-signage、标牌、显示屏、紧急警报、定时提醒、信息列表、公告。
+argument-hint: "[操作描述] 例如：触发煤气泄漏警报 / 显示所有在线设备 / 在客厅屏幕创建出门提醒 / 添加一条重要信息到信息列表"
 ---
 
 # HomeSignage 控制助手
@@ -73,6 +73,23 @@ try:
     print('（暂无画面）')
   for s in data:
     print(f\"🖼  {s['name']} (ID: {s['id'][:8]}...)\")
+except: print('（获取失败）')
+" 2>/dev/null || echo "（获取失败）"
+
+echo ""
+echo "=== 信息列表（有效条目）==="
+curl -sf "$SERVER/api/v1/info-items/active" -H "Authorization: Bearer $TOKEN" 2>/dev/null \
+  | python3 -c "
+import sys, json
+TYPE = {'info':'[提示]','important':'[重要]','urgent':'[紧急]'}
+try:
+  data = json.load(sys.stdin).get('data', [])
+  if not data:
+    print('（暂无有效条目）')
+  for item in data:
+    t = TYPE.get(item.get('type','info'),'[提示]')
+    end = item.get('end_time','永久') or '永久'
+    print(f\"{t} {item['text'][:40]} | 到期: {end[:16]} | ID: {item['id'][:8]}...\")
 except: print('（获取失败）')
 " 2>/dev/null || echo "（获取失败）"
 
@@ -210,6 +227,53 @@ curl -s -X PUT "$SERVER/api/v1/devices/<deviceId>/scenes" \
       {"sceneId":"<sceneId2>","duration":20,"sortOrder":1,"enabled":true}
     ]
   }'
+```
+
+---
+
+### 📋 信息列表
+
+信息列表是所有画面共享的全局公告板。三种类型：`info`（提示/蓝）、`important`（重要/黄）、`urgent`（紧急/红）。增删改后即时推送至所有显示设备。
+
+**查看所有条目：**
+```bash
+curl -s "$SERVER/api/v1/info-items" -H "Authorization: Bearer $TOKEN" \
+  | python3 -c "
+import sys, json
+TYPE = {'info':'提示','important':'重要','urgent':'紧急'}
+for item in json.load(sys.stdin)['data']:
+    end = item.get('end_time','永久') or '永久'
+    print(f\"[{TYPE.get(item['type'],'?')}] {item['text']} | 到期:{end[:16]} | {item['id']}\")
+"
+```
+
+**添加信息条目：**
+```bash
+# type 可选: info | important | urgent
+# start_time / end_time 格式: "2026-03-20T08:00:00"，留 null 表示立即/永久
+curl -s -X POST "$SERVER/api/v1/info-items" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "type": "important",
+    "text": "明天上午 10 点楼道消毒，请勿外出",
+    "start_time": null,
+    "end_time": "2026-03-21T12:00:00"
+  }' | python3 -c "import sys,json; d=json.load(sys.stdin); print('已添加 ID:', d['data']['id'])"
+```
+
+**修改信息条目：**
+```bash
+curl -s -X PUT "$SERVER/api/v1/info-items/<itemId>" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"type":"urgent","text":"修改后的内容","end_time":"2026-03-22T00:00:00"}'
+```
+
+**删除信息条目：**
+```bash
+curl -s -X DELETE "$SERVER/api/v1/info-items/<itemId>" \
+  -H "Authorization: Bearer $TOKEN"
 ```
 
 ---
@@ -360,6 +424,11 @@ curl -s "$SERVER/api/v1/reminders/emergency/active" \
 | "给所有屏幕显示 XX" | device_ids=["all"] |
 | "把 XX 画面给客厅显示" | 找画面 ID 和设备 ID，PUT /devices/:id/scenes |
 | "更新备忘录内容为 XX" | PATCH /scenes/:id/content/text |
+| "在信息列表添加一条 XX" | POST /info-items，type 根据描述判断 |
+| "信息列表显示 XX 紧急公告" | POST /info-items，type=urgent |
+| "把 XX 那条信息删掉" | 先 GET /info-items 找 ID，再 DELETE /info-items/:id |
+| "更新信息列表中的 XX" | 先 GET /info-items 找 ID，再 PUT /info-items/:id |
+| "信息列表现在有什么？" | GET /info-items/active |
 
 ## 执行约定
 
