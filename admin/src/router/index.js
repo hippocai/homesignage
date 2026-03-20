@@ -48,6 +48,11 @@ const routes = [
         component: () => import('../views/EmergencyView.vue')
       },
       {
+        path: 'info-items',
+        name: 'InfoItems',
+        component: () => import('../views/InfoItemsView.vue')
+      },
+      {
         path: 'api-keys',
         name: 'ApiKeys',
         component: () => import('../views/ApiKeysView.vue')

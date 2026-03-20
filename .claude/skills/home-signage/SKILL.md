@@ -1,32 +1,37 @@
 ---
 name: home-signage
-description: 控制 HomeSignage 家庭数字标牌系统。管理设备、画面、定时提醒和紧急警报。触发词：home-signage、标牌、显示屏、紧急警报、定时提醒。
-argument-hint: "[操作描述] 例如：触发煤气泄漏警报 / 显示所有在线设备 / 在客厅屏幕创建出门提醒"
+description: 控制 HomeSignage 家庭数字标牌系统。管理设备、画面、信息列表、定时提醒和紧急警报。触发词：home-signage、标牌、显示屏、紧急警报、定时提醒、信息列表、公告。
+argument-hint: "[操作描述] 例如：触发煤气泄漏警报 / 显示所有在线设备 / 在客厅屏幕创建出门提醒 / 添加一条重要信息到信息列表"
 ---
 
 # HomeSignage 控制助手
 
 你是 HomeSignage 家庭数字标牌系统的控制助手。用户可以用自然语言来控制显示设备、管理画面内容、创建定时提醒和触发紧急警报。
 
-## 系统连接配置
+---
 
-```bash
-# 读取服务器配置
-HS_SERVER="!`cat /Users/caiyicheng/HomeSignage/.env 2>/dev/null | grep -E '^PORT=' | cut -d= -f2 | xargs -I{} echo "http://localhost:{}" || echo "http://localhost:3000"`"
-HS_TOKEN_FILE="/Users/caiyicheng/HomeSignage/.claude/skills/home-signage/.token"
-```
+## ⚙️ 部署配置
+
+> 换机器部署时，只需修改一个文件：**`hs-config.sh`**（与本文件同目录）。
+> 设置好 `HS_ROOT`（项目根目录绝对路径）和 `HS_SERVER`（服务器地址含端口）即可。
 
 ## 当前系统状态
 
-> **服务器地址**：!`cat /Users/caiyicheng/HomeSignage/.env 2>/dev/null | grep -E '^PORT=' | awk -F= '{print "http://localhost:"$2}' || echo "http://localhost:3000"`
+!`
+_HS_CONFIG="$(git rev-parse --show-toplevel 2>/dev/null || pwd)/.claude/skills/home-signage/hs-config.sh"
+source "$_HS_CONFIG" 2>/dev/null || { HS_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd); HS_SERVER="http://localhost:3000"; }
+TOKEN_FILE="$HS_ROOT/.claude/skills/home-signage/.token"
 
-> **认证 Token**：!`[ -f /Users/caiyicheng/HomeSignage/.claude/skills/home-signage/.token ] && echo "✅ 已缓存" || echo "❌ 未配置（需先登录）"`
+echo "服务器地址：$HS_SERVER"
+if [ -f "$TOKEN_FILE" ]; then echo "认证 Token：✅ 已缓存"; else echo "认证 Token：❌ 未配置（需先登录）"; fi
+`
 
 ### 实时状态快照
 
 !`
-SERVER=$(cat /Users/caiyicheng/HomeSignage/.env 2>/dev/null | grep -E '^PORT=' | awk -F= '{print "http://localhost:"$2}' || echo "http://localhost:3000")
-TOKEN_FILE="/Users/caiyicheng/HomeSignage/.claude/skills/home-signage/.token"
+_HS_CONFIG="$(git rev-parse --show-toplevel 2>/dev/null || pwd)/.claude/skills/home-signage/hs-config.sh"
+source "$_HS_CONFIG" 2>/dev/null || { HS_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd); HS_SERVER="http://localhost:3000"; }
+TOKEN_FILE="$HS_ROOT/.claude/skills/home-signage/.token"
 TOKEN=$(cat "$TOKEN_FILE" 2>/dev/null)
 
 if [ -z "$TOKEN" ]; then
@@ -35,7 +40,7 @@ if [ -z "$TOKEN" ]; then
 fi
 
 echo "=== 设备列表 ==="
-curl -sf "$SERVER/api/v1/devices" -H "Authorization: Bearer $TOKEN" 2>/dev/null \
+curl -sf "$HS_SERVER/api/v1/devices" -H "Authorization: Bearer $TOKEN" 2>/dev/null \
   | python3 -c "
 import sys, json
 try:
@@ -50,7 +55,7 @@ except: print('（获取失败，服务器可能未启动）')
 
 echo ""
 echo "=== 活跃紧急警报 ==="
-curl -sf "$SERVER/api/v1/reminders/emergency/active" -H "Authorization: Bearer $TOKEN" 2>/dev/null \
+curl -sf "$HS_SERVER/api/v1/reminders/emergency/active" -H "Authorization: Bearer $TOKEN" 2>/dev/null \
   | python3 -c "
 import sys, json
 try:
@@ -64,7 +69,7 @@ except: print('（获取失败）')
 
 echo ""
 echo "=== 画面列表 ==="
-curl -sf "$SERVER/api/v1/scenes" -H "Authorization: Bearer $TOKEN" 2>/dev/null \
+curl -sf "$HS_SERVER/api/v1/scenes" -H "Authorization: Bearer $TOKEN" 2>/dev/null \
   | python3 -c "
 import sys, json
 try:
@@ -77,8 +82,25 @@ except: print('（获取失败）')
 " 2>/dev/null || echo "（获取失败）"
 
 echo ""
+echo "=== 信息列表（有效条目）==="
+curl -sf "$HS_SERVER/api/v1/info-items/active" -H "Authorization: Bearer $TOKEN" 2>/dev/null \
+  | python3 -c "
+import sys, json
+TYPE = {'info':'[提示]','important':'[重要]','urgent':'[紧急]'}
+try:
+  data = json.load(sys.stdin).get('data', [])
+  if not data:
+    print('（暂无有效条目）')
+  for item in data:
+    t = TYPE.get(item.get('type','info'),'[提示]')
+    end = item.get('end_time','永久') or '永久'
+    print(f\"{t} {item['text'][:40]} | 到期: {end[:16]} | ID: {item['id'][:8]}...\")
+except: print('（获取失败）')
+" 2>/dev/null || echo "（获取失败）"
+
+echo ""
 echo "=== 系统状态 ==="
-curl -sf "$SERVER/api/v1/system/status" -H "Authorization: Bearer $TOKEN" 2>/dev/null \
+curl -sf "$HS_SERVER/api/v1/system/status" -H "Authorization: Bearer $TOKEN" 2>/dev/null \
   | python3 -c "
 import sys, json
 try:
@@ -96,12 +118,13 @@ except: print('（服务器未启动）')
 
 ### 变量约定
 
-在执行任何 API 调用前，先在 Bash 中设置：
+在执行任何 API 调用前，先在 Bash 中设置（从配置文件读取）：
 
 ```bash
-SERVER="http://localhost:3000"   # 或从 .env 读取端口
-TOKEN=$(cat /Users/caiyicheng/HomeSignage/.claude/skills/home-signage/.token 2>/dev/null)
-TOKEN_FILE="/Users/caiyicheng/HomeSignage/.claude/skills/home-signage/.token"
+_HS_CONFIG="$(git rev-parse --show-toplevel 2>/dev/null || pwd)/.claude/skills/home-signage/hs-config.sh"
+source "$_HS_CONFIG" 2>/dev/null || { HS_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd); HS_SERVER="http://localhost:3000"; }
+TOKEN_FILE="$HS_ROOT/.claude/skills/home-signage/.token"
+TOKEN=$(cat "$TOKEN_FILE" 2>/dev/null)
 ```
 
 ---
@@ -109,7 +132,7 @@ TOKEN_FILE="/Users/caiyicheng/HomeSignage/.claude/skills/home-signage/.token"
 ### 🔐 登录（首次使用或 Token 过期时）
 
 ```bash
-RESP=$(curl -s -X POST "$SERVER/api/v1/auth/login" \
+RESP=$(curl -s -X POST "$HS_SERVER/api/v1/auth/login" \
   -H "Content-Type: application/json" \
   -d '{"username":"admin","password":"admin123"}')
 TOKEN=$(echo "$RESP" | python3 -c "import sys,json; print(json.load(sys.stdin)['data']['token'])")
@@ -125,13 +148,13 @@ echo "登录成功，Token 已保存"
 
 **列出所有设备：**
 ```bash
-curl -s "$SERVER/api/v1/devices" -H "Authorization: Bearer $TOKEN" \
+curl -s "$HS_SERVER/api/v1/devices" -H "Authorization: Bearer $TOKEN" \
   | python3 -c "import sys,json; [print(f\"{d['name']} ({d['status']}) - {d['id']}\") for d in json.load(sys.stdin)['data']]"
 ```
 
 **添加新设备：**
 ```bash
-curl -s -X POST "$SERVER/api/v1/devices" \
+curl -s -X POST "$HS_SERVER/api/v1/devices" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"name":"卧室平板","group_name":"卧室"}'
@@ -140,7 +163,7 @@ curl -s -X POST "$SERVER/api/v1/devices" \
 
 **强制切换设备画面：**
 ```bash
-curl -s -X POST "$SERVER/api/v1/devices/<deviceId>/active-scene" \
+curl -s -X POST "$HS_SERVER/api/v1/devices/<deviceId>/active-scene" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"sceneId":"<sceneId>"}'
@@ -152,13 +175,13 @@ curl -s -X POST "$SERVER/api/v1/devices/<deviceId>/active-scene" \
 
 **列出所有画面：**
 ```bash
-curl -s "$SERVER/api/v1/scenes" -H "Authorization: Bearer $TOKEN" \
+curl -s "$HS_SERVER/api/v1/scenes" -H "Authorization: Bearer $TOKEN" \
   | python3 -c "import sys,json; [print(f\"{s['name']} - {s['id']}\") for s in json.load(sys.stdin)['data']]"
 ```
 
 **创建新画面：**
 ```bash
-curl -s -X POST "$SERVER/api/v1/scenes" \
+curl -s -X POST "$HS_SERVER/api/v1/scenes" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"name":"家庭公告板","description":"显示家庭公告和备忘录"}'
@@ -166,7 +189,7 @@ curl -s -X POST "$SERVER/api/v1/scenes" \
 
 **向画面添加时钟组件：**
 ```bash
-curl -s -X POST "$SERVER/api/v1/scenes/<sceneId>/components" \
+curl -s -X POST "$HS_SERVER/api/v1/scenes/<sceneId>/components" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -179,7 +202,7 @@ curl -s -X POST "$SERVER/api/v1/scenes/<sceneId>/components" \
 
 **向画面添加文本组件：**
 ```bash
-curl -s -X POST "$SERVER/api/v1/scenes/<sceneId>/components" \
+curl -s -X POST "$HS_SERVER/api/v1/scenes/<sceneId>/components" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -193,7 +216,7 @@ curl -s -X POST "$SERVER/api/v1/scenes/<sceneId>/components" \
 **动态更新文本内容（外部集成专用）：**
 ```bash
 # 无需重建画面，直接更新文本组件内容并实时推送给设备
-curl -s -X PATCH "$SERVER/api/v1/scenes/<sceneId>/content/text" \
+curl -s -X PATCH "$HS_SERVER/api/v1/scenes/<sceneId>/content/text" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"componentId":"<componentId>","content":"新内容：明天开家长会，请准时参加"}'
@@ -201,7 +224,7 @@ curl -s -X PATCH "$SERVER/api/v1/scenes/<sceneId>/content/text" \
 
 **为设备分配画面（设置轮播）：**
 ```bash
-curl -s -X PUT "$SERVER/api/v1/devices/<deviceId>/scenes" \
+curl -s -X PUT "$HS_SERVER/api/v1/devices/<deviceId>/scenes" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -214,11 +237,58 @@ curl -s -X PUT "$SERVER/api/v1/devices/<deviceId>/scenes" \
 
 ---
 
+### 📋 信息列表
+
+信息列表是所有画面共享的全局公告板。三种类型：`info`（提示/蓝）、`important`（重要/黄）、`urgent`（紧急/红）。增删改后即时推送至所有显示设备。
+
+**查看所有条目：**
+```bash
+curl -s "$HS_SERVER/api/v1/info-items" -H "Authorization: Bearer $TOKEN" \
+  | python3 -c "
+import sys, json
+TYPE = {'info':'提示','important':'重要','urgent':'紧急'}
+for item in json.load(sys.stdin)['data']:
+    end = item.get('end_time','永久') or '永久'
+    print(f\"[{TYPE.get(item['type'],'?')}] {item['text']} | 到期:{end[:16]} | {item['id']}\")
+"
+```
+
+**添加信息条目：**
+```bash
+# type 可选: info | important | urgent
+# start_time / end_time 格式: "2026-03-20T08:00:00"，留 null 表示立即/永久
+curl -s -X POST "$HS_SERVER/api/v1/info-items" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "type": "important",
+    "text": "明天上午 10 点楼道消毒，请勿外出",
+    "start_time": null,
+    "end_time": "2026-03-21T12:00:00"
+  }' | python3 -c "import sys,json; d=json.load(sys.stdin); print('已添加 ID:', d['data']['id'])"
+```
+
+**修改信息条目：**
+```bash
+curl -s -X PUT "$HS_SERVER/api/v1/info-items/<itemId>" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"type":"urgent","text":"修改后的内容","end_time":"2026-03-22T00:00:00"}'
+```
+
+**删除信息条目：**
+```bash
+curl -s -X DELETE "$HS_SERVER/api/v1/info-items/<itemId>" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+---
+
 ### ⏰ 定时提醒
 
 **创建定时提醒：**
 ```bash
-curl -s -X POST "$SERVER/api/v1/reminders/timed" \
+curl -s -X POST "$HS_SERVER/api/v1/reminders/timed" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -254,7 +324,7 @@ curl -s -X POST "$SERVER/api/v1/reminders/timed" \
 
 **列出所有定时提醒：**
 ```bash
-curl -s "$SERVER/api/v1/reminders/timed" -H "Authorization: Bearer $TOKEN" \
+curl -s "$HS_SERVER/api/v1/reminders/timed" -H "Authorization: Bearer $TOKEN" \
   | python3 -c "
 import sys, json
 for r in json.load(sys.stdin)['data']:
@@ -265,7 +335,7 @@ for r in json.load(sys.stdin)['data']:
 
 **删除定时提醒：**
 ```bash
-curl -s -X DELETE "$SERVER/api/v1/reminders/timed/<reminderId>" \
+curl -s -X DELETE "$HS_SERVER/api/v1/reminders/timed/<reminderId>" \
   -H "Authorization: Bearer $TOKEN"
 ```
 
@@ -277,7 +347,7 @@ curl -s -X DELETE "$SERVER/api/v1/reminders/timed/<reminderId>" \
 
 **触发紧急警报（所有设备）：**
 ```bash
-curl -s -X POST "$SERVER/api/v1/reminders/emergency" \
+curl -s -X POST "$HS_SERVER/api/v1/reminders/emergency" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -294,7 +364,7 @@ curl -s -X POST "$SERVER/api/v1/reminders/emergency" \
 
 **触发警报（指定设备）：**
 ```bash
-curl -s -X POST "$SERVER/api/v1/reminders/emergency" \
+curl -s -X POST "$HS_SERVER/api/v1/reminders/emergency" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -306,7 +376,7 @@ curl -s -X POST "$SERVER/api/v1/reminders/emergency" \
 
 **查询当前活跃警报：**
 ```bash
-curl -s "$SERVER/api/v1/reminders/emergency/active" -H "Authorization: Bearer $TOKEN" \
+curl -s "$HS_SERVER/api/v1/reminders/emergency/active" -H "Authorization: Bearer $TOKEN" \
   | python3 -c "
 import sys, json
 alerts = json.load(sys.stdin)['data']
@@ -320,7 +390,7 @@ else:
 
 **解除紧急警报：**
 ```bash
-curl -s -X DELETE "$SERVER/api/v1/reminders/emergency/<alertId>" \
+curl -s -X DELETE "$HS_SERVER/api/v1/reminders/emergency/<alertId>" \
   -H "Authorization: Bearer $TOKEN"
 ```
 
@@ -330,7 +400,7 @@ curl -s -X DELETE "$SERVER/api/v1/reminders/emergency/<alertId>" \
 
 **生成新 API 密钥：**
 ```bash
-curl -s -X POST "$SERVER/api/v1/api-keys" \
+curl -s -X POST "$HS_SERVER/api/v1/api-keys" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"name":"HomeAssistant 集成"}' \
@@ -340,7 +410,7 @@ curl -s -X POST "$SERVER/api/v1/api-keys" \
 **使用 API Key（无需 JWT）：**
 ```bash
 # 外部系统用 X-API-Key 替代 Authorization 头
-curl -s "$SERVER/api/v1/reminders/emergency/active" \
+curl -s "$HS_SERVER/api/v1/reminders/emergency/active" \
   -H "X-API-Key: <your-api-key>"
 ```
 
@@ -360,6 +430,11 @@ curl -s "$SERVER/api/v1/reminders/emergency/active" \
 | "给所有屏幕显示 XX" | device_ids=["all"] |
 | "把 XX 画面给客厅显示" | 找画面 ID 和设备 ID，PUT /devices/:id/scenes |
 | "更新备忘录内容为 XX" | PATCH /scenes/:id/content/text |
+| "在信息列表添加一条 XX" | POST /info-items，type 根据描述判断 |
+| "信息列表显示 XX 紧急公告" | POST /info-items，type=urgent |
+| "把 XX 那条信息删掉" | 先 GET /info-items 找 ID，再 DELETE /info-items/:id |
+| "更新信息列表中的 XX" | 先 GET /info-items 找 ID，再 PUT /info-items/:id |
+| "信息列表现在有什么？" | GET /info-items/active |
 
 ## 执行约定
 

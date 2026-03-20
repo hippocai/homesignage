@@ -135,11 +135,22 @@ CREATE TABLE IF NOT EXISTS uploads (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS info_items (
+    id TEXT PRIMARY KEY,
+    type TEXT NOT NULL DEFAULT 'info',
+    text TEXT NOT NULL,
+    start_time TEXT,
+    end_time TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now'))
+);
+
 CREATE INDEX IF NOT EXISTS idx_devices_status ON devices(status);
 CREATE INDEX IF NOT EXISTS idx_devices_last_seen ON devices(last_seen);
 CREATE INDEX IF NOT EXISTS idx_components_scene_id ON components(scene_id);
 CREATE INDEX IF NOT EXISTS idx_timed_reminders_start_time ON timed_reminders(start_time);
 CREATE INDEX IF NOT EXISTS idx_emergency_alerts_status ON emergency_alerts(status);
+CREATE INDEX IF NOT EXISTS idx_info_items_end_time ON info_items(end_time);
 `;
 
 async function initDatabase() {
@@ -191,6 +202,18 @@ async function initDatabase() {
       const hasStartDate = cols.some(c => c.name === 'start_date');
       if (!hasStartDate) {
         db.run('ALTER TABLE timed_reminders ADD COLUMN start_date TEXT', resolve);
+      } else {
+        resolve();
+      }
+    });
+  });
+
+  await new Promise((resolve) => {
+    db.all('PRAGMA table_info(info_items)', [], (err, cols) => {
+      if (err || !cols) return resolve();
+      const hasType = cols.some(c => c.name === 'type');
+      if (!hasType) {
+        db.run("ALTER TABLE info_items ADD COLUMN type TEXT NOT NULL DEFAULT 'info'", resolve);
       } else {
         resolve();
       }

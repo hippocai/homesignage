@@ -79,6 +79,14 @@ export const apiKeysApi = {
   delete: (id) => api.delete(`/api-keys/${id}`)
 }
 
+export const infoItemsApi = {
+  list: () => api.get('/info-items'),
+  listActive: () => api.get('/info-items/active'),
+  create: (data) => api.post('/info-items', data),
+  update: (id, data) => api.put(`/info-items/${id}`, data),
+  delete: (id) => api.delete(`/info-items/${id}`)
+}
+
 export const systemApi = {
   getStatus: () => api.get('/system/status')
 }

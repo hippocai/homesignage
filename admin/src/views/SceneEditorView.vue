@@ -127,6 +127,13 @@
                 <template v-else-if="comp.type === 'clock'">
                   <div class="clock-preview">{{ getClockDisplay(comp) }}</div>
                 </template>
+                <template v-else-if="comp.type === 'info-list'">
+                  <div class="info-list-preview" :style="{ backgroundColor: comp.config?.backgroundColor || 'rgba(0,0,0,0.5)', padding: (comp.config?.padding || 10) + 'px' }">
+                    <div v-for="n in 3" :key="n" class="info-list-preview-row" :style="{ fontSize: Math.min(comp.config?.fontSize || 18, 14) + 'px', color: comp.config?.color || '#fff', marginBottom: (comp.config?.itemSpacing || 6) + 'px' }">
+                      信息条目示例 {{ n }}
+                    </div>
+                  </div>
+                </template>
                 <template v-else>
                   <div class="comp-placeholder">
                     <el-icon :size="18"><component :is="getComponentIcon(comp.type)" /></el-icon>
@@ -284,6 +291,32 @@
                 <el-input v-model="editForm.config.url" placeholder="https://..." />
               </el-form-item>
             </el-form>
+
+            <el-form v-else-if="selectedComponent.type === 'info-list'" label-width="90px" size="small">
+              <el-form-item label="字体大小">
+                <el-input-number v-model="editForm.config.fontSize" :min="10" :max="120" controls-position="right" />
+              </el-form-item>
+              <el-form-item label="文字颜色">
+                <el-color-picker v-model="editForm.config.color" />
+              </el-form-item>
+              <el-form-item label="背景颜色">
+                <el-color-picker v-model="editForm.config.backgroundColor" show-alpha />
+              </el-form-item>
+              <el-form-item label="行间距(px)">
+                <el-input-number v-model="editForm.config.itemSpacing" :min="0" :max="40" controls-position="right" />
+              </el-form-item>
+              <el-form-item label="内边距(px)">
+                <el-input-number v-model="editForm.config.padding" :min="0" :max="60" controls-position="right" />
+              </el-form-item>
+              <el-form-item label="横向滚速">
+                <el-input-number v-model="editForm.config.scrollSpeed" :min="10" :max="200" controls-position="right" />
+                <div style="font-size:11px;color:#909399;margin-top:2px">像素/秒，值越大滚动越快</div>
+              </el-form-item>
+              <el-form-item label="翻页间隔">
+                <el-input-number v-model="editForm.config.pageInterval" :min="1" :max="60" controls-position="right" />
+                <div style="font-size:11px;color:#909399;margin-top:2px">秒，内容超出组件高度时分页显示</div>
+              </el-form-item>
+            </el-form>
           </div>
 
           <div class="prop-actions">
@@ -335,6 +368,11 @@
               <template v-else-if="comp.type === 'iframe'">
                 <div class="dialog-iframe">🌐 {{ comp.config?.url || '' }}</div>
               </template>
+              <template v-else-if="comp.type === 'info-list'">
+                <div class="dialog-info-list" :style="{ backgroundColor: comp.config?.backgroundColor || 'rgba(0,0,0,0.5)', padding: (comp.config?.padding || 10) + 'px', fontSize: (comp.config?.fontSize || 18) + 'px', color: comp.config?.color || '#fff' }">
+                  <div v-for="n in 3" :key="n" :style="{ marginBottom: (comp.config?.itemSpacing || 6) + 'px' }">信息条目示例 {{ n }}</div>
+                </div>
+              </template>
             </div>
           </div>
         </div>
@@ -364,7 +402,7 @@
 import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { ArrowLeft, Plus, Check, Delete, View, Clock, Cloudy, Document, Picture, Link } from '@element-plus/icons-vue'
+import { ArrowLeft, Plus, Check, Delete, View, Clock, Cloudy, Document, Picture, Link, List } from '@element-plus/icons-vue'
 import { scenesApi } from '../api/index.js'
 
 const route = useRoute()
@@ -410,18 +448,20 @@ const resizeState = ref(null)
 const editForm = reactive({ x: 0, y: 0, width: 30, height: 20, config: {} })
 
 const componentTypes = [
-  { value: 'clock',   label: '时钟', icon: 'Clock',    color: '#409EFF' },
-  { value: 'weather', label: '天气', icon: 'Cloudy',   color: '#67C23A' },
-  { value: 'text',    label: '文字', icon: 'Document', color: '#E6A23C' },
-  { value: 'image',   label: '图片', icon: 'Picture',  color: '#F56C6C' },
-  { value: 'iframe',  label: '网页', icon: 'Link',     color: '#909399' },
+  { value: 'clock',     label: '时钟',   icon: 'Clock',    color: '#409EFF' },
+  { value: 'weather',   label: '天气',   icon: 'Cloudy',   color: '#67C23A' },
+  { value: 'text',      label: '文字',   icon: 'Document', color: '#E6A23C' },
+  { value: 'image',     label: '图片',   icon: 'Picture',  color: '#F56C6C' },
+  { value: 'iframe',    label: '网页',   icon: 'Link',     color: '#909399' },
+  { value: 'info-list', label: '信息列表', icon: 'List',   color: '#9B59B6' },
 ]
 const defaultConfigs = {
-  clock:   { format: 'HH:mm', showDate: true, timezone: 'Asia/Shanghai' },
-  weather: { city: 'Beijing', unit: 'C' },
-  text:    { content: '文字内容', fontSize: 24, color: '#ffffff', backgroundColor: 'transparent', textAlign: 'center' },
-  image:   { url: '', objectFit: 'cover' },
-  iframe:  { url: 'https://example.com' },
+  clock:     { format: 'HH:mm', showDate: true, timezone: 'Asia/Shanghai' },
+  weather:   { city: 'Beijing', unit: 'C' },
+  text:      { content: '文字内容', fontSize: 24, color: '#ffffff', backgroundColor: 'transparent', textAlign: 'center' },
+  image:     { url: '', objectFit: 'cover' },
+  iframe:    { url: 'https://example.com' },
+  'info-list': { fontSize: 18, color: '#ffffff', backgroundColor: 'rgba(0,0,0,0.5)', itemSpacing: 6, padding: 10, scrollSpeed: 40, pageInterval: 5 },
 }
 
 // Computed styles
@@ -490,18 +530,19 @@ function applyCustomResolution() {
 
 // Component helpers
 function getComponentIcon(type) {
-  return { clock: 'Clock', weather: 'Cloudy', text: 'Document', image: 'Picture', iframe: 'Link' }[type] || 'Grid'
+  return { clock: 'Clock', weather: 'Cloudy', text: 'Document', image: 'Picture', iframe: 'Link', 'info-list': 'List' }[type] || 'Grid'
 }
 function getComponentLabel(type) {
-  return { clock: '时钟', weather: '天气', text: '文字', image: '图片', iframe: '网页' }[type] || type
+  return { clock: '时钟', weather: '天气', text: '文字', image: '图片', iframe: '网页', 'info-list': '信息列表' }[type] || type
 }
 function getComponentSummary(comp) {
   const cfg = comp.config || {}
-  if (comp.type === 'clock')   return cfg.format || 'HH:mm'
-  if (comp.type === 'weather') return cfg.city || '未设置城市'
-  if (comp.type === 'text')    return (cfg.content || '').slice(0, 20) || '空文字'
-  if (comp.type === 'image')   return cfg.url ? cfg.url.split('/').pop() : '未设置URL'
-  if (comp.type === 'iframe')  return cfg.url || '未设置URL'
+  if (comp.type === 'clock')     return cfg.format || 'HH:mm'
+  if (comp.type === 'weather')   return cfg.city || '未设置城市'
+  if (comp.type === 'text')      return (cfg.content || '').slice(0, 20) || '空文字'
+  if (comp.type === 'image')     return cfg.url ? cfg.url.split('/').pop() : '未设置URL'
+  if (comp.type === 'iframe')    return cfg.url || '未设置URL'
+  if (comp.type === 'info-list') return `字号${cfg.fontSize || 18}px · 滚动速度${cfg.scrollSpeed || 40}`
   return ''
 }
 
@@ -1112,5 +1153,20 @@ onUnmounted(() => {
   display: flex; align-items: center; justify-content: center;
   color: rgba(255,255,255,0.8);
   font-size: 1.2em;
+}
+.dialog-info-list {
+  width: 100%; height: 100%;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+.info-list-preview {
+  width: 100%; height: 100%;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+.info-list-preview-row {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 </style>

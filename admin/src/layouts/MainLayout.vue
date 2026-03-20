@@ -34,6 +34,10 @@
           <el-icon><Warning /></el-icon>
           <span>紧急提示</span>
         </el-menu-item>
+        <el-menu-item index="/info-items">
+          <el-icon><List /></el-icon>
+          <span>信息列表</span>
+        </el-menu-item>
         <el-menu-item index="/api-keys">
           <el-icon><Key /></el-icon>
           <span>API密钥</span>
@@ -86,6 +90,7 @@ import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth.js'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { List } from '@element-plus/icons-vue'
 
 const route = useRoute()
 const router = useRouter()
