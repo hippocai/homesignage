@@ -42,10 +42,10 @@ function findById(id) {
 
 function create(item) {
   return new Promise((resolve, reject) => {
-    const { id, text, start_time = null, end_time = null } = item;
+    const { id, type = 'info', text, start_time = null, end_time = null } = item;
     db.run(
-      `INSERT INTO info_items (id, text, start_time, end_time) VALUES (?, ?, ?, ?)`,
-      [id, text, start_time, end_time],
+      `INSERT INTO info_items (id, type, text, start_time, end_time) VALUES (?, ?, ?, ?, ?)`,
+      [id, type, text, start_time, end_time],
       function (err) {
         if (err) return reject(err);
         resolve(findById(id));
@@ -56,7 +56,7 @@ function create(item) {
 
 function update(id, fields) {
   return new Promise((resolve, reject) => {
-    const allowed = ['text', 'start_time', 'end_time'];
+    const allowed = ['type', 'text', 'start_time', 'end_time'];
     const updates = [];
     const values = [];
     for (const key of allowed) {

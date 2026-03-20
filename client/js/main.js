@@ -1296,12 +1296,19 @@ function clearInfoListIntervals() {
    INFO-LIST COMPONENT
 ───────────────────────────────────────────── */
 function renderInfoList(el, cfg) {
-  var fontSize       = (cfg.fontSize    || 18) + 'px';
-  var color          = cfg.color        || '#ffffff';
-  var bgColor        = cfg.backgroundColor || 'rgba(0,0,0,0.5)';
-  var itemSpacing    = cfg.itemSpacing  !== undefined ? cfg.itemSpacing : 6;
-  var padding        = cfg.padding      !== undefined ? cfg.padding     : 10;
-  var scrollSpeed    = cfg.scrollSpeed  || 40; // px/sec
+  var fontSize     = cfg.fontSize     !== undefined ? cfg.fontSize     : 18;
+  var color        = cfg.color        || '#ffffff';
+  var bgColor      = cfg.backgroundColor || 'rgba(0,0,0,0.5)';
+  var itemSpacing  = cfg.itemSpacing  !== undefined ? cfg.itemSpacing  : 6;
+  var padding      = cfg.padding      !== undefined ? cfg.padding      : 10;
+  var scrollSpeed  = cfg.scrollSpeed  || 40;   // px/sec for horizontal marquee
+  var pageInterval = (cfg.pageInterval || 5) * 1000; // ms between page flips
+
+  var TYPE_MAP = {
+    info:      { label: '提示', bg: '#1677ff' },
+    important: { label: '重要', bg: '#d48806' },
+    urgent:    { label: '紧急', bg: '#cf1322' },
+  };
 
   el.style.backgroundColor = bgColor;
   el.style.padding          = padding + 'px';
@@ -1309,80 +1316,154 @@ function renderInfoList(el, cfg) {
   el.style.overflow         = 'hidden';
 
   var wrapper = document.createElement('div');
-  wrapper.className = 'info-list-wrapper';
+  wrapper.style.cssText = 'width:100%;height:100%;overflow:hidden;position:relative;';
   el.appendChild(wrapper);
 
-  var scroller = document.createElement('div');
-  scroller.className = 'info-list-scroller';
-  wrapper.appendChild(scroller);
+  var _marqueeCounter = 0;
+  var currentPageEl   = null;
+  var pageTimer       = null;
 
-  function buildItemEls(items) {
-    var frag = document.createDocumentFragment();
-    for (var i = 0; i < items.length; i++) {
-      var row = document.createElement('div');
-      row.className = 'info-list-item';
-      row.style.cssText = [
-        'font-size:' + fontSize,
-        'color:' + color,
-        'margin-bottom:' + itemSpacing + 'px',
-        'overflow:hidden',
-        'white-space:nowrap',
-        'flex-shrink:0',
-      ].join(';');
+  // Build a single row element (badge + text)
+  function buildRowEl(item) {
+    var typeInfo = TYPE_MAP[item.type] || TYPE_MAP.info;
 
-      var span = document.createElement('span');
-      span.className = 'info-item-text';
-      span.textContent = items[i].text;
-      row.appendChild(span);
-      frag.appendChild(row);
-    }
-    return frag;
+    var row = document.createElement('div');
+    row.style.cssText = [
+      'display:flex', 'align-items:center', 'flex-shrink:0', 'overflow:hidden',
+      'margin-bottom:' + itemSpacing + 'px',
+    ].join(';');
+
+    // Type badge
+    var badge = document.createElement('div');
+    badge.style.cssText = [
+      'flex-shrink:0', 'white-space:nowrap', 'text-align:center',
+      'padding:2px 8px', 'border-radius:3px', 'font-weight:bold',
+      'margin-right:10px', 'min-width:3em',
+      'font-size:' + fontSize + 'px',
+      'background:' + typeInfo.bg, 'color:#fff',
+    ].join(';');
+    badge.textContent = typeInfo.label;
+    row.appendChild(badge);
+
+    // Text wrapper (overflow clip container)
+    var textWrap = document.createElement('div');
+    textWrap.className = 'il-textwrap';
+    textWrap.style.cssText = 'flex:1;min-width:0;overflow:hidden;';
+
+    var span = document.createElement('span');
+    span.className = 'il-text';
+    span.style.cssText = [
+      'display:inline-block', 'white-space:nowrap',
+      'font-size:' + fontSize + 'px', 'color:' + color,
+    ].join(';');
+    span.textContent = item.text;
+    textWrap.appendChild(span);
+    row.appendChild(textWrap);
+
+    return row;
   }
 
-  function applyScrollAnimations(items) {
-    // Must run after DOM paint so we can measure dimensions
+  // Apply horizontal marquee to overflowing text spans in a container
+  function applyMarquee(container) {
+    var wraps = container.querySelectorAll('.il-textwrap');
+    for (var i = 0; i < wraps.length; i++) {
+      var tw   = wraps[i];
+      var span = tw.querySelector('.il-text');
+      if (!span) continue;
+      var containerW = tw.clientWidth;
+      var textW      = span.scrollWidth;
+      if (textW > containerW + 1) {
+        var animName  = 'il-mq-' + (++_marqueeCounter);
+        var totalDist = containerW + textW;
+        var dur       = totalDist / scrollSpeed;
+        var styleEl   = document.createElement('style');
+        styleEl.textContent = '@keyframes ' + animName +
+          ' { 0% { transform: translateX(' + containerW + 'px); }' +
+          ' 100% { transform: translateX(-' + textW + 'px); } }';
+        document.head.appendChild(styleEl);
+        span.style.animation = animName + ' ' + dur + 's linear infinite';
+      }
+    }
+  }
+
+  // Fade in a new page element, fade out the old one
+  function showPage(pageEl) {
+    pageEl.style.cssText += 'position:absolute;top:0;left:0;width:100%;opacity:0;transition:opacity 0.5s ease;';
+    wrapper.appendChild(pageEl);
+
+    // Measure and apply marquee before fading in
     setTimeout(function () {
-      var rows = scroller.querySelectorAll('.info-list-item');
+      applyMarquee(pageEl);
+      pageEl.style.opacity = '1';
+    }, 50);
 
-      // Horizontal: check each row for text overflow
-      for (var i = 0; i < rows.length; i++) {
-        var row = rows[i];
-        var span = row.querySelector('.info-item-text');
-        if (span && span.scrollWidth > row.clientWidth + 1) {
-          var totalDist = row.clientWidth + span.scrollWidth;
-          var dur = totalDist / scrollSpeed;
-          span.style.animation = 'info-marquee ' + dur + 's linear infinite';
-        }
-      }
-
-      // Vertical: check if list overflows the wrapper
-      var wrapH   = wrapper.clientHeight;
-      var listH   = scroller.scrollHeight;
-      if (listH > wrapH && items.length > 1) {
-        // Duplicate content for seamless vertical loop
-        scroller.appendChild(buildItemEls(items));
-        var totalH   = scroller.scrollHeight;
-        var dur = (totalH / 2) / scrollSpeed;
-        scroller.style.animation = 'info-scroll-up ' + dur + 's linear infinite';
-      }
-    }, 400);
+    // Fade out old page
+    if (currentPageEl) {
+      var old = currentPageEl;
+      old.style.opacity = '0';
+      setTimeout(function () {
+        if (old.parentNode) old.parentNode.removeChild(old);
+      }, 560);
+    }
+    currentPageEl = pageEl;
   }
 
   function renderItems(items) {
-    scroller.innerHTML = '';
-    scroller.style.animation = '';
+    // Stop existing page timer
+    if (pageTimer) { clearInterval(pageTimer); pageTimer = null; }
+    if (currentPageEl) {
+      wrapper.removeChild(currentPageEl);
+      currentPageEl = null;
+    }
 
     if (!items || items.length === 0) {
       var empty = document.createElement('div');
-      empty.className = 'info-item-empty';
+      empty.style.cssText = 'padding:20px;color:' + color + ';opacity:0.5;font-size:' + fontSize + 'px;';
       empty.textContent = '暂无信息';
-      empty.style.cssText = 'padding:20px;color:' + color + ';opacity:0.5;';
-      scroller.appendChild(empty);
+      wrapper.appendChild(empty);
+      currentPageEl = empty;
       return;
     }
 
-    scroller.appendChild(buildItemEls(items));
-    applyScrollAnimations(items);
+    // Measure row height using a hidden test row, then paginate
+    var testRow = buildRowEl(items[0]);
+    testRow.style.visibility = 'hidden';
+    testRow.style.position   = 'absolute';
+    wrapper.appendChild(testRow);
+
+    setTimeout(function () {
+      var wrapH  = wrapper.clientHeight;
+      var rowH   = testRow.offsetHeight + itemSpacing;
+      if (rowH <= 0) rowH = fontSize * 1.6 + itemSpacing;
+      wrapper.removeChild(testRow);
+
+      var perPage = Math.max(1, Math.floor(wrapH / rowH));
+
+      // Split items into pages
+      var pages = [];
+      for (var i = 0; i < items.length; i += perPage) {
+        pages.push(items.slice(i, i + perPage));
+      }
+
+      var currentIdx = 0;
+      function buildPageEl(pageItems) {
+        var page = document.createElement('div');
+        for (var j = 0; j < pageItems.length; j++) {
+          page.appendChild(buildRowEl(pageItems[j]));
+        }
+        return page;
+      }
+
+      showPage(buildPageEl(pages[0]));
+
+      if (pages.length > 1) {
+        pageTimer = setInterval(function () {
+          currentIdx = (currentIdx + 1) % pages.length;
+          showPage(buildPageEl(pages[currentIdx]));
+        }, pageInterval);
+        infoListIntervals.push(pageTimer);
+      }
+    }, 400);
   }
 
   function fetchAndRender() {
@@ -1398,10 +1479,8 @@ function renderInfoList(el, cfg) {
   }
 
   fetchAndRender();
-
-  // Refresh every 60 seconds so expired items disappear without a page reload
-  var intervalId = setInterval(fetchAndRender, 60000);
-  infoListIntervals.push(intervalId);
+  var refreshId = setInterval(fetchAndRender, 60000);
+  infoListIntervals.push(refreshId);
 }
 
 /* ─────────────────────────────────────────────

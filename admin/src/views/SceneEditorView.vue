@@ -308,9 +308,13 @@
               <el-form-item label="内边距(px)">
                 <el-input-number v-model="editForm.config.padding" :min="0" :max="60" controls-position="right" />
               </el-form-item>
-              <el-form-item label="滚动速度">
+              <el-form-item label="横向滚速">
                 <el-input-number v-model="editForm.config.scrollSpeed" :min="10" :max="200" controls-position="right" />
                 <div style="font-size:11px;color:#909399;margin-top:2px">像素/秒，值越大滚动越快</div>
+              </el-form-item>
+              <el-form-item label="翻页间隔">
+                <el-input-number v-model="editForm.config.pageInterval" :min="1" :max="60" controls-position="right" />
+                <div style="font-size:11px;color:#909399;margin-top:2px">秒，内容超出组件高度时分页显示</div>
               </el-form-item>
             </el-form>
           </div>
@@ -457,7 +461,7 @@ const defaultConfigs = {
   text:      { content: '文字内容', fontSize: 24, color: '#ffffff', backgroundColor: 'transparent', textAlign: 'center' },
   image:     { url: '', objectFit: 'cover' },
   iframe:    { url: 'https://example.com' },
-  'info-list': { fontSize: 18, color: '#ffffff', backgroundColor: 'rgba(0,0,0,0.5)', itemSpacing: 6, padding: 10, scrollSpeed: 40 },
+  'info-list': { fontSize: 18, color: '#ffffff', backgroundColor: 'rgba(0,0,0,0.5)', itemSpacing: 6, padding: 10, scrollSpeed: 40, pageInterval: 5 },
 }
 
 // Computed styles

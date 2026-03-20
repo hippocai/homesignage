@@ -10,7 +10,14 @@
 
     <el-card>
       <el-table :data="items" v-loading="loading" stripe>
-        <el-table-column label="信息内容" prop="text" min-width="260" show-overflow-tooltip />
+        <el-table-column label="类型" width="90">
+          <template #default="{ row }">
+            <el-tag :type="TYPE_MAP[row.type]?.tagType || 'info'" size="small">
+              {{ TYPE_MAP[row.type]?.label || row.type }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="信息内容" prop="text" min-width="220" show-overflow-tooltip />
         <el-table-column label="开始时间" width="180">
           <template #default="{ row }">
             <span v-if="row.start_time">{{ formatTime(row.start_time) }}</span>
@@ -49,6 +56,19 @@
       @closed="resetForm"
     >
       <el-form :model="form" :rules="rules" ref="formRef" label-width="90px">
+        <el-form-item label="信息类型" prop="type">
+          <el-radio-group v-model="form.type">
+            <el-radio-button value="info">
+              <span style="color:#409EFF">● 提示</span>
+            </el-radio-button>
+            <el-radio-button value="important">
+              <span style="color:#E6A23C">● 重要</span>
+            </el-radio-button>
+            <el-radio-button value="urgent">
+              <span style="color:#F56C6C">● 紧急</span>
+            </el-radio-button>
+          </el-radio-group>
+        </el-form-item>
         <el-form-item label="信息内容" prop="text">
           <el-input
             v-model="form.text"
@@ -102,7 +122,13 @@ const dialogVisible = ref(false)
 const editingItem = ref(null)
 const formRef = ref(null)
 
-const form = ref({ text: '', start_time: null, end_time: null })
+const TYPE_MAP = {
+  info:      { label: '提示', tagType: 'primary' },
+  important: { label: '重要', tagType: 'warning' },
+  urgent:    { label: '紧急', tagType: 'danger' },
+}
+
+const form = ref({ type: 'info', text: '', start_time: null, end_time: null })
 
 const rules = {
   text: [{ required: true, message: '请输入信息内容', trigger: 'blur' }]
@@ -112,12 +138,13 @@ function openDialog(item = null) {
   editingItem.value = item
   if (item) {
     form.value = {
+      type: item.type || 'info',
       text: item.text,
       start_time: item.start_time || null,
       end_time: item.end_time || null,
     }
   } else {
-    form.value = { text: '', start_time: null, end_time: null }
+    form.value = { type: 'info', text: '', start_time: null, end_time: null }
   }
   dialogVisible.value = true
 }
@@ -145,6 +172,7 @@ async function handleSave() {
   saving.value = true
   try {
     const payload = {
+      type: form.value.type,
       text: form.value.text,
       start_time: form.value.start_time || null,
       end_time: form.value.end_time || null,

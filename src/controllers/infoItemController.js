@@ -21,12 +21,14 @@ async function listActive(req, res) {
 
 async function create(req, res) {
   try {
-    const { text, start_time, end_time } = req.body;
+    const { type, text, start_time, end_time } = req.body;
     if (!text || !text.trim()) {
       return res.status(400).json({ error: 'text is required' });
     }
+    const validTypes = ['info', 'important', 'urgent'];
     const item = await infoItemDao.create({
       id: uuidv4(),
+      type: validTypes.includes(type) ? type : 'info',
       text: text.trim(),
       start_time: start_time || null,
       end_time: end_time || null,
@@ -40,8 +42,10 @@ async function create(req, res) {
 async function update(req, res) {
   try {
     const { id } = req.params;
-    const { text, start_time, end_time } = req.body;
+    const { type, text, start_time, end_time } = req.body;
+    const validTypes = ['info', 'important', 'urgent'];
     const fields = {};
+    if (type !== undefined && validTypes.includes(type)) fields.type = type;
     if (text !== undefined) fields.text = text.trim();
     if ('start_time' in req.body) fields.start_time = start_time || null;
     if ('end_time' in req.body) fields.end_time = end_time || null;

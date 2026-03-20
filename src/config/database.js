@@ -137,6 +137,7 @@ CREATE TABLE IF NOT EXISTS uploads (
 
 CREATE TABLE IF NOT EXISTS info_items (
     id TEXT PRIMARY KEY,
+    type TEXT NOT NULL DEFAULT 'info',
     text TEXT NOT NULL,
     start_time TEXT,
     end_time TEXT,
@@ -201,6 +202,18 @@ async function initDatabase() {
       const hasStartDate = cols.some(c => c.name === 'start_date');
       if (!hasStartDate) {
         db.run('ALTER TABLE timed_reminders ADD COLUMN start_date TEXT', resolve);
+      } else {
+        resolve();
+      }
+    });
+  });
+
+  await new Promise((resolve) => {
+    db.all('PRAGMA table_info(info_items)', [], (err, cols) => {
+      if (err || !cols) return resolve();
+      const hasType = cols.some(c => c.name === 'type');
+      if (!hasType) {
+        db.run("ALTER TABLE info_items ADD COLUMN type TEXT NOT NULL DEFAULT 'info'", resolve);
       } else {
         resolve();
       }
