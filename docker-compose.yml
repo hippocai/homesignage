@@ -13,12 +13,14 @@ services:
       - ./data:/app/data
       - ./uploads:/app/uploads
       - ./logs:/app/logs
+      - ./file-repo:/app/file-repo
     environment:
       - NODE_ENV=production
       - PORT=3000
       - JWT_SECRET=${JWT_SECRET}
       - SQLITE_PATH=/app/data/signage.db
       - LOG_LEVEL=info
+      - FILE_REPO_PATH=/app/file-repo
     logging:
       driver: "json-file"
       options:
