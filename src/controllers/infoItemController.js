@@ -1,5 +1,10 @@
 const { v4: uuidv4 } = require('uuid');
 const infoItemDao = require('../dao/infoItemDao');
+const socketService = require('../services/socketService');
+
+function notifyClients() {
+  socketService.emitToAll('info-items-updated', {});
+}
 
 async function list(req, res) {
   try {
@@ -33,6 +38,7 @@ async function create(req, res) {
       start_time: start_time || null,
       end_time: end_time || null,
     });
+    notifyClients();
     res.status(201).json({ data: item, message: '信息已创建' });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -51,6 +57,7 @@ async function update(req, res) {
     if ('end_time' in req.body) fields.end_time = end_time || null;
     const item = await infoItemDao.update(id, fields);
     if (!item) return res.status(404).json({ error: '信息不存在' });
+    notifyClients();
     res.json({ data: item, message: '信息已更新' });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -62,6 +69,7 @@ async function deleteItem(req, res) {
     const { id } = req.params;
     const deleted = await infoItemDao.delete(id);
     if (!deleted) return res.status(404).json({ error: '信息不存在' });
+    notifyClients();
     res.json({ message: '信息已删除' });
   } catch (err) {
     res.status(500).json({ error: err.message });

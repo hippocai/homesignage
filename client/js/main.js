@@ -28,6 +28,7 @@ var heartbeatTimer = null;
 var pollTimer      = null;
 var clockIntervals = [];
 var infoListIntervals = [];
+var infoListFetchers  = [];   // fetchAndRender functions for active info-list components
 
 // Active emergency tracking
 var activeEmergency = null; // { id, audio }
@@ -256,6 +257,7 @@ function applyConfig(config) {
   // Clear clock and info-list intervals from old scene layers
   clearClockIntervals();
   clearInfoListIntervals();
+  infoListFetchers = [];
 
   // Remove existing scene layers from DOM
   var app = document.getElementById('app');
@@ -802,6 +804,13 @@ function connectWebSocket() {
   socket.on('reconnect', function (attempt) {
     log('socket', 'Reconnected after ' + attempt + ' attempts');
     updateOnlineStatus(true);
+  });
+
+  socket.on('info-items-updated', function () {
+    log('socket', 'info-items-updated received');
+    for (var i = 0; i < infoListFetchers.length; i++) {
+      infoListFetchers[i]();
+    }
   });
 
   socket.on('config-updated', function (data) {
@@ -1479,6 +1488,7 @@ function renderInfoList(el, cfg) {
   }
 
   fetchAndRender();
+  infoListFetchers.push(fetchAndRender);
   var refreshId = setInterval(fetchAndRender, 60000);
   infoListIntervals.push(refreshId);
 }
