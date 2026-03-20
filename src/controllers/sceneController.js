@@ -54,6 +54,7 @@ async function updateScene(req, res) {
     }
     const updated = await sceneDao.update(id, req.body);
     logger.info('Scene updated', { sceneId: id });
+    socketService.emitToAll('config-updated', { sceneId: id });
     return res.json({ data: updated, message: 'Scene updated successfully' });
   } catch (err) {
     logger.error('Update scene error', { error: err.message });
@@ -69,6 +70,7 @@ async function deleteScene(req, res) {
       return res.status(404).json({ error: 'Scene not found' });
     }
     logger.info('Scene deleted', { sceneId: id });
+    socketService.emitToAll('config-updated', { sceneId: id });
     return res.json({ message: 'Scene deleted successfully' });
   } catch (err) {
     logger.error('Delete scene error', { error: err.message });
@@ -117,6 +119,7 @@ async function addComponent(req, res) {
     });
 
     logger.info('Component added to scene', { sceneId, componentId, type });
+    socketService.emitToAll('config-updated', { sceneId });
     return res.status(201).json({ data: component, message: 'Component added successfully' });
   } catch (err) {
     logger.error('Add component error', { error: err.message });
@@ -133,6 +136,7 @@ async function updateComponent(req, res) {
     }
     const updated = await componentDao.update(componentId, req.body);
     logger.info('Component updated', { componentId, sceneId });
+    socketService.emitToAll('config-updated', { sceneId });
     return res.json({ data: updated, message: 'Component updated successfully' });
   } catch (err) {
     logger.error('Update component error', { error: err.message });
@@ -149,6 +153,7 @@ async function deleteComponent(req, res) {
     }
     await componentDao.delete(componentId);
     logger.info('Component deleted', { componentId, sceneId });
+    socketService.emitToAll('config-updated', { sceneId });
     return res.json({ message: 'Component deleted successfully' });
   } catch (err) {
     logger.error('Delete component error', { error: err.message });
