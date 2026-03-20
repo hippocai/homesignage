@@ -4,7 +4,7 @@
 
 > Turn idle phones, tablets, and old laptops into smart home information displays.
 
-HomeSignage is a self-hosted digital signage system for the home. It supports multi-scene carousels, timed overlays, emergency alerts, real-time weather, and a full REST API for integration with home automation systems like HomeAssistant.
+HomeSignage is a self-hosted digital signage system for the home. It supports multi-scene carousels, timed overlays, emergency alerts, real-time weather, a file repository for local media, and a full REST API for integration with home automation systems like HomeAssistant.
 
 ---
 
@@ -23,14 +23,16 @@ HomeSignage is a self-hosted digital signage system for the home. It supports mu
 ## Features
 
 - **Multi-scene carousel** — Each device shows multiple scenes in rotation with fade transitions
-- **Rich components** — Clock, weather (auto-fetched, no API key required), text, image, iframe, info list
+- **Rich components** — Clock, weather (auto-fetched, no API key required), text, image, video, iframe, info list
+- **Video component** — Plays local or remote video files with configurable autoplay, loop, and mute settings
+- **File repository** — Upload images, audio, and video to a local folder; files can also be dropped in manually. All media assets are available to select directly in the scene editor and reminder settings
 - **Info list** — A shared bulletin board of timestamped items (info / important / urgent) shown across all scenes; supports horizontal marquee and paginated display with fade transitions
 - **Timed reminders** — Overlay banners on a schedule: daily / weekdays / weekends / one-time
 - **Emergency alerts** — Full-screen red alert pushed to all devices in under 2 seconds, with looping audio
-- **Real-time updates** — Info list changes are pushed instantly to all displays via Socket.IO
+- **Real-time updates** — Scene changes and info list edits are pushed instantly to all displays via Socket.IO
 - **Offline resilience** — Devices fall back to cached content when the network is unavailable
 - **Open REST API** — Control content and trigger alerts from external systems using API keys
-- **Web admin UI** — Vue.js dashboard to manage all devices, scenes, and reminders
+- **Web admin UI** — Vue.js dashboard to manage all devices, scenes, reminders, and files
 
 ---
 
@@ -77,6 +79,7 @@ Once running:
 | `SQLITE_PATH` | `./data/signage.db` | SQLite database path |
 | `LOG_LEVEL` | `info` | Log level: `debug` / `info` / `warn` / `error` |
 | `NODE_ENV` | `development` | Runtime environment |
+| `FILE_REPO_PATH` | `./file-repo` | Path to the file repository directory |
 
 ---
 
@@ -107,7 +110,24 @@ Open `http://<server-ip>:3000/admin` and log in with the default credentials:
 
 ---
 
-### 3. Create scenes
+### 3. Manage the file repository (optional)
+
+Go to **文件仓库** in the sidebar to upload and manage media files.
+
+| Operation | Description |
+|-----------|-------------|
+| Upload | Drag and drop or click to upload images, audio, or video (up to 200 MB each) |
+| Download | Download any file to your local machine |
+| Rename | Rename files in-place |
+| Delete | Remove files from the repository |
+
+You can also drop files directly into the `file-repo/` folder on the server — they will appear immediately in the repository browser.
+
+Once uploaded, files can be selected directly when configuring an **Image**, **Video**, or **Sound** field anywhere in the admin — no need to type a URL manually.
+
+---
+
+### 4. Create scenes
 
 1. Go to **Scenes** → **New Scene**
 2. Set the canvas resolution to match your display (presets included for common sizes)
@@ -118,25 +138,26 @@ Open `http://<server-ip>:3000/admin` and log in with the default credentials:
 | Clock | Current time and date | 24h/12h format, timezone |
 | Weather | Live weather data | City name, °C / °F |
 | Text | Notices, reminders | Content, font size, color |
-| Image | Display a photo | Image URL |
+| Image | Display a photo | URL or pick from file repository |
+| Video | Play a video file | URL or pick from file repository; autoplay / loop / mute |
 | Webpage | Embed an external page | Target URL |
 | Info List | Shared bulletin board fed from the global info-items list | Font, colors, scroll speed, page interval |
 
 4. Drag components to position them, or enter x/y/width/height values (percentage-based)
-5. Click **Save Scene**
+5. Click **Save Scene** — connected displays update instantly
 
 ---
 
-### 4. Assign scenes to devices
+### 5. Assign scenes to devices
 
 1. Go to **Devices** → click **Scenes** on the target device
 2. Check the scenes to display and set the duration (seconds) for each
 3. Use the arrow buttons to set the carousel order
-4. Save — the device will reload its config within 5 minutes (or immediately via **Refresh**)
+4. Save — the device reloads its config immediately via Socket.IO
 
 ---
 
-### 5. Set up timed reminders (optional)
+### 6. Set up timed reminders (optional)
 
 Go to **Timed Reminders** → **Create Reminder**
 
@@ -148,6 +169,7 @@ Go to **Timed Reminders** → **Create Reminder**
 | Content | Message text |
 | Style | Top bar / Bottom bar / Center / Blink |
 | Priority | 1–10 (higher = takes precedence when overlapping) |
+| Sound | Optional audio file — enter a URL or pick from the file repository |
 
 Reminders overlay the scene carousel without interrupting it. Multiple reminders at the same position rotate with fade transitions.
 
@@ -158,7 +180,7 @@ Reminders overlay the scene carousel without interrupting it. Multiple reminders
 
 ---
 
-### 6. Manage info list items (optional)
+### 7. Manage info list items (optional)
 
 Go to **Info List** in the sidebar to add, edit, or delete bulletin items.
 
@@ -180,12 +202,13 @@ Any change to the list is pushed instantly to all connected displays via Socket.
 
 ---
 
-### 7. Trigger emergency alerts (optional)
+### 8. Trigger emergency alerts (optional)
 
 1. Go to **Emergency Alerts** → **Trigger Alert**
 2. Write the alert message and choose target devices
-3. Click **Trigger** — all target devices immediately go full-screen red
-4. Click **Clear** when the situation is resolved — devices return to normal
+3. Optionally select an audio file from the file repository for the alarm sound
+4. Click **Trigger** — all target devices immediately go full-screen red
+5. Click **Clear** when the situation is resolved — devices return to normal
 
 ---
 
@@ -247,6 +270,13 @@ curl -X POST http://<server>:3000/api/v1/reminders/timed \
   }'
 ```
 
+**Upload a file to the repository**
+```bash
+curl -X POST http://<server>:3000/api/v1/file-repo \
+  -H "Authorization: Bearer <token>" \
+  -F "file=@/path/to/video.mp4"
+```
+
 ### API Reference
 
 | Method | Path | Description |
@@ -268,6 +298,11 @@ curl -X POST http://<server>:3000/api/v1/reminders/timed \
 | POST | `/api/v1/info-items` | Create an info item |
 | PUT | `/api/v1/info-items/:id` | Update an info item |
 | DELETE | `/api/v1/info-items/:id` | Delete an info item |
+| GET | `/api/v1/file-repo` | List files in repository (`?type=image\|audio\|video`) |
+| POST | `/api/v1/file-repo` | Upload a file (multipart, max 200 MB) |
+| GET | `/api/v1/file-repo/:filename/download` | Download a file |
+| PATCH | `/api/v1/file-repo/:filename` | Rename a file |
+| DELETE | `/api/v1/file-repo/:filename` | Delete a file |
 
 Full interactive docs available at `http://localhost:3000/api/docs`
 
@@ -305,7 +340,7 @@ HomeAssistant / n8n / External Systems
 HomeSignage/
 ├── src/               # Node.js backend
 │   ├── index.js       # Entry point
-│   ├── config/        # Database schema & init
+│   ├── config/        # Database schema, file repo config
 │   ├── middleware/     # JWT & API key auth
 │   ├── dao/           # SQLite data access layer
 │   ├── services/      # Socket.IO, scheduler
@@ -315,7 +350,8 @@ HomeSignage/
 ├── admin/             # Admin dashboard source (Vue.js 3)
 ├── admin-dist/        # Built admin dashboard
 ├── data/              # SQLite database
-├── uploads/           # Uploaded images and audio
+├── file-repo/         # File repository (images, audio, video)
+├── uploads/           # Legacy upload directory
 ├── logs/              # Application logs
 └── docker-compose.yml
 ```
@@ -342,7 +378,7 @@ cd admin && npm run dev
 | Server | Home NAS, Raspberry Pi 4, any low-power mini PC |
 | Display | Old iPad/iPhone, old Android tablet, old laptop connected to a monitor |
 
-**Minimum server spec**: 1 CPU core · 512 MB RAM · 1 GB storage
+**Minimum server spec**: 1 CPU core · 512 MB RAM · 1 GB storage (more for video files)
 
 ---
 
@@ -354,21 +390,23 @@ cd admin && npm run dev
 
 > 将闲置的手机、平板、旧笔记本变成家庭信息展示屏。
 
-HomeSignage 是一个自托管的家庭数字标牌系统，支持多画面轮播、定时提醒叠加、紧急警报推送、实时天气显示，并提供完整的 REST API 供家庭自动化系统（如 HomeAssistant）集成。
+HomeSignage 是一个自托管的家庭数字标牌系统，支持多画面轮播、定时提醒叠加、紧急警报推送、实时天气显示、本地文件仓库，并提供完整的 REST API 供家庭自动化系统（如 HomeAssistant）集成。
 
 ---
 
 ## 功能概览
 
 - **多画面轮播** — 每台设备可配置多个画面按序轮播，淡入淡出切换
-- **丰富组件** — 时钟、天气（自动获取，无需 API Key）、文本、图片、网页嵌入（iframe）、信息列表
+- **丰富组件** — 时钟、天气（自动获取，无需 API Key）、文本、图片、视频、网页嵌入（iframe）、信息列表
+- **视频组件** — 播放本地或远程视频，支持自动播放、循环播放、静音配置
+- **文件仓库** — 上传图片、音频、视频到本地文件夹，也可手动将文件放入目录后直接使用；所有媒体资源可在画面编辑器和提醒设置中直接选取
 - **信息列表** — 全局共享的公告条目（提示 / 重要 / 紧急三种类型），支持时效性显示；超宽文字横向滚动，超高内容自动分页淡入淡出
 - **定时提醒** — 在指定时段叠加显示提醒条，支持每天 / 工作日 / 周末 / 单次
 - **紧急警报** — 全屏红色警报，2 秒内推送到所有设备，循环播放警示音
-- **实时推送** — 信息列表增删改后即时通过 Socket.IO 推送给所有显示设备
+- **实时推送** — 画面变更、信息列表增删改均即时通过 Socket.IO 推送给所有显示设备
 - **断网缓存** — 网络断开时显示本地缓存内容，不黑屏
 - **开放 API** — 支持外部系统通过 API Key 控制内容和触发警报
-- **管理后台** — Vue.js Web 界面，统一管理所有设备和内容
+- **管理后台** — Vue.js Web 界面，统一管理所有设备、内容和文件
 
 ---
 
@@ -415,6 +453,7 @@ npm start
 | `SQLITE_PATH` | `./data/signage.db` | 数据库文件路径 |
 | `LOG_LEVEL` | `info` | 日志级别（debug/info/warn/error） |
 | `NODE_ENV` | `development` | 运行环境 |
+| `FILE_REPO_PATH` | `./file-repo` | 文件仓库目录路径 |
 
 ---
 
@@ -445,7 +484,24 @@ npm start
 
 ---
 
-### 第三步：创建画面
+### 第三步：管理文件仓库（可选）
+
+进入侧边栏「**文件仓库**」页面，上传和管理媒体文件。
+
+| 操作 | 说明 |
+|------|------|
+| 上传 | 拖拽或点击上传图片、音频、视频（单文件最大 200 MB） |
+| 下载 | 将文件下载到本地 |
+| 重命名 | 在仓库中重命名文件 |
+| 删除 | 从仓库中删除文件 |
+
+也可以直接将文件放入服务器上的 `file-repo/` 目录，系统会立即识别并显示。
+
+上传后，所有文件可在**图片组件**、**视频组件**、**声音设置**中点击「从仓库选择」直接使用，无需手动输入 URL。
+
+---
+
+### 第四步：创建画面
 
 1. 进入**画面管理**页面，点击「新建画面」
 2. 设置画布分辨率以匹配显示设备（内置常用预设）
@@ -456,25 +512,26 @@ npm start
 | 时钟 | 显示当前时间和日期 | 24h/12h 格式、时区 |
 | 天气 | 实时天气（自动获取） | 城市名称、温度单位 |
 | 文本 | 备忘录、公告等 | 内容、字号、颜色 |
-| 图片 | 展示图片 | 图片 URL |
+| 图片 | 展示图片 | URL 或从文件仓库选择 |
+| 视频 | 播放视频 | URL 或从文件仓库选择；自动播放 / 循环 / 静音 |
 | 网页 | 嵌入外部网页 | 目标 URL |
 | 信息列表 | 显示全局共享的公告条目 | 字号、颜色、背景、横向滚动速度、翻页间隔 |
 
 4. 拖拽组件调整位置和大小，或输入 x/y/宽/高（百分比）精确定位
-5. 点击「保存画面」
+5. 点击「保存画面」— 已连接的显示设备**即时更新**
 
 ---
 
-### 第四步：为设备分配画面
+### 第五步：为设备分配画面
 
 1. 在**设备管理**页面，点击目标设备的「画面」按钮
 2. 勾选要显示的画面，设置每个画面的显示时长（秒）
 3. 通过上下箭头调整轮播顺序
-4. 保存后设备会在 5 分钟内（或点击「刷新」按钮后立即）切换
+4. 保存后设备通过 Socket.IO 即时收到新配置
 
 ---
 
-### 第五步：设置定时提醒（可选）
+### 第六步：设置定时提醒（可选）
 
 进入**定时提示**页面，点击「创建提示」
 
@@ -486,6 +543,7 @@ npm start
 | 提示内容 | 显示的文字 |
 | 显示样式 | 顶部条 / 底部条 / 居中浮窗 / 闪烁 |
 | 优先级 | 1–10，同时段多条提醒时数字大的优先 |
+| 声音文件 | 可选，输入 URL 或从文件仓库选择音频 |
 
 提醒会**叠加**在画面轮播之上，同一位置有多条时淡入淡出轮播显示。
 
@@ -496,7 +554,7 @@ npm start
 
 ---
 
-### 第六步：管理信息列表（可选）
+### 第七步：管理信息列表（可选）
 
 进入侧边栏「**信息列表**」页面，添加、编辑或删除公告条目。
 
@@ -518,13 +576,14 @@ npm start
 
 ---
 
-### 第七步：触发紧急警报（可选）
+### 第八步：触发紧急警报（可选）
 
 1. 进入**紧急提示**页面
 2. 点击红色「触发紧急警报」按钮
 3. 填写警报内容，选择目标设备
-4. 点击「立即触发」— 目标设备立即全屏显示红色警报
-5. 处理完毕后点击「解除警报」，设备恢复正常显示
+4. 可选择从文件仓库选取警报声音
+5. 点击「立即触发」— 目标设备立即全屏显示红色警报
+6. 处理完毕后点击「解除警报」，设备恢复正常显示
 
 ---
 
@@ -586,6 +645,13 @@ curl -X POST http://<server>:3000/api/v1/reminders/timed \
   }'
 ```
 
+**上传文件到仓库**
+```bash
+curl -X POST http://<server>:3000/api/v1/file-repo \
+  -H "Authorization: Bearer <token>" \
+  -F "file=@/path/to/video.mp4"
+```
+
 ### 完整 API 列表
 
 | 方法 | 路径 | 说明 |
@@ -607,6 +673,11 @@ curl -X POST http://<server>:3000/api/v1/reminders/timed \
 | POST | `/api/v1/info-items` | 创建信息条目 |
 | PUT | `/api/v1/info-items/:id` | 更新信息条目 |
 | DELETE | `/api/v1/info-items/:id` | 删除信息条目 |
+| GET | `/api/v1/file-repo` | 列出仓库文件（`?type=image\|audio\|video`） |
+| POST | `/api/v1/file-repo` | 上传文件（multipart，最大 200 MB） |
+| GET | `/api/v1/file-repo/:filename/download` | 下载文件 |
+| PATCH | `/api/v1/file-repo/:filename` | 重命名文件 |
+| DELETE | `/api/v1/file-repo/:filename` | 删除文件 |
 
 完整交互式文档：`http://localhost:3000/api/docs`
 
@@ -644,7 +715,7 @@ HomeAssistant / n8n / 外部系统
 HomeSignage/
 ├── src/               # 后端 Node.js 代码
 │   ├── index.js       # 入口文件
-│   ├── config/        # 数据库配置
+│   ├── config/        # 数据库配置、文件仓库配置
 │   ├── middleware/     # JWT & API Key 认证
 │   ├── dao/           # 数据访问层（SQLite）
 │   ├── services/      # Socket.IO、定时调度
@@ -654,7 +725,8 @@ HomeSignage/
 ├── admin/             # 管理后台源码（Vue.js 3）
 ├── admin-dist/        # 管理后台构建产物
 ├── data/              # SQLite 数据库文件
-├── uploads/           # 上传的图片和音频
+├── file-repo/         # 文件仓库（图片、音频、视频）
+├── uploads/           # 旧版上传目录
 ├── logs/              # 运行日志
 └── docker-compose.yml
 ```
@@ -681,4 +753,4 @@ cd admin && npm run dev
 | 服务器 | 家庭 NAS、树莓派 4、低功耗小主机 |
 | 显示终端 | 旧 iPad/iPhone、旧 Android 平板、旧笔记本接显示器 |
 
-**服务器最低配置**：1 核 CPU · 512 MB 内存 · 1 GB 存储
+**服务器最低配置**：1 核 CPU · 512 MB 内存 · 1 GB 存储（存放视频文件需更多）
