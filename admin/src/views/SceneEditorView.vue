@@ -319,6 +319,10 @@
                 <el-switch v-model="editForm.config.muted" />
                 <div style="font-size:11px;color:#909399;margin-top:2px">{{ $t('sceneEditor.video.mutedHint') }}</div>
               </el-form-item>
+              <el-form-item :label="$t('sceneEditor.video.useStream')">
+                <el-switch v-model="editForm.config.useStream" />
+                <div style="font-size:11px;color:#909399;margin-top:2px">{{ $t('sceneEditor.video.useStreamHint') }}</div>
+              </el-form-item>
             </el-form>
 
             <el-form v-else-if="selectedComponent.type === 'iframe'" label-width="80px" size="small">
@@ -509,7 +513,7 @@ const defaultConfigs = computed(() => ({
   weather:   { city: 'Beijing', unit: 'C' },
   text:      { content: t('sceneEditor.placeholders.text'), fontSize: 24, color: '#ffffff', backgroundColor: 'transparent', textAlign: 'center' },
   image:     { url: '', objectFit: 'cover' },
-  video:     { url: '', objectFit: 'cover', autoplay: true, loop: true, muted: true },
+  video:     { url: '', objectFit: 'cover', autoplay: true, loop: true, muted: true, useStream: true },
   iframe:    { url: 'https://example.com' },
   'info-list': { fontSize: 18, color: '#ffffff', backgroundColor: 'rgba(0,0,0,0.5)', itemSpacing: 6, padding: 10, scrollSpeed: 40, pageInterval: 5 },
 }))

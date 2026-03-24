@@ -228,6 +228,8 @@ export default {
       loop: 'Loop',
       muted: 'Muted',
       mutedHint: 'Browser requires muted for autoplay',
+      useStream: 'Streaming',
+      useStreamHint: 'Stream via HTTP Range requests for instant start and seeking',
     },
     iframe: {
       url: 'Page URL',

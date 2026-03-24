@@ -228,6 +228,8 @@ export default {
       loop: '循环播放',
       muted: '静音播放',
       mutedHint: '浏览器要求自动播放时必须静音',
+      useStream: '流式传输',
+      useStreamHint: '开启后视频以 HTTP 流方式播放，支持即时起播和快速跳转',
     },
     iframe: {
       url: '网页URL',
