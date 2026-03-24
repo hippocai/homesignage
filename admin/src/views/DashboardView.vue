@@ -199,13 +199,19 @@ const uptime = computed(() => {
 function isOnline(device) {
   if (device.connected) return true
   if (!device.last_seen) return false
-  const lastSeen = new Date(device.last_seen).getTime()
+  const lastSeen = parseUtcTime(device.last_seen).getTime()
   return Date.now() - lastSeen < 2 * 60 * 1000
+}
+
+function parseUtcTime(time) {
+  if (!time) return null
+  const s = time.replace(' ', 'T')
+  return new Date(/Z|[+-]\d{2}:\d{2}$/.test(s) ? s : s + 'Z')
 }
 
 function formatTime(time) {
   if (!time) return t('common.never')
-  const date = new Date(time)
+  const date = parseUtcTime(time)
   const now = new Date()
   const diff = now - date
   if (diff < 60000) return t('common.justNow')

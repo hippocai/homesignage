@@ -185,13 +185,22 @@ const createdDeviceUrl = computed(() => {
 function isOnline(device) {
   if (device.connected) return true
   if (!device.last_seen) return false
-  const lastSeen = new Date(device.last_seen).getTime()
+  const lastSeen = parseUtcTime(device.last_seen).getTime()
   return Date.now() - lastSeen < 2 * 60 * 1000
+}
+
+// SQLite CURRENT_TIMESTAMP returns "YYYY-MM-DD HH:MM:SS" (no timezone).
+// JS treats that as local time, causing an 8-hour offset for UTC+8.
+// Normalize to ISO 8601 UTC before parsing.
+function parseUtcTime(time) {
+  if (!time) return null
+  const s = time.replace(' ', 'T')
+  return new Date(/Z|[+-]\d{2}:\d{2}$/.test(s) ? s : s + 'Z')
 }
 
 function formatTime(time) {
   if (!time) return t('common.never')
-  const date = new Date(time)
+  const date = parseUtcTime(time)
   const now = new Date()
   const diff = now - date
   if (diff < 60000) return t('common.justNow')

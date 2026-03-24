@@ -218,9 +218,15 @@ const triggerRules = computed(() => ({
   text: [{ required: true, message: t('emergency.alertTextRequired'), trigger: 'blur' }]
 }))
 
+function parseUtcTime(time) {
+  if (!time) return null
+  const s = time.replace(' ', 'T')
+  return new Date(/Z|[+-]\d{2}:\d{2}$/.test(s) ? s : s + 'Z')
+}
+
 function formatTime(time) {
   if (!time) return '—'
-  const date = new Date(time)
+  const date = parseUtcTime(time)
   const now = new Date()
   const diff = now - date
   if (diff < 60000) return t('common.justNow')
