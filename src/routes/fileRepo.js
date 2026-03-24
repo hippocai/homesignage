@@ -20,6 +20,9 @@ const upload = multer({
   limits: { fileSize: 200 * 1024 * 1024 }, // 200MB
 });
 
+// GET  /api/v1/file-repo/:filename/stream  — no auth (display clients access via video.src)
+router.get('/:filename/stream', ctrl.streamVideo);
+
 // GET  /api/v1/file-repo              list files (?type=image|audio|video|other)
 router.get('/', authenticateJWT, ctrl.list);
 

@@ -74,7 +74,9 @@ async function loadFiles() {
 }
 
 function selectFile(file) {
-  emit('select', file.url)
+  // Use streaming URL for videos so the display client gets proper Range-request support
+  const url = file.type === 'video' && file.streamUrl ? file.streamUrl : file.url
+  emit('select', url)
   emit('update:modelValue', false)
 }
 </script>
