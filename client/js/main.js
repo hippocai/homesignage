@@ -47,13 +47,27 @@ var audioUnlocked = false;
 ───────────────────────────────────────────── */
 document.addEventListener('DOMContentLoaded', init);
 
+function getUrlParam(name) {
+  var search = window.location.search.substring(1);
+  var pairs = search ? search.split('&') : [];
+  for (var i = 0; i < pairs.length; i++) {
+    var idx = pairs[i].indexOf('=');
+    if (idx === -1) continue;
+    var key = decodeURIComponent(pairs[i].substring(0, idx).replace(/\+/g, ' '));
+    if (key === name) {
+      return decodeURIComponent(pairs[i].substring(idx + 1).replace(/\+/g, ' '));
+    }
+  }
+  return null;
+}
+
 function init() {
   log('init', 'Client initialising');
 
   // Prefer URL params so a fresh link always works
-  var params = new URLSearchParams(window.location.search);
-  var urlDeviceId  = params.get('deviceId');
-  var urlDeviceKey = params.get('deviceKey');
+  // (URLSearchParams not supported on iOS < 10.3, use manual parser)
+  var urlDeviceId  = getUrlParam('deviceId');
+  var urlDeviceKey = getUrlParam('deviceKey');
 
   deviceId  = urlDeviceId  || localStorage.getItem('deviceId');
   deviceKey = urlDeviceKey || localStorage.getItem('deviceKey');
@@ -259,6 +273,9 @@ function applyConfig(config) {
   clearInfoListIntervals();
   infoListFetchers = [];
 
+  // Release video decoder memory before clearing DOM (critical on iOS Safari)
+  releaseAllVideos();
+
   // Remove existing scene layers from DOM
   var app = document.getElementById('app');
   app.innerHTML = '';
@@ -267,11 +284,12 @@ function applyConfig(config) {
 
   var scenes = (config.scenes && config.scenes.length > 0) ? config.scenes : [];
 
-  // Build scene layers
+  // Build scene layers; pause videos on all but the first (startCarousel will resume)
   for (var i = 0; i < scenes.length; i++) {
     var layer = buildSceneLayer(scenes[i], i);
     app.appendChild(layer);
     sceneLayers.push(layer);
+    if (i > 0) pauseLayerVideos(layer);
   }
 
   // Show placeholder if no scenes configured
@@ -628,6 +646,7 @@ function renderVideo(el, cfg) {
 
   var video = document.createElement('video');
   video.src      = src;
+  video.dataset.origSrc = src;            // saved for reload after background release
   video.style.width     = '100%';
   video.style.height    = '100%';
   video.style.objectFit = cfg.objectFit || 'cover';
@@ -715,23 +734,27 @@ function transitionToScene(index) {
 
   if (!current || !next) return;
 
-  // Fade in next (on top while both visible)
+  // Fade in next (on top), resume its videos
   next.style.zIndex = '2';
+  resumeLayerVideos(next);
   requestAnimationFrame(function () {
     next.classList.add('active');
   });
 
-  // After transition completes, hide current
+  // After next is fully visible, start fading out current (next stays on top via zIndex:2)
   setTimeout(function () {
     current.classList.remove('active');
-    current.style.zIndex = '';
-    next.style.zIndex    = '';
     currentSceneIndex = index;
-    // Schedule the following transition
     if (state !== 'EMERGENCY') {
       scheduleNextScene();
     }
-  }, CONFIG.TRANSITION_DURATION + 50); // slight buffer
+    // Clear zIndex only after current has fully faded out, then pause its videos
+    setTimeout(function () {
+      next.style.zIndex    = '';
+      current.style.zIndex = '';
+      pauseLayerVideos(current);
+    }, CONFIG.TRANSITION_DURATION + 50);
+  }, CONFIG.TRANSITION_DURATION + 50);
 }
 
 function showScene(index) {
@@ -739,9 +762,11 @@ function showScene(index) {
   for (var i = 0; i < sceneLayers.length; i++) {
     sceneLayers[i].classList.remove('active');
     sceneLayers[i].style.zIndex = '';
+    if (i !== index) pauseLayerVideos(sceneLayers[i]);
   }
   if (sceneLayers[index]) {
     sceneLayers[index].classList.add('active');
+    resumeLayerVideos(sceneLayers[index]);
     currentSceneIndex = index;
   }
 }
@@ -1314,6 +1339,64 @@ function loadCachedConfig() {
 }
 
 /* ─────────────────────────────────────────────
+   VIDEO MEMORY MANAGEMENT
+   iOS Safari does not release <video> decoder memory when elements are
+   removed from the DOM via innerHTML=''. Must explicitly pause + clear src
+   + call load() to flush the decoder. Failure to do so causes OOM crashes
+   after several hours on devices like iPad Air 2 (iOS 15).
+───────────────────────────────────────────── */
+function releaseAllVideos() {
+  var app = document.getElementById('app');
+  if (!app) return;
+  var videos = app.querySelectorAll('video');
+  for (var i = 0; i < videos.length; i++) {
+    try {
+      videos[i].pause();
+      videos[i].removeAttribute('src');
+      videos[i].load(); // flushes iOS decoder buffer
+    } catch (e) {}
+  }
+}
+
+function pauseLayerVideos(layer) {
+  if (!layer) return;
+  var videos = layer.querySelectorAll('video');
+  for (var i = 0; i < videos.length; i++) {
+    try { videos[i].pause(); } catch (e) {}
+  }
+}
+
+function resumeLayerVideos(layer) {
+  if (!layer) return;
+  var videos = layer.querySelectorAll('video');
+  for (var i = 0; i < videos.length; i++) {
+    try {
+      var v = videos[i];
+      if (v.paused && v.getAttribute('src') !== '' && v.dataset.origSrc) {
+        v.src = v.dataset.origSrc;
+        v.load();
+      }
+      v.play().catch(function () {});
+    } catch (e) {}
+  }
+}
+
+function reloadLayerVideos(layer) {
+  if (!layer) return;
+  var videos = layer.querySelectorAll('video');
+  for (var i = 0; i < videos.length; i++) {
+    try {
+      var v = videos[i];
+      if (v.dataset.origSrc) {
+        v.src = v.dataset.origSrc;
+        v.load();
+        v.play().catch(function () {});
+      }
+    } catch (e) {}
+  }
+}
+
+/* ─────────────────────────────────────────────
    CLOCK INTERVALS CLEANUP
 ───────────────────────────────────────────── */
 function clearClockIntervals() {
@@ -1562,8 +1645,13 @@ function log(tag, msg) {
 document.addEventListener('visibilitychange', function () {
   if (document.hidden) {
     stopCarousel();
+    releaseAllVideos();
   } else {
     if (state === 'NORMAL' || state === 'TIMED_REMINDER') {
+      // Re-load the current scene's videos after resuming from background
+      if (sceneLayers[currentSceneIndex]) {
+        reloadLayerVideos(sceneLayers[currentSceneIndex]);
+      }
       startCarousel();
     }
   }
