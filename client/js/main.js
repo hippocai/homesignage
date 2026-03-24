@@ -642,6 +642,11 @@ function renderImage(el, cfg) {
 /* ── Video ── */
 function renderVideo(el, cfg) {
   var src = cfg.url || cfg.src || '';
+  // Normalise legacy static file-repo URLs to the streaming endpoint so
+  // Range requests work correctly on all browsers (including iOS Safari).
+  if (src && src.indexOf('/file-repo/') === 0) {
+    src = '/api/v1/file-repo/' + src.slice('/file-repo/'.length) + '/stream';
+  }
   el.style.overflow = 'hidden';
 
   var video = document.createElement('video');
