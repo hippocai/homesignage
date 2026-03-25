@@ -39,7 +39,7 @@ function fetchUrl(url) {
 }
 
 async function getCachedContent(url, ttlMs) {
-  const ttl = ttlMs || DEFAULT_TTL_MS;
+  const ttl = ttlMs != null ? ttlMs : DEFAULT_TTL_MS;
   const cached = cache.get(url);
   if (cached && Date.now() - cached.fetchedAt < ttl) {
     return cached;
