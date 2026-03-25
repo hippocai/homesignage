@@ -59,6 +59,18 @@ async function start() {
     initSocketService(server);
     logger.info('Socket.IO initialized');
 
+    // Initialize weather service (caching + push)
+    const weatherService = require('./services/weatherService');
+    const socketService  = require('./services/socketService');
+    const componentDao   = require('./dao/componentDao');
+    weatherService.setSocketService(socketService);
+    weatherService.startScheduler(async () => {
+      // Collect all cities currently configured in weather components
+      const comps = await componentDao.findByType('weather').catch(() => []);
+      return [...new Set(comps.map((c) => (c.config && c.config.city) || 'Beijing'))];
+    });
+    logger.info('Weather service initialized');
+
     // Initialize scheduler
     await initScheduler();
     logger.info('Scheduler initialized');

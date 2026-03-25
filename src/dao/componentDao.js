@@ -107,9 +107,19 @@ function deleteBySceneId(sceneId) {
   });
 }
 
+function findByType(type) {
+  return new Promise((resolve, reject) => {
+    db.all('SELECT * FROM components WHERE type = ?', [type], (err, rows) => {
+      if (err) return reject(err);
+      resolve(rows.map(parseComponent));
+    });
+  });
+}
+
 module.exports = {
   findBySceneId,
   findById,
+  findByType,
   create,
   update,
   delete: deleteComponent,

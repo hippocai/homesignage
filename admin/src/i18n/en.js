@@ -233,6 +233,9 @@ export default {
     },
     iframe: {
       url: 'Page URL',
+      useProxy: 'Server Proxy',
+      useProxyHint: 'Server fetches and caches the page — for display clients without internet access',
+      refreshInterval: 'Refresh Interval',
     },
     infoList: {
       fontSize: 'Font Size',

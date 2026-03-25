@@ -2,7 +2,20 @@ const { v4: uuidv4 } = require('uuid');
 const sceneDao = require('../dao/sceneDao');
 const componentDao = require('../dao/componentDao');
 const socketService = require('../services/socketService');
+const { localizeUrl } = require('../services/assetDownloadService');
 const logger = require('../utils/logger');
+
+// Asset types whose URL should be downloaded to local file-repo
+const ASSET_URL_TYPES = new Set(['image', 'video']);
+
+async function localizeComponentConfig(type, config) {
+  if (!ASSET_URL_TYPES.has(type)) return config;
+  const url = config.url || config.src;
+  if (!url) return config;
+  const localUrl = await localizeUrl(url);
+  if (localUrl === url) return config;
+  return { ...config, url: localUrl };
+}
 
 async function listScenes(req, res) {
   try {
@@ -107,13 +120,14 @@ async function addComponent(req, res) {
       return res.status(404).json({ error: 'Scene not found' });
     }
 
+    const localizedConfig = await localizeComponentConfig(type, config);
     const componentId = uuidv4();
     const component = await componentDao.create({
       id: componentId,
       scene_id: sceneId,
       type,
       position,
-      config,
+      config: localizedConfig,
       style: style || {},
       sort_order: sort_order || 0
     });
@@ -134,7 +148,11 @@ async function updateComponent(req, res) {
     if (!component || component.scene_id !== sceneId) {
       return res.status(404).json({ error: 'Component not found' });
     }
-    const updated = await componentDao.update(componentId, req.body);
+    const body = { ...req.body };
+    if (body.config) {
+      body.config = await localizeComponentConfig(component.type, body.config);
+    }
+    const updated = await componentDao.update(componentId, body);
     logger.info('Component updated', { componentId, sceneId });
     socketService.emitToAll('config-updated', { sceneId });
     return res.json({ data: updated, message: 'Component updated successfully' });

@@ -325,9 +325,17 @@
               </el-form-item>
             </el-form>
 
-            <el-form v-else-if="selectedComponent.type === 'iframe'" label-width="80px" size="small">
+            <el-form v-else-if="selectedComponent.type === 'iframe'" label-width="100px" size="small">
               <el-form-item :label="$t('sceneEditor.iframe.url')">
                 <el-input v-model="editForm.config.url" placeholder="https://..." />
+              </el-form-item>
+              <el-form-item :label="$t('sceneEditor.iframe.useProxy')">
+                <el-switch v-model="editForm.config.useProxy" />
+                <div style="font-size:11px;color:#909399;margin-top:2px">{{ $t('sceneEditor.iframe.useProxyHint') }}</div>
+              </el-form-item>
+              <el-form-item v-if="editForm.config.useProxy" :label="$t('sceneEditor.iframe.refreshInterval')">
+                <el-input-number v-model="editForm.config.refreshInterval" :min="1" :max="1440" controls-position="right" />
+                <span style="margin-left:6px;font-size:12px;color:#909399">{{ $t('common.minutes') }}</span>
               </el-form-item>
             </el-form>
 
@@ -514,7 +522,7 @@ const defaultConfigs = computed(() => ({
   text:      { content: t('sceneEditor.placeholders.text'), fontSize: 24, color: '#ffffff', backgroundColor: 'transparent', textAlign: 'center' },
   image:     { url: '', objectFit: 'cover' },
   video:     { url: '', objectFit: 'cover', autoplay: true, loop: true, muted: true, useStream: true },
-  iframe:    { url: 'https://example.com' },
+  iframe:    { url: 'https://example.com', useProxy: false, refreshInterval: 10 },
   'info-list': { fontSize: 18, color: '#ffffff', backgroundColor: 'rgba(0,0,0,0.5)', itemSpacing: 6, padding: 10, scrollSpeed: 40, pageInterval: 5 },
 }))
 

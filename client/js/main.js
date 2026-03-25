@@ -545,8 +545,9 @@ function fetchWeatherData(city, callback) {
 }
 
 function renderWeather(el, cfg, sty) {
-  var city = cfg.city || 'Beijing';
-  var unit = cfg.unit || 'C';
+  var city    = cfg.city || 'Beijing';
+  var cityKey = city.toLowerCase();
+  var unit    = cfg.unit || 'C';
 
   var iconEl = document.createElement('div');
   iconEl.style.fontSize   = '3em';
@@ -591,11 +592,26 @@ function renderWeather(el, cfg, sty) {
     metaEl.textContent = '\u6e7f\u5ea6 ' + data.humidity + '%  \u98ce\u901f ' + data.wind;
   }
 
+  // Initial load via REST (uses server-side cache)
   fetchWeatherData(city, applyData);
 
-  // Refresh every 30 minutes
-  var timer = setInterval(function() { fetchWeatherData(city, applyData); }, 30 * 60 * 1000);
-  clockIntervals.push(timer);
+  // Listen for server-push updates for this city (server refreshes every 30 min)
+  if (socket) {
+    socket.on('weather-update', function(payload) {
+      if (payload && payload.city === cityKey && payload.data) {
+        var d = payload.data;
+        applyData({
+          tempC:       d.tempC,
+          tempF:       d.tempF,
+          icon:        weatherCodeToEmoji(d.weatherCode),
+          description: d.description,
+          humidity:    d.humidity,
+          wind:        d.windKmph + ' km/h',
+          city:        d.city
+        });
+      }
+    });
+  }
 }
 
 /* ── Text ── */
@@ -676,6 +692,14 @@ function renderVideo(el, cfg) {
 /* ── Iframe ── */
 function renderIframe(el, cfg) {
   var src = cfg.url || cfg.src || '';
+  // If useProxy is enabled (or URL is external), route through server-side cache
+  // so display clients without internet access can still load the content.
+  var isExternal = /^https?:\/\//i.test(src) && src.indexOf(CONFIG.SERVER_URL) !== 0;
+  if (src && (cfg.useProxy || isExternal)) {
+    var ttl = cfg.refreshInterval || '';
+    src = CONFIG.SERVER_URL + '/url-content?url=' + encodeURIComponent(src)
+          + (ttl ? '&ttl=' + ttl : '');
+  }
   el.style.overflow = 'hidden';
 
   var iframe = document.createElement('iframe');

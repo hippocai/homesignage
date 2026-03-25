@@ -233,6 +233,9 @@ export default {
     },
     iframe: {
       url: '网页URL',
+      useProxy: '服务器代理',
+      useProxyHint: '开启后由服务器拉取并缓存网页，适用于显示端无法访问外网的环境',
+      refreshInterval: '刷新间隔',
     },
     infoList: {
       fontSize: '字体大小',

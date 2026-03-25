@@ -64,6 +64,8 @@ app.use('/api/v1/uploads', require('./routes/uploads'));
 app.use('/api/v1/weather', require('./routes/weather'));
 app.use('/api/v1/info-items', require('./routes/infoItems'));
 app.use('/api/v1/file-repo', require('./routes/fileRepo'));
+// No-auth endpoint: server-proxies external URLs for display clients in isolated networks
+app.use('/url-content', require('./routes/urlContent'));
 
 // Root health check
 app.get('/', (req, res) => {
