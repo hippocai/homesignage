@@ -196,6 +196,8 @@ export default {
       tempUnit: '温度单位',
       celsius: '摄氏度 (°C)',
       fahrenheit: '华氏度 (°F)',
+      refreshInterval: '更新频率',
+      refreshIntervalUnit: '分钟',
     },
     text: {
       content: '文字内容',

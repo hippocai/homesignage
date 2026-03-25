@@ -196,6 +196,8 @@ export default {
       tempUnit: 'Temp Unit',
       celsius: 'Celsius (°C)',
       fahrenheit: 'Fahrenheit (°F)',
+      refreshInterval: 'Refresh Every',
+      refreshIntervalUnit: 'minutes',
     },
     text: {
       content: 'Content',

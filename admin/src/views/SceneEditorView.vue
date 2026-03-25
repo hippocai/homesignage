@@ -245,6 +245,17 @@
                   <el-option :label="$t('sceneEditor.weather.fahrenheit')" value="F" />
                 </el-select>
               </el-form-item>
+              <el-form-item :label="$t('sceneEditor.weather.refreshInterval')">
+                <el-input-number
+                  v-model="editForm.config.refreshInterval"
+                  :min="5"
+                  :max="1440"
+                  :step="5"
+                  controls-position="right"
+                  style="width: 120px"
+                />
+                <span style="margin-left:8px;color:#909399;font-size:12px">{{ $t('sceneEditor.weather.refreshIntervalUnit') }}</span>
+              </el-form-item>
             </el-form>
 
             <el-form v-else-if="selectedComponent.type === 'text'" label-width="80px" size="small">
@@ -518,7 +529,7 @@ const componentTypes = computed(() => [
 
 const defaultConfigs = computed(() => ({
   clock:     { format: 'HH:mm', showDate: true, timezone: 'Asia/Shanghai' },
-  weather:   { city: 'Beijing', unit: 'C' },
+  weather:   { city: 'Beijing', unit: 'C', refreshInterval: 30 },
   text:      { content: t('sceneEditor.placeholders.text'), fontSize: 24, color: '#ffffff', backgroundColor: 'transparent', textAlign: 'center' },
   image:     { url: '', objectFit: 'cover' },
   video:     { url: '', objectFit: 'cover', autoplay: true, loop: true, muted: true, useStream: true },

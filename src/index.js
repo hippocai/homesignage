@@ -64,11 +64,19 @@ async function start() {
     const socketService  = require('./services/socketService');
     const componentDao   = require('./dao/componentDao');
     weatherService.setSocketService(socketService);
-    weatherService.startScheduler(async () => {
-      // Collect all cities currently configured in weather components
+
+    async function getWeatherCities() {
       const comps = await componentDao.findByType('weather').catch(() => []);
       return [...new Set(comps.map((c) => (c.config && c.config.city) || 'Beijing'))];
-    });
+    }
+    async function getMinWeatherInterval() {
+      const comps = await componentDao.findByType('weather').catch(() => []);
+      const intervals = comps.map((c) => parseInt((c.config && c.config.refreshInterval) || 30, 10)).filter(Boolean);
+      return intervals.length ? Math.min(...intervals) : 30;
+    }
+
+    const initInterval = await getMinWeatherInterval();
+    weatherService.startScheduler(getWeatherCities, initInterval);
     logger.info('Weather service initialized');
 
     // Initialize scheduler

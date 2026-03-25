@@ -2,11 +2,23 @@ const { v4: uuidv4 } = require('uuid');
 const sceneDao = require('../dao/sceneDao');
 const componentDao = require('../dao/componentDao');
 const socketService = require('../services/socketService');
+const weatherService = require('../services/weatherService');
 const { localizeUrl } = require('../services/assetDownloadService');
 const logger = require('../utils/logger');
 
 // Asset types whose URL should be downloaded to local file-repo
 const ASSET_URL_TYPES = new Set(['image', 'video']);
+
+// Re-compute and restart the weather scheduler whenever weather components change
+async function maybeRestartWeatherScheduler(type) {
+  if (type !== 'weather') return;
+  const comps = await componentDao.findByType('weather').catch(() => []);
+  const cities = [...new Set(comps.map((c) => (c.config && c.config.city) || 'Beijing'))];
+  const intervals = comps.map((c) => parseInt((c.config && c.config.refreshInterval) || 30, 10)).filter(Boolean);
+  const minInterval = intervals.length ? Math.min(...intervals) : 30;
+  weatherService.startScheduler(async () => cities, minInterval);
+  logger.info('Weather scheduler restarted', { intervalMinutes: minInterval, cities });
+}
 
 async function localizeComponentConfig(type, config) {
   if (!ASSET_URL_TYPES.has(type)) return config;
@@ -134,6 +146,7 @@ async function addComponent(req, res) {
 
     logger.info('Component added to scene', { sceneId, componentId, type });
     socketService.emitToAll('config-updated', { sceneId });
+    await maybeRestartWeatherScheduler(type);
     return res.status(201).json({ data: component, message: 'Component added successfully' });
   } catch (err) {
     logger.error('Add component error', { error: err.message });
@@ -155,6 +168,7 @@ async function updateComponent(req, res) {
     const updated = await componentDao.update(componentId, body);
     logger.info('Component updated', { componentId, sceneId });
     socketService.emitToAll('config-updated', { sceneId });
+    await maybeRestartWeatherScheduler(component.type);
     return res.json({ data: updated, message: 'Component updated successfully' });
   } catch (err) {
     logger.error('Update component error', { error: err.message });
@@ -169,9 +183,11 @@ async function deleteComponent(req, res) {
     if (!component || component.scene_id !== sceneId) {
       return res.status(404).json({ error: 'Component not found' });
     }
+    const deletedType = component.type;
     await componentDao.delete(componentId);
     logger.info('Component deleted', { componentId, sceneId });
     socketService.emitToAll('config-updated', { sceneId });
+    await maybeRestartWeatherScheduler(deletedType);
     return res.json({ message: 'Component deleted successfully' });
   } catch (err) {
     logger.error('Delete component error', { error: err.message });

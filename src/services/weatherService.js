@@ -10,8 +10,8 @@ const logger = require('../utils/logger');
 
 // cache: Map<city_lower -> { data, fetchedAt }>
 const cache = new Map();
-const CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes
 
+let _intervalMinutes = 30;
 let _socketService = null;
 let _refreshJob = null;
 
@@ -77,28 +77,31 @@ async function refreshCity(city) {
 async function getWeather(city) {
   const key = city.toLowerCase();
   const cached = cache.get(key);
-  if (cached && Date.now() - cached.fetchedAt < CACHE_TTL_MS) {
+  if (cached && Date.now() - cached.fetchedAt < _intervalMinutes * 60 * 1000) {
     return cached.data;
   }
   return refreshCity(city);
 }
 
 /**
- * Start periodic refresh for all cities currently in the scene configs.
- * Called once at startup; also called whenever scene configs change.
+ * Start (or restart) periodic refresh for all cities currently in the scene configs.
+ * @param {Function} getCitiesFromScenes - async function returning array of city names
+ * @param {number} [intervalMinutes=30] - refresh interval in minutes (1–1440)
  */
-function startScheduler(getCitiesFromScenes) {
+function startScheduler(getCitiesFromScenes, intervalMinutes) {
+  _intervalMinutes = Math.max(1, Math.min(1440, Math.round(intervalMinutes || 30)));
   if (_refreshJob) _refreshJob.cancel();
 
-  // Refresh every 30 minutes
-  _refreshJob = schedule.scheduleJob('0 */30 * * * *', async () => {
+  // node-schedule cron supports */N for minutes up to 60; cap at 60 for the cron expression
+  const cronInterval = Math.min(60, _intervalMinutes);
+  _refreshJob = schedule.scheduleJob(`0 */${cronInterval} * * * *`, async () => {
     const cities = await getCitiesFromScenes();
-    logger.info('Weather scheduler tick', { cities });
+    logger.info('Weather scheduler tick', { cities, intervalMinutes: _intervalMinutes });
     for (const city of cities) {
       await refreshCity(city);
     }
   });
-  logger.info('Weather scheduler started');
+  logger.info('Weather scheduler started', { intervalMinutes: _intervalMinutes });
 }
 
-module.exports = { getWeather, refreshCity, startScheduler, setSocketService };
+module.exports = { getWeather, refreshCity, startScheduler, setSocketService, getIntervalMinutes: () => _intervalMinutes };
