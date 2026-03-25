@@ -1,5 +1,13 @@
 const { db } = require('../config/database');
 
+// start_time / end_time are stored as local-time strings ("YYYY-MM-DDTHH:mm:ss", no timezone)
+// from the admin date picker. We must compare against local time, not UTC (toISOString).
+function localNow() {
+  const d = new Date();
+  const p = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+}
+
 function parseItem(row) {
   if (!row) return null;
   return { ...row };
@@ -15,7 +23,7 @@ function findAll() {
 }
 
 function findActive() {
-  const now = new Date().toISOString();
+  const now = localNow();
   return new Promise((resolve, reject) => {
     db.all(
       `SELECT * FROM info_items
@@ -89,7 +97,7 @@ function deleteItem(id) {
 }
 
 function deleteExpired() {
-  const now = new Date().toISOString();
+  const now = localNow();
   return new Promise((resolve, reject) => {
     db.run(
       `DELETE FROM info_items WHERE end_time IS NOT NULL AND end_time < ?`,
