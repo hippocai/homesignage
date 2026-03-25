@@ -221,16 +221,16 @@ function formatTime(isoStr) {
 }
 
 function getStatusType(row) {
-  const now = new Date().toISOString()
-  if (row.end_time && row.end_time < now) return 'danger'
-  if (row.start_time && row.start_time > now) return 'warning'
+  const now = Date.now()
+  if (row.end_time && new Date(row.end_time).getTime() < now) return 'danger'
+  if (row.start_time && new Date(row.start_time).getTime() > now) return 'warning'
   return 'success'
 }
 
 function getStatusLabel(row) {
-  const now = new Date().toISOString()
-  if (row.end_time && row.end_time < now) return t('infoItems.statusExpired')
-  if (row.start_time && row.start_time > now) return t('infoItems.statusPending')
+  const now = Date.now()
+  if (row.end_time && new Date(row.end_time).getTime() < now) return t('infoItems.statusExpired')
+  if (row.start_time && new Date(row.start_time).getTime() > now) return t('infoItems.statusPending')
   return t('infoItems.statusActive')
 }
 
