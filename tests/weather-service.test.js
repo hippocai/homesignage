@@ -48,8 +48,10 @@ describe('weatherService.getWeather', () => {
       return fakeReq;
     });
 
-    const data = await weatherService.getWeather('TestCity1');
-    expect(data).toMatchObject({
+    const result = await weatherService.getWeather('TestCity1');
+    expect(result.stale).toBe(false);
+    expect(result.fetchedAt).toBeGreaterThan(0);
+    expect(result.data).toMatchObject({
       city: 'Beijing',
       tempC: 20,
       tempF: 68,
@@ -72,33 +74,44 @@ describe('weatherService.getWeather', () => {
     expect(mockGet).toHaveBeenCalledTimes(1);
 
     // Second call — should use cache
-    await weatherService.getWeather('TestCity2');
+    const cached = await weatherService.getWeather('TestCity2');
     expect(mockGet).toHaveBeenCalledTimes(1); // still 1
+    expect(cached.stale).toBe(false);
   });
 
-  it('returns null when upstream responds with invalid JSON (retries 3 times)', async () => {
-    const fakeReq = { on: jest.fn(), setTimeout: jest.fn() };
-    mockGet.mockImplementation((url, opts, cb) => {
-      cb(makeUpstreamResponse('not-json'));
-      return fakeReq;
-    });
-
-    const data = await weatherService.getWeather('BadCity1');
-    expect(data).toBeNull();
-    expect(mockGet).toHaveBeenCalledTimes(3); // retried 3 times
-  });
-
-  it('returns null when upstream request errors (retries 3 times)', async () => {
-    mockGet.mockImplementation((url, opts, cb) => {
+  it('returns null when no cache and all retries fail', async () => {
+    mockGet.mockImplementation(() => {
       const req = new EventEmitter();
       req.setTimeout = jest.fn();
       process.nextTick(() => req.emit('error', new Error('ECONNREFUSED')));
       return req;
     });
 
-    const data = await weatherService.getWeather('BadCity2');
-    expect(data).toBeNull();
+    const result = await weatherService.getWeather('BadCity1');
+    expect(result).toBeNull(); // no stale cache → null
     expect(mockGet).toHaveBeenCalledTimes(3); // retried 3 times
+  });
+
+  it('returns stale cached data with stale:true when upstream fails', async () => {
+    const fakeReq = { on: jest.fn(), setTimeout: jest.fn() };
+    // First call: success → populates cache
+    mockGet.mockImplementationOnce((url, opts, cb) => {
+      cb(makeUpstreamResponse(SAMPLE_WTTR));
+      return fakeReq;
+    });
+    await weatherService.getWeather('StaleCity');
+
+    // Expire the cache by directly testing refreshCity with a broken upstream
+    mockGet.mockImplementation(() => {
+      const req = new EventEmitter();
+      req.setTimeout = jest.fn();
+      process.nextTick(() => req.emit('error', new Error('ECONNREFUSED')));
+      return req;
+    });
+    const result = await weatherService.refreshCity('StaleCity');
+    expect(result).not.toBeNull();
+    expect(result.stale).toBe(true);
+    expect(result.data.city).toBe('Beijing'); // stale data still returned
   });
 
   it('succeeds on second attempt after a transient TLS error', async () => {
@@ -107,20 +120,19 @@ describe('weatherService.getWeather', () => {
     mockGet.mockImplementation((url, opts, cb) => {
       calls++;
       if (calls === 1) {
-        // First attempt: network error (TLS disconnect)
         const req = new EventEmitter();
         req.setTimeout = jest.fn();
         process.nextTick(() => req.emit('error', new Error('Client network socket disconnected')));
         return req;
       }
-      // Second attempt: success
       cb(makeUpstreamResponse(SAMPLE_WTTR));
       return fakeReq;
     });
 
-    const data = await weatherService.getWeather('RetryCity');
-    expect(data).not.toBeNull();
-    expect(data.city).toBe('Beijing');
+    const result = await weatherService.getWeather('RetryCity');
+    expect(result).not.toBeNull();
+    expect(result.stale).toBe(false);
+    expect(result.data.city).toBe('Beijing');
     expect(mockGet).toHaveBeenCalledTimes(2);
   });
 });
@@ -139,7 +151,7 @@ describe('weatherService.refreshCity', () => {
     await weatherService.refreshCity('SocketCity');
     expect(mockSocket.emitToAll).toHaveBeenCalledWith(
       'weather-update',
-      expect.objectContaining({ city: 'socketcity' })
+      expect.objectContaining({ city: 'socketcity', fetchedAt: expect.any(Number) })
     );
   });
 

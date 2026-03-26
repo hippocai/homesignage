@@ -516,6 +516,13 @@ function weatherCodeToEmoji(code) {
   return '\ud83c\udf24\ufe0f'; // 🌤️ 默认
 }
 
+function weatherAgoText(fetchedAt) {
+  var mins = Math.round((Date.now() - fetchedAt) / 60000);
+  if (mins < 1) return '刚刚';
+  if (mins < 60) return mins + ' 分钟前';
+  return Math.round(mins / 60) + ' 小时前';
+}
+
 function fetchWeatherData(city, callback) {
   var xhr = new XMLHttpRequest();
   xhr.open('GET', CONFIG.SERVER_URL + '/api/v1/weather?city=' + encodeURIComponent(city), true);
@@ -533,7 +540,9 @@ function fetchWeatherData(city, callback) {
         description: d.description,
         humidity:    d.humidity,
         wind:        d.windKmph + ' km/h',
-        city:        d.city
+        city:        d.city,
+        stale:       resp.stale || false,
+        fetchedAt:   resp.fetchedAt || Date.now()
       });
     } catch (e) {
       log('warn', 'Weather parse error: ' + e.message);
@@ -577,11 +586,19 @@ function renderWeather(el, cfg, sty) {
   metaEl.style.marginTop = '6px';
   metaEl.style.color     = '#888';
 
+  var staleEl = document.createElement('div');
+  staleEl.style.fontSize   = '0.7em';
+  staleEl.style.marginTop  = '4px';
+  staleEl.style.color      = '#f0a040';
+  staleEl.style.fontStyle  = 'italic';
+  staleEl.style.display    = 'none';
+
   el.appendChild(iconEl);
   el.appendChild(tempEl);
   el.appendChild(descEl);
   el.appendChild(cityEl);
   el.appendChild(metaEl);
+  el.appendChild(staleEl);
 
   function applyData(data) {
     if (!data) return;
@@ -590,12 +607,18 @@ function renderWeather(el, cfg, sty) {
     descEl.textContent = data.description;
     cityEl.textContent = data.city || city;
     metaEl.textContent = '\u6e7f\u5ea6 ' + data.humidity + '%  \u98ce\u901f ' + data.wind;
+    if (data.stale && data.fetchedAt) {
+      staleEl.textContent = '\u4e0a\u6b21\u66f4\u65b0: ' + weatherAgoText(data.fetchedAt); // 上次更新: X
+      staleEl.style.display = '';
+    } else {
+      staleEl.style.display = 'none';
+    }
   }
 
   // Initial load via REST (uses server-side cache)
   fetchWeatherData(city, applyData);
 
-  // Listen for server-push updates for this city (server refreshes every 30 min)
+  // Listen for server-push updates for this city
   if (socket) {
     socket.on('weather-update', function(payload) {
       if (payload && payload.city === cityKey && payload.data) {
@@ -607,7 +630,9 @@ function renderWeather(el, cfg, sty) {
           description: d.description,
           humidity:    d.humidity,
           wind:        d.windKmph + ' km/h',
-          city:        d.city
+          city:        d.city,
+          stale:       false,
+          fetchedAt:   payload.fetchedAt || Date.now()
         });
       }
     });

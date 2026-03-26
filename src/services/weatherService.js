@@ -10,6 +10,8 @@ const logger = require('../utils/logger');
 
 // cache: Map<city_lower -> { data, fetchedAt }>
 const cache = new Map();
+// in-flight: Map<city_lower -> Promise> — deduplicates concurrent upstream requests
+const _inflight = new Map();
 
 let _intervalMinutes = 30;
 let _socketService = null;
@@ -63,15 +65,16 @@ async function refreshCity(city) {
   for (let attempt = 1; attempt <= RETRY_ATTEMPTS; attempt++) {
     try {
       const data = await fetchFromUpstream(city);
-      cache.set(key, { data, fetchedAt: Date.now() });
+      const fetchedAt = Date.now();
+      cache.set(key, { data, fetchedAt });
       if (attempt > 1) logger.info('Weather fetch succeeded after retry', { city, attempt });
       else logger.info('Weather cache updated', { city });
 
-      // Push to all connected display clients
+      // Push fresh data to all connected display clients
       if (_socketService) {
-        _socketService.emitToAll('weather-update', { city: key, data });
+        _socketService.emitToAll('weather-update', { city: key, data, fetchedAt });
       }
-      return data;
+      return { data, fetchedAt, stale: false };
     } catch (e) {
       lastError = e;
       if (attempt < RETRY_ATTEMPTS) {
@@ -83,19 +86,27 @@ async function refreshCity(city) {
     }
   }
   logger.warn('Weather fetch failed after all retries', { city, error: lastError.message });
+  // Return stale cache if available so the client can still display something
+  const stale = cache.get(key);
+  if (stale) return { data: stale.data, fetchedAt: stale.fetchedAt, stale: true };
   return null;
 }
 
 /**
  * Get cached weather for a city. Fetches from upstream if cache is stale.
+ * Returns { data, fetchedAt, stale } or null if no data available at all.
  */
 async function getWeather(city) {
   const key = city.toLowerCase();
   const cached = cache.get(key);
   if (cached && Date.now() - cached.fetchedAt < _intervalMinutes * 60 * 1000) {
-    return cached.data;
+    return { data: cached.data, fetchedAt: cached.fetchedAt, stale: false };
   }
-  return refreshCity(city);
+  // Deduplicate concurrent requests for the same city
+  if (_inflight.has(key)) return _inflight.get(key);
+  const promise = refreshCity(city).finally(() => _inflight.delete(key));
+  _inflight.set(key, promise);
+  return promise;
 }
 
 /**
