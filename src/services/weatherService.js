@@ -19,6 +19,10 @@ function setSocketService(svc) {
   _socketService = svc;
 }
 
+const FETCH_TIMEOUT_MS = 20000;
+const RETRY_ATTEMPTS   = 3;
+const RETRY_DELAY_MS   = 3000;
+
 function fetchFromUpstream(city) {
   return new Promise((resolve, reject) => {
     const url = 'https://wttr.in/' + encodeURIComponent(city) + '?format=j1&lang=zh';
@@ -49,26 +53,37 @@ function fetchFromUpstream(city) {
       });
     });
     req.on('error', reject);
-    req.setTimeout(10000, () => { req.destroy(); reject(new Error('Weather request timeout')); });
+    req.setTimeout(FETCH_TIMEOUT_MS, () => { req.destroy(); reject(new Error('Weather request timeout')); });
   });
 }
 
 async function refreshCity(city) {
   const key = city.toLowerCase();
-  try {
-    const data = await fetchFromUpstream(city);
-    cache.set(key, { data, fetchedAt: Date.now() });
-    logger.info('Weather cache updated', { city });
+  let lastError;
+  for (let attempt = 1; attempt <= RETRY_ATTEMPTS; attempt++) {
+    try {
+      const data = await fetchFromUpstream(city);
+      cache.set(key, { data, fetchedAt: Date.now() });
+      if (attempt > 1) logger.info('Weather fetch succeeded after retry', { city, attempt });
+      else logger.info('Weather cache updated', { city });
 
-    // Push to all connected display clients
-    if (_socketService) {
-      _socketService.emitToAll('weather-update', { city: key, data });
+      // Push to all connected display clients
+      if (_socketService) {
+        _socketService.emitToAll('weather-update', { city: key, data });
+      }
+      return data;
+    } catch (e) {
+      lastError = e;
+      if (attempt < RETRY_ATTEMPTS) {
+        logger.warn('Weather fetch failed, retrying...', { city, attempt, error: e.message });
+        if (process.env.NODE_ENV !== 'test') {
+          await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
+        }
+      }
     }
-    return data;
-  } catch (e) {
-    logger.warn('Weather fetch failed', { city, error: e.message });
-    return null;
   }
+  logger.warn('Weather fetch failed after all retries', { city, error: lastError.message });
+  return null;
 }
 
 /**

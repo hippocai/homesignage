@@ -76,7 +76,7 @@ describe('weatherService.getWeather', () => {
     expect(mockGet).toHaveBeenCalledTimes(1); // still 1
   });
 
-  it('returns null when upstream responds with invalid JSON', async () => {
+  it('returns null when upstream responds with invalid JSON (retries 3 times)', async () => {
     const fakeReq = { on: jest.fn(), setTimeout: jest.fn() };
     mockGet.mockImplementation((url, opts, cb) => {
       cb(makeUpstreamResponse('not-json'));
@@ -85,17 +85,43 @@ describe('weatherService.getWeather', () => {
 
     const data = await weatherService.getWeather('BadCity1');
     expect(data).toBeNull();
+    expect(mockGet).toHaveBeenCalledTimes(3); // retried 3 times
   });
 
-  it('returns null when upstream request errors', async () => {
-    const fakeReq = new EventEmitter();
+  it('returns null when upstream request errors (retries 3 times)', async () => {
     mockGet.mockImplementation((url, opts, cb) => {
-      process.nextTick(() => fakeReq.emit('error', new Error('ECONNREFUSED')));
-      return fakeReq;
+      const req = new EventEmitter();
+      req.setTimeout = jest.fn();
+      process.nextTick(() => req.emit('error', new Error('ECONNREFUSED')));
+      return req;
     });
 
     const data = await weatherService.getWeather('BadCity2');
     expect(data).toBeNull();
+    expect(mockGet).toHaveBeenCalledTimes(3); // retried 3 times
+  });
+
+  it('succeeds on second attempt after a transient TLS error', async () => {
+    const fakeReq = { on: jest.fn(), setTimeout: jest.fn() };
+    let calls = 0;
+    mockGet.mockImplementation((url, opts, cb) => {
+      calls++;
+      if (calls === 1) {
+        // First attempt: network error (TLS disconnect)
+        const req = new EventEmitter();
+        req.setTimeout = jest.fn();
+        process.nextTick(() => req.emit('error', new Error('Client network socket disconnected')));
+        return req;
+      }
+      // Second attempt: success
+      cb(makeUpstreamResponse(SAMPLE_WTTR));
+      return fakeReq;
+    });
+
+    const data = await weatherService.getWeather('RetryCity');
+    expect(data).not.toBeNull();
+    expect(data.city).toBe('Beijing');
+    expect(mockGet).toHaveBeenCalledTimes(2);
   });
 });
 
