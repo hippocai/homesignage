@@ -5,14 +5,24 @@
  * Paid tier host:  api.qweather.com
  */
 const https = require('https');
+const zlib  = require('zlib');
 
 function fetchJson(url, timeoutMs) {
   return new Promise((resolve, reject) => {
-    const req = https.get(url, { headers: { 'User-Agent': 'HomeSignage/1.0' } }, (res) => {
-      let body = '';
-      res.on('data', (c) => { body += c; });
+    const req = https.get(url, {
+      headers: { 'User-Agent': 'HomeSignage/1.0', 'Accept-Encoding': 'gzip' },
+    }, (res) => {
+      const chunks = [];
+      res.on('data', (c) => chunks.push(c));
       res.on('end', () => {
-        try { resolve(JSON.parse(body)); } catch (e) { reject(new Error('JSON parse error: ' + e.message)); }
+        const buf = Buffer.concat(chunks);
+        const decompress = res.headers['content-encoding'] === 'gzip'
+          ? (cb) => zlib.gunzip(buf, cb)
+          : (cb) => cb(null, buf);
+        decompress((err, data) => {
+          if (err) return reject(new Error('Decompress error: ' + err.message));
+          try { resolve(JSON.parse(data.toString())); } catch (e) { reject(new Error('JSON parse error: ' + e.message)); }
+        });
       });
     });
     req.on('error', reject);
@@ -42,7 +52,7 @@ function buildWeatherUrl(locationId, apiKey, host) {
 }
 
 function buildGeoUrl(query, apiKey) {
-  return `https://geoapi.qweather.com/geo/v2/city/lookup?location=${encodeURIComponent(query)}&number=10&key=${encodeURIComponent(apiKey)}`;
+  return `https://geoapi.qweather.com/v2/city/lookup?location=${encodeURIComponent(query)}&number=10&key=${encodeURIComponent(apiKey)}`;
 }
 
 async function fetchWeather(locationConfig, apiConfig) {
