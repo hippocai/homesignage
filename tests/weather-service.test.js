@@ -52,7 +52,7 @@ describe('weatherService.getWeather', () => {
     expect(result.stale).toBe(false);
     expect(result.fetchedAt).toBeGreaterThan(0);
     expect(result.data).toMatchObject({
-      city: 'Beijing',
+      city: 'TestCity1',
       tempC: 20,
       tempF: 68,
       description: '局部多云',
@@ -111,7 +111,7 @@ describe('weatherService.getWeather', () => {
     const result = await weatherService.refreshCity('StaleCity');
     expect(result).not.toBeNull();
     expect(result.stale).toBe(true);
-    expect(result.data.city).toBe('Beijing'); // stale data still returned
+    expect(result.data.city).toBe('StaleCity'); // stale data still returned
   });
 
   it('succeeds on second attempt after a transient TLS error', async () => {
@@ -132,7 +132,7 @@ describe('weatherService.getWeather', () => {
     const result = await weatherService.getWeather('RetryCity');
     expect(result).not.toBeNull();
     expect(result.stale).toBe(false);
-    expect(result.data.city).toBe('Beijing');
+    expect(result.data.city).toBe('RetryCity');
     expect(mockGet).toHaveBeenCalledTimes(2);
   });
 });

@@ -523,9 +523,11 @@ function weatherAgoText(fetchedAt) {
   return Math.round(mins / 60) + ' 小时前';
 }
 
-function fetchWeatherData(city, callback) {
+function fetchWeatherData(city, locationId, callback) {
+  var url = CONFIG.SERVER_URL + '/api/v1/weather?city=' + encodeURIComponent(city);
+  if (locationId) url += '&locationId=' + encodeURIComponent(locationId);
   var xhr = new XMLHttpRequest();
-  xhr.open('GET', CONFIG.SERVER_URL + '/api/v1/weather?city=' + encodeURIComponent(city), true);
+  xhr.open('GET', url, true);
   xhr.timeout = 10000;
   xhr.onreadystatechange = function() {
     if (xhr.readyState !== 4) return;
@@ -536,7 +538,7 @@ function fetchWeatherData(city, callback) {
       callback({
         tempC:       d.tempC,
         tempF:       d.tempF,
-        icon:        weatherCodeToEmoji(d.weatherCode),
+        icon:        d.icon || weatherCodeToEmoji(d.weatherCode),
         description: d.description,
         humidity:    d.humidity,
         wind:        d.windKmph + ' km/h',
@@ -554,9 +556,10 @@ function fetchWeatherData(city, callback) {
 }
 
 function renderWeather(el, cfg, sty) {
-  var city    = cfg.city || 'Beijing';
-  var cityKey = city.toLowerCase();
-  var unit    = cfg.unit || 'C';
+  var city       = cfg.city || 'Beijing';
+  var locationId = cfg.locationId || '';
+  var cityKey    = (locationId || city).toLowerCase();
+  var unit       = cfg.unit || 'C';
 
   var iconEl = document.createElement('div');
   iconEl.style.fontSize   = '3em';
@@ -616,7 +619,7 @@ function renderWeather(el, cfg, sty) {
   }
 
   // Initial load via REST (uses server-side cache)
-  fetchWeatherData(city, applyData);
+  fetchWeatherData(city, locationId, applyData);
 
   // Listen for server-push updates for this city
   if (socket) {
@@ -626,7 +629,7 @@ function renderWeather(el, cfg, sty) {
         applyData({
           tempC:       d.tempC,
           tempF:       d.tempF,
-          icon:        weatherCodeToEmoji(d.weatherCode),
+          icon:        d.icon || weatherCodeToEmoji(d.weatherCode),
           description: d.description,
           humidity:    d.humidity,
           wind:        d.windKmph + ' km/h',

@@ -62,6 +62,7 @@ app.use('/api/v1/api-keys', require('./routes/apiKeys'));
 app.use('/api/v1/system', require('./routes/system'));
 app.use('/api/v1/uploads', require('./routes/uploads'));
 app.use('/api/v1/weather', require('./routes/weather'));
+app.use('/api/v1/settings', require('./routes/settings'));
 app.use('/api/v1/info-items', require('./routes/infoItems'));
 app.use('/api/v1/file-repo', require('./routes/fileRepo'));
 // No-auth endpoint: server-proxies external URLs for display clients in isolated networks

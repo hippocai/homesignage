@@ -237,7 +237,28 @@
 
             <el-form v-else-if="selectedComponent.type === 'weather'" label-width="80px" size="small">
               <el-form-item :label="$t('sceneEditor.weather.city')">
-                <el-input v-model="editForm.config.city" :placeholder="$t('sceneEditor.weather.cityPlaceholder')" />
+                <el-autocomplete
+                  v-model="editForm.config.city"
+                  :fetch-suggestions="searchCities"
+                  :placeholder="$t('sceneEditor.weather.cityPlaceholder')"
+                  :loading="citySearchLoading"
+                  value-key="name"
+                  style="width: 100%"
+                  @select="onCitySelected"
+                  clearable
+                >
+                  <template #default="{ item }">
+                    <div style="font-size:13px;line-height:1.4">
+                      <span>{{ item.name }}</span>
+                      <span style="color:#909399;margin-left:6px;font-size:11px">
+                        {{ [item.adm1, item.country].filter(Boolean).join(' · ') }}
+                      </span>
+                    </div>
+                  </template>
+                </el-autocomplete>
+                <div v-if="!citySearchSupported" style="font-size:11px;color:#909399;margin-top:3px">
+                  {{ $t('sceneEditor.weather.cityManualHint') }}
+                </div>
               </el-form-item>
               <el-form-item :label="$t('sceneEditor.weather.tempUnit')">
                 <el-select v-model="editForm.config.unit">
@@ -248,11 +269,11 @@
               <el-form-item :label="$t('sceneEditor.weather.refreshInterval')">
                 <el-input-number
                   v-model="editForm.config.refreshInterval"
-                  :min="5"
-                  :max="1440"
-                  :step="5"
+                  :min="1"
+                  :max="24"
+                  :step="1"
                   controls-position="right"
-                  style="width: 120px"
+                  style="width: 100px"
                 />
                 <span style="margin-left:8px;color:#909399;font-size:12px">{{ $t('sceneEditor.weather.refreshIntervalUnit') }}</span>
               </el-form-item>
@@ -468,7 +489,7 @@ import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowLeft, Plus, Check, Delete, View, Clock, Cloudy, Document, Picture, VideoPlay, Link, List, FolderOpened } from '@element-plus/icons-vue'
 import FilePicker from '../components/FilePicker.vue'
-import { scenesApi } from '../api/index.js'
+import { scenesApi, weatherApi } from '../api/index.js'
 import { useI18n } from 'vue-i18n'
 
 const { t } = useI18n()
@@ -484,6 +505,35 @@ const RESOLUTION_PRESETS = computed(() => [
   { key: '390x844',   label: t('resolutionPresets.r390x844'),   width: 390,  height: 844 },
 ])
 const RESIZE_HANDLES = ['nw', 'n', 'ne', 'w', 'e', 'sw', 's', 'se']
+
+// Weather city search
+const citySearchResults = ref([])
+const citySearchLoading = ref(false)
+const citySearchSupported = ref(true) // set false when provider returns empty
+
+async function searchCities(query, cb) {
+  if (!query || query.length < 2) { cb([]); return }
+  citySearchLoading.value = true
+  try {
+    const res = await weatherApi.searchLocations(query)
+    const locs = res.data.data || []
+    citySearchSupported.value = locs.length > 0 || query.length >= 2
+    cb(locs.map((loc) => ({ value: loc.name, ...loc })))
+  } catch {
+    cb([])
+  } finally {
+    citySearchLoading.value = false
+  }
+}
+
+function onCitySelected(item) {
+  if (item && editForm.value && editForm.value.config) {
+    editForm.value.config.city       = item.name
+    editForm.value.config.locationId = item.id   || ''
+    editForm.value.config.adm1       = item.adm1 || ''
+    editForm.value.config.country    = item.country || ''
+  }
+}
 
 // State
 const loading = ref(false)
@@ -529,7 +579,7 @@ const componentTypes = computed(() => [
 
 const defaultConfigs = computed(() => ({
   clock:     { format: 'HH:mm', showDate: true, timezone: 'Asia/Shanghai' },
-  weather:   { city: 'Beijing', unit: 'C', refreshInterval: 30 },
+  weather:   { city: 'Beijing', locationId: '', unit: 'C', refreshInterval: 1 },
   text:      { content: t('sceneEditor.placeholders.text'), fontSize: 24, color: '#ffffff', backgroundColor: 'transparent', textAlign: 'center' },
   image:     { url: '', objectFit: 'cover' },
   video:     { url: '', objectFit: 'cover', autoplay: true, loop: true, muted: true, useStream: true },

@@ -13,11 +13,20 @@ const ASSET_URL_TYPES = new Set(['image', 'video']);
 async function maybeRestartWeatherScheduler(type) {
   if (type !== 'weather') return;
   const comps = await componentDao.findByType('weather').catch(() => []);
-  const cities = [...new Set(comps.map((c) => (c.config && c.config.city) || 'Beijing'))];
-  const intervals = comps.map((c) => parseInt((c.config && c.config.refreshInterval) || 30, 10)).filter(Boolean);
-  const minInterval = intervals.length ? Math.min(...intervals) : 30;
-  weatherService.startScheduler(async () => cities, minInterval);
-  logger.info('Weather scheduler restarted', { intervalMinutes: minInterval, cities });
+  const seen = new Set();
+  const locations = comps.map((c) => ({
+    city:       (c.config && c.config.city) || 'Beijing',
+    locationId: (c.config && c.config.locationId) || null,
+  })).filter((loc) => {
+    const k = (loc.locationId || loc.city).toLowerCase();
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+  const hours = comps.map((c) => parseInt((c.config && c.config.refreshInterval) || 1, 10)).filter(Boolean);
+  const minIntervalMinutes = (hours.length ? Math.min(...hours) : 1) * 60; // convert hours → minutes
+  weatherService.startScheduler(async () => locations, minIntervalMinutes);
+  logger.info('Weather scheduler restarted', { intervalMinutes: minIntervalMinutes, locations: locations.length });
 }
 
 async function localizeComponentConfig(type, config) {

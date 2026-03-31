@@ -116,14 +116,60 @@
         </el-card>
       </el-col>
     </el-row>
+
+    <!-- Weather service settings (full width) -->
+    <el-row style="margin-top: 24px;">
+      <el-col :span="24">
+        <el-card shadow="never" v-loading="weatherLoading">
+          <template #header>
+            <div class="card-header">
+              <el-icon><Cloudy /></el-icon>
+              <span>{{ $t('settings.weatherSettings') }}</span>
+            </div>
+          </template>
+          <el-form label-width="130px" size="default">
+            <el-form-item :label="$t('settings.weatherProvider')">
+              <el-select v-model="weatherForm['weather.provider']" style="width: 320px">
+                <el-option value="wttr"     :label="$t('settings.providerWttr')" />
+                <el-option value="qweather" :label="$t('settings.providerQweather')" />
+              </el-select>
+            </el-form-item>
+            <template v-if="weatherForm['weather.provider'] === 'qweather'">
+              <el-form-item :label="$t('settings.weatherApiKey')">
+                <el-input
+                  v-model="weatherForm['weather.qweather.apiKey']"
+                  type="password"
+                  show-password
+                  :placeholder="$t('settings.weatherApiKeyPlaceholder')"
+                  style="width: 320px"
+                />
+                <div class="field-hint">{{ $t('settings.weatherApiKeyHint') }}</div>
+              </el-form-item>
+              <el-form-item :label="$t('settings.weatherHost')">
+                <el-input
+                  v-model="weatherForm['weather.qweather.host']"
+                  style="width: 320px"
+                />
+                <div class="field-hint">{{ $t('settings.weatherHostHint') }}</div>
+              </el-form-item>
+            </template>
+            <el-form-item>
+              <el-button type="primary" :loading="weatherSaving" @click="saveWeatherSettings">
+                {{ $t('common.save') }}
+              </el-button>
+            </el-form-item>
+          </el-form>
+        </el-card>
+      </el-col>
+    </el-row>
   </div>
 </template>
 
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Lock, InfoFilled, Refresh } from '@element-plus/icons-vue'
-import { systemApi, authApi } from '../api/index.js'
+import { Lock, InfoFilled, Refresh, Cloudy } from '@element-plus/icons-vue'
+import { systemApi, authApi, settingsApi, weatherApi } from '../api/index.js'
 import { useI18n } from 'vue-i18n'
 
 const { t, locale } = useI18n()
@@ -132,6 +178,16 @@ const changingPassword = ref(false)
 const sysLoading = ref(false)
 const systemInfo = ref({})
 const passwordFormRef = ref(null)
+
+// Weather settings
+const weatherLoading = ref(false)
+const weatherSaving  = ref(false)
+const weatherForm    = reactive({
+  'weather.provider':         'wttr',
+  'weather.qweather.apiKey':  '',
+  'weather.qweather.host':    'devapi.qweather.com',
+})
+const providers = ref([])
 
 const passwordForm = reactive({
   currentPassword: '',
@@ -222,7 +278,44 @@ async function loadSystemInfo() {
   }
 }
 
-onMounted(loadSystemInfo)
+async function loadWeatherSettings() {
+  weatherLoading.value = true
+  try {
+    const [settingsRes, providersRes] = await Promise.all([
+      settingsApi.get(),
+      weatherApi.getProviders(),
+    ])
+    const data = settingsRes.data.data || {}
+    weatherForm['weather.provider']        = data['weather.provider']        || 'wttr'
+    weatherForm['weather.qweather.apiKey'] = '' // never pre-fill API key
+    weatherForm['weather.qweather.host']   = data['weather.qweather.host']   || 'devapi.qweather.com'
+    providers.value = providersRes.data.data || []
+  } catch {
+    // ignore
+  } finally {
+    weatherLoading.value = false
+  }
+}
+
+async function saveWeatherSettings() {
+  weatherSaving.value = true
+  try {
+    const payload = { 'weather.provider': weatherForm['weather.provider'] }
+    if (weatherForm['weather.qweather.apiKey']) {
+      payload['weather.qweather.apiKey'] = weatherForm['weather.qweather.apiKey']
+    }
+    payload['weather.qweather.host'] = weatherForm['weather.qweather.host'] || 'devapi.qweather.com'
+    await settingsApi.update(payload)
+    ElMessage.success(t('settings.weatherSaveSuccess'))
+    weatherForm['weather.qweather.apiKey'] = ''
+  } catch {
+    ElMessage.error(t('settings.weatherSaveFailed'))
+  } finally {
+    weatherSaving.value = false
+  }
+}
+
+onMounted(() => { loadSystemInfo(); loadWeatherSettings() })
 </script>
 
 <style scoped>
@@ -310,5 +403,12 @@ onMounted(loadSystemInfo)
 .about-logo p {
   font-size: 13px;
   color: #909399;
+}
+
+.field-hint {
+  font-size: 12px;
+  color: #909399;
+  margin-top: 4px;
+  line-height: 1.4;
 }
 </style>
