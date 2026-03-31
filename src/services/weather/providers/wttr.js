@@ -37,11 +37,10 @@ async function fetchWeather(locationConfig) {
   const parsed = await fetchJson(url);
   const data   = parsed.data || parsed;
   const cur    = data.current_condition[0];
-  const area   = data.nearest_area && data.nearest_area[0];
   const desc   = (cur.lang_zh && cur.lang_zh[0] && cur.lang_zh[0].value)
                  || (cur.weatherDesc && cur.weatherDesc[0] && cur.weatherDesc[0].value) || '';
   return {
-    city:        area ? area.areaName[0].value : query,
+    city:        locationConfig.city || query,
     tempC:       parseInt(cur.temp_C, 10),
     tempF:       parseInt(cur.temp_F, 10),
     icon:        codeToEmoji(cur.weatherCode),
