@@ -91,6 +91,16 @@ export const systemApi = {
   getStatus: () => api.get('/system/status')
 }
 
+export const settingsApi = {
+  get:    ()       => api.get('/settings'),
+  update: (data)   => api.put('/settings', data),
+}
+
+export const weatherApi = {
+  searchLocations: (query) => api.get('/weather/locations', { params: { query } }),
+  getProviders:    ()      => api.get('/weather/providers'),
+}
+
 export const uploadsApi = {
   list: () => api.get('/uploads'),
   upload: (formData) => api.post('/uploads', formData, {
