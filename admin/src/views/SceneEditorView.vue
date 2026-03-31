@@ -269,11 +269,11 @@
               <el-form-item :label="$t('sceneEditor.weather.refreshInterval')">
                 <el-input-number
                   v-model="editForm.config.refreshInterval"
-                  :min="5"
-                  :max="1440"
-                  :step="5"
+                  :min="1"
+                  :max="24"
+                  :step="1"
                   controls-position="right"
-                  style="width: 120px"
+                  style="width: 100px"
                 />
                 <span style="margin-left:8px;color:#909399;font-size:12px">{{ $t('sceneEditor.weather.refreshIntervalUnit') }}</span>
               </el-form-item>
@@ -579,7 +579,7 @@ const componentTypes = computed(() => [
 
 const defaultConfigs = computed(() => ({
   clock:     { format: 'HH:mm', showDate: true, timezone: 'Asia/Shanghai' },
-  weather:   { city: 'Beijing', locationId: '', unit: 'C', refreshInterval: 30 },
+  weather:   { city: 'Beijing', locationId: '', unit: 'C', refreshInterval: 1 },
   text:      { content: t('sceneEditor.placeholders.text'), fontSize: 24, color: '#ffffff', backgroundColor: 'transparent', textAlign: 'center' },
   image:     { url: '', objectFit: 'cover' },
   video:     { url: '', objectFit: 'cover', autoplay: true, loop: true, muted: true, useStream: true },

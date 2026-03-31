@@ -13,7 +13,7 @@ const weatherProvider = require('./weather/index');
 const cache     = new Map();
 const _inflight = new Map();
 
-let _intervalMinutes = 30;
+let _intervalMinutes = 60; // default 1 hour
 let _socketService   = null;
 let _refreshJob      = null;
 
@@ -96,7 +96,7 @@ function refreshCity(city) {
  * @param {number}   [intervalMinutes=30]
  */
 function startScheduler(getLocationsFromScenes, intervalMinutes) {
-  _intervalMinutes = Math.max(1, Math.min(1440, Math.round(intervalMinutes || 30)));
+  _intervalMinutes = Math.max(60, Math.min(1440, Math.round(intervalMinutes || 60)));
   if (_refreshJob) _refreshJob.cancel();
 
   const cronInterval = Math.min(60, _intervalMinutes);

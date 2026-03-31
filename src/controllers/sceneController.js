@@ -23,10 +23,10 @@ async function maybeRestartWeatherScheduler(type) {
     seen.add(k);
     return true;
   });
-  const intervals = comps.map((c) => parseInt((c.config && c.config.refreshInterval) || 30, 10)).filter(Boolean);
-  const minInterval = intervals.length ? Math.min(...intervals) : 30;
-  weatherService.startScheduler(async () => locations, minInterval);
-  logger.info('Weather scheduler restarted', { intervalMinutes: minInterval, locations: locations.length });
+  const hours = comps.map((c) => parseInt((c.config && c.config.refreshInterval) || 1, 10)).filter(Boolean);
+  const minIntervalMinutes = (hours.length ? Math.min(...hours) : 1) * 60; // convert hours → minutes
+  weatherService.startScheduler(async () => locations, minIntervalMinutes);
+  logger.info('Weather scheduler restarted', { intervalMinutes: minIntervalMinutes, locations: locations.length });
 }
 
 async function localizeComponentConfig(type, config) {

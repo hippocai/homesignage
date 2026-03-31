@@ -199,7 +199,7 @@ export default {
       celsius: 'Celsius (°C)',
       fahrenheit: 'Fahrenheit (°F)',
       refreshInterval: 'Refresh Every',
-      refreshIntervalUnit: 'minutes',
+      refreshIntervalUnit: 'hours',
     },
     text: {
       content: 'Content',

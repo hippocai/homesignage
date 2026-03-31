@@ -80,8 +80,8 @@ async function start() {
     }
     async function getMinWeatherInterval() {
       const comps = await componentDao.findByType('weather').catch(() => []);
-      const intervals = comps.map((c) => parseInt((c.config && c.config.refreshInterval) || 30, 10)).filter(Boolean);
-      return intervals.length ? Math.min(...intervals) : 30;
+      const hours = comps.map((c) => parseInt((c.config && c.config.refreshInterval) || 1, 10)).filter(Boolean);
+      return (hours.length ? Math.min(...hours) : 1) * 60; // convert hours → minutes
     }
 
     const initInterval = await getMinWeatherInterval();
