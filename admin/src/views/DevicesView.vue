@@ -31,6 +31,23 @@
             </el-tag>
           </template>
         </el-table-column>
+        <el-table-column :label="$t('device.currentScene')" width="190">
+          <template #default="{ row }">
+            <div v-if="row.currentScene" class="current-scene-cell">
+              <img
+                v-if="row.currentScene.previewUrl"
+                :src="row.currentScene.previewUrl"
+                class="scene-thumbnail"
+                :alt="row.currentScene.name"
+              />
+              <div v-else class="scene-thumbnail scene-thumbnail--placeholder">
+                <el-icon><Picture /></el-icon>
+              </div>
+              <span class="scene-name-label">{{ row.currentScene.name }}</span>
+            </div>
+            <span v-else class="text-muted">{{ $t('device.noScene') }}</span>
+          </template>
+        </el-table-column>
         <el-table-column :label="$t('dashboard.lastSeen')" width="160">
           <template #default="{ row }">
             <span class="text-muted">{{ formatTime(row.last_seen) }}</span>
@@ -149,7 +166,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Edit, Delete, Refresh, Connection, CopyDocument } from '@element-plus/icons-vue'
+import { Plus, Edit, Delete, Refresh, Connection, CopyDocument, Picture } from '@element-plus/icons-vue'
 import { useDevicesStore } from '../stores/devices.js'
 import { devicesApi } from '../api/index.js'
 import DeviceSceneConfig from '../components/DeviceSceneConfig.vue'
@@ -383,5 +400,38 @@ onMounted(() => {
 
 .mb-4 {
   margin-bottom: 16px;
+}
+
+.current-scene-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.scene-thumbnail {
+  width: 72px;
+  height: 40px;
+  object-fit: cover;
+  border-radius: 4px;
+  border: 1px solid #e4e7ed;
+  flex-shrink: 0;
+}
+
+.scene-thumbnail--placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f5f7fa;
+  color: #c0c4cc;
+  font-size: 16px;
+}
+
+.scene-name-label {
+  font-size: 12px;
+  color: #606266;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 90px;
 }
 </style>

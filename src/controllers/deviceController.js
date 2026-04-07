@@ -17,10 +17,26 @@ async function listDevices(req, res) {
   try {
     const devices = await deviceDao.findAll();
     const connectedIds = new Set(socketService.getConnectedDevices());
-    const devicesWithStatus = devices.map((d) => ({
-      ...d,
-      connected: connectedIds.has(d.id)
+
+    const devicesWithStatus = await Promise.all(devices.map(async (d) => {
+      const base = { ...d, connected: connectedIds.has(d.id), currentScene: null };
+      const plan = scenePlannerService.getLastSent(d.id);
+      if (plan) {
+        const scene = await sceneDao.findById(plan.sceneId).catch(() => null);
+        if (scene) {
+          // Derive a preview image: prefer explicit thumbnail, then first image component
+          let previewUrl = scene.thumbnail || null;
+          if (!previewUrl) {
+            const comps = await componentDao.findBySceneId(scene.id).catch(() => []);
+            const imgComp = comps.find((c) => c.type === 'image' && c.config && c.config.url);
+            if (imgComp) previewUrl = imgComp.config.url;
+          }
+          base.currentScene = { id: scene.id, name: scene.name, previewUrl };
+        }
+      }
+      return base;
     }));
+
     return res.json({ data: devicesWithStatus });
   } catch (err) {
     logger.error('List devices error', { error: err.message });

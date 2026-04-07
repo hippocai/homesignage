@@ -159,4 +159,12 @@ function onDeviceConfigChange(deviceId) {
   );
 }
 
-module.exports = { setSocketService, startPlanner, stopPlanner, onDeviceConnect, onDeviceConfigChange };
+/**
+ * Returns the last scene pushed to a device, or null if not yet sent.
+ * { sceneId: string, sceneIndex: number }
+ */
+function getLastSent(deviceId) {
+  return _lastSent.get(deviceId) || null;
+}
+
+module.exports = { setSocketService, startPlanner, stopPlanner, onDeviceConnect, onDeviceConfigChange, getLastSent };

@@ -21,6 +21,21 @@ router.get('/', async (req, res) => {
     res.set('Content-Type', contentType);
     res.set('Cache-Control', 'no-store'); // client always asks server; server manages staleness
     res.set('X-Frame-Options', 'SAMEORIGIN');
+
+    // For HTML responses, inject <base href> so relative URLs inside the proxied
+    // page resolve against the original host rather than localhost.
+    if (contentType && contentType.includes('text/html')) {
+      const origin = new URL(url).origin;
+      const tag = `<base href="${origin}/">`;
+      let html = body.toString('utf8');
+      if (/<head[^>]*>/i.test(html)) {
+        html = html.replace(/<head([^>]*)>/i, `<head$1>${tag}`);
+      } else {
+        html = tag + html;
+      }
+      return res.send(html);
+    }
+
     res.send(body);
   } catch (e) {
     res.status(502).send('Failed to fetch content: ' + e.message);
