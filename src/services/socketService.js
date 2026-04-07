@@ -95,6 +95,14 @@ function initSocketService(server) {
         }
       });
 
+      // Respond to time-sync requests (NTP-style: echo t0 + server timestamp)
+      socket.on('time-sync-request', (data) => {
+        socket.emit('time-sync-response', {
+          t0:         data && data.t0,
+          serverTime: Date.now(),
+        });
+      });
+
       // Acknowledge successful connection
       socket.emit('connected', { deviceId, status: 'online' });
     } catch (err) {

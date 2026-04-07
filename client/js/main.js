@@ -26,6 +26,10 @@ var sceneLayers    = [];
 var socket         = null;
 var backendControlled = false; // true while socket is connected; backend drives scene switching
 var _transitioning    = false; // true while a scene fade is in progress
+
+// Server time sync (NTP-style round-trip compensation)
+var serverTimeOffset  = 0;     // ms to add to Date.now() to get server time
+var timeSyncTimer     = null;  // periodic re-sync handle
 var heartbeatTimer = null;
 var pollTimer      = null;
 var clockIntervals = [];
@@ -460,7 +464,7 @@ function renderClock(el, cfg, sty) {
   el.appendChild(dateEl);
 
   function tick() {
-    var now = timezone ? getTimeInZone(timezone) : new Date();
+    var now = timezone ? getTimeInZone(timezone) : getServerNow();
     timeEl.textContent = formatTime(now, use24h);
     if (showDate) {
       dateEl.textContent = formatDate(now);
@@ -472,13 +476,21 @@ function renderClock(el, cfg, sty) {
   clockIntervals.push(interval);
 }
 
+/**
+ * Returns the current time adjusted to the server's clock.
+ * serverTimeOffset is calculated via round-trip latency compensation.
+ */
+function getServerNow() {
+  return new Date(Date.now() + serverTimeOffset);
+}
+
 function getTimeInZone(tz) {
   try {
     // Build a Date whose local-time fields reflect the requested timezone
-    var str = new Date().toLocaleString('en-US', { timeZone: tz });
+    var str = getServerNow().toLocaleString('en-US', { timeZone: tz });
     return new Date(str);
   } catch (e) {
-    return new Date();
+    return getServerNow();
   }
 }
 
@@ -930,6 +942,25 @@ function connectWebSocket() {
   socket.on('connected', function (data) {
     log('socket', 'Auth confirmed for device: ' + data.deviceId);
   });
+
+  /* ── Time sync (NTP-style) ── */
+  function requestTimeSync() {
+    socket.emit('time-sync-request', { t0: Date.now() });
+  }
+
+  socket.on('time-sync-response', function (data) {
+    var t1  = Date.now();
+    var rtt = t1 - data.t0;
+    // offset = serverTime - t0 - one-way-latency
+    //        = serverTime - t0 - rtt/2
+    serverTimeOffset = data.serverTime - data.t0 - Math.round(rtt / 2);
+    log('time-sync', 'offset=' + serverTimeOffset + 'ms rtt=' + rtt + 'ms');
+  });
+
+  // Initial sync on connect; then re-sync every 5 minutes to correct drift
+  requestTimeSync();
+  if (timeSyncTimer) clearInterval(timeSyncTimer);
+  timeSyncTimer = setInterval(requestTimeSync, 5 * 60 * 1000);
 
   socket.on('disconnect', function (reason) {
     log('socket', 'Disconnected: ' + reason);
