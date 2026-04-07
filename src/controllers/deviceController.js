@@ -6,6 +6,7 @@ const sceneDao = require('../dao/sceneDao');
 const componentDao = require('../dao/componentDao');
 const emergencyDao = require('../dao/emergencyDao');
 const socketService = require('../services/socketService');
+const scenePlannerService = require('../services/scenePlannerService');
 const logger = require('../utils/logger');
 
 function generateDeviceKey() {
@@ -219,8 +220,9 @@ async function setDeviceScenes(req, res) {
 
     const result = await deviceSceneDao.setDeviceScenes(id, scenes);
 
-    // Notify device to reload config
+    // Notify device to reload config and update scene planner
     socketService.emitToDevice(id, 'config-updated', { deviceId: id });
+    scenePlannerService.onDeviceConfigChange(id);
 
     logger.info('Device scenes updated', { deviceId: id, sceneCount: scenes.length });
     return res.json({ data: result, message: 'Device scenes updated successfully' });

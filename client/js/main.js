@@ -20,10 +20,12 @@ var state = 'INIT'; // INIT | LOADING | NORMAL | TIMED_REMINDER | EMERGENCY | OF
 var deviceId  = null;
 var deviceKey = null;
 var currentConfig  = null;
-var carouselTimer  = null;
+var carouselTimer  = null;   // used only in OFFLINE fallback mode
 var currentSceneIndex = 0;
 var sceneLayers    = [];
 var socket         = null;
+var backendControlled = false; // true while socket is connected; backend drives scene switching
+var _transitioning    = false; // true while a scene fade is in progress
 var heartbeatTimer = null;
 var pollTimer      = null;
 var clockIntervals = [];
@@ -754,12 +756,13 @@ function startCarousel() {
   // Immediately show first scene
   showScene(0);
 
-  if (sceneLayers.length === 1) {
-    // Only one scene — nothing to rotate
-    return;
-  }
+  if (sceneLayers.length <= 1) return;
 
-  scheduleNextScene();
+  // When backend is connected it drives scene switching via `scene-switch` events.
+  // The local timer is only a fallback for OFFLINE mode.
+  if (!backendControlled) {
+    scheduleNextScene();
+  }
 }
 
 function scheduleNextScene() {
@@ -786,10 +789,16 @@ function scheduleNextScene() {
 }
 
 function transitionToScene(index) {
+  // Guard: skip if already showing this scene or a transition is in progress
+  if (index === currentSceneIndex) return;
+  if (_transitioning) return;
+
   var current = sceneLayers[currentSceneIndex];
   var next    = sceneLayers[index];
 
   if (!current || !next) return;
+
+  _transitioning = true;
 
   // Fade in next (on top), resume its videos
   next.style.zIndex = '2';
@@ -798,18 +807,22 @@ function transitionToScene(index) {
     next.classList.add('active');
   });
 
-  // After next is fully visible, start fading out current (next stays on top via zIndex:2)
+  // After next is fully visible, clean up current layer
   setTimeout(function () {
     current.classList.remove('active');
     currentSceneIndex = index;
-    if (state !== 'EMERGENCY') {
+
+    // In OFFLINE mode without backend control, keep the local timer going
+    if (!backendControlled && state !== 'EMERGENCY') {
       scheduleNextScene();
     }
+
     // Clear zIndex only after current has fully faded out, then pause its videos
     setTimeout(function () {
       next.style.zIndex    = '';
       current.style.zIndex = '';
       pauseLayerVideos(current);
+      _transitioning = false;
     }, CONFIG.TRANSITION_DURATION + 50);
   }, CONFIG.TRANSITION_DURATION + 50);
 }
@@ -860,6 +873,17 @@ function forceShowScene(sceneId) {
 }
 
 /* ─────────────────────────────────────────────
+   SCENE-SWITCH HELPER
+───────────────────────────────────────────── */
+function findSceneIndex(sceneId) {
+  var scenes = (currentConfig && currentConfig.scenes) ? currentConfig.scenes : [];
+  for (var i = 0; i < scenes.length; i++) {
+    if (scenes[i].scene && scenes[i].scene.id === sceneId) return i;
+  }
+  return -1;
+}
+
+/* ─────────────────────────────────────────────
    WEBSOCKET
 ───────────────────────────────────────────── */
 function connectWebSocket() {
@@ -887,13 +911,15 @@ function connectWebSocket() {
 
   socket.on('connect', function () {
     log('socket', 'Connected — socket id: ' + socket.id);
+    backendControlled = true;
+    stopCarousel(); // stop any offline fallback timer
     updateOnlineStatus(true);
     if (state === 'OFFLINE') {
       // Re-fetch fresh config now that we're back online
       fetchAndApplyConfig()
         .then(function () {
           setState('NORMAL');
-          startCarousel();
+          startCarousel(); // shows scene 0; backend will send scene-switch shortly
         })
         .catch(function (e) {
           log('warn', 'Re-fetch on reconnect failed: ' + e.message);
@@ -907,10 +933,16 @@ function connectWebSocket() {
 
   socket.on('disconnect', function (reason) {
     log('socket', 'Disconnected: ' + reason);
+    backendControlled = false;
     if (state !== 'EMERGENCY') {
       updateOnlineStatus(false);
       if (state === 'NORMAL' || state === 'TIMED_REMINDER') {
         setState('OFFLINE');
+        // Start local fallback carousel so the screen keeps rotating while offline
+        if (sceneLayers.length > 1) {
+          stopCarousel();
+          scheduleNextScene();
+        }
       }
     }
   });
@@ -927,11 +959,22 @@ function connectWebSocket() {
     }
   });
 
+  socket.on('scene-switch', function (data) {
+    log('socket', 'scene-switch: sceneId=' + data.sceneId + ' index=' + data.sceneIndex);
+    if (state === 'EMERGENCY') return; // emergency takes priority
+    stopCarousel(); // cancel any offline fallback timer
+    var index = findSceneIndex(data.sceneId);
+    if (index === -1) index = (typeof data.sceneIndex === 'number') ? data.sceneIndex : 0;
+    if (index >= 0 && index < sceneLayers.length) {
+      transitionToScene(index);
+    }
+  });
+
   socket.on('config-updated', function (data) {
     log('socket', 'config-updated received');
     fetchAndApplyConfig()
       .then(function () {
-        // Restart carousel with new config
+        // Show scene 0 immediately; backend will send scene-switch for the correct scene
         startCarousel();
       })
       .catch(function (e) {

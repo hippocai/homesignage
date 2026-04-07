@@ -2,6 +2,7 @@ const { Server } = require('socket.io');
 const deviceDao = require('../dao/deviceDao');
 const emergencyDao = require('../dao/emergencyDao');
 const logger = require('../utils/logger');
+const scenePlannerService = require('./scenePlannerService');
 
 let io = null;
 // Map of socketId -> { deviceId, groupName }
@@ -62,6 +63,9 @@ function initSocketService(server) {
       await deviceDao.updateStatus(deviceId, 'online', ipAddress);
 
       logger.info('Device connected via WebSocket', { deviceId, socketId: socket.id });
+
+      // Push correct scene immediately
+      scenePlannerService.onDeviceConnect(deviceId).catch(() => {});
 
       // Send any active emergency alerts to newly connected device
       try {
