@@ -110,6 +110,8 @@ export default {
     deviceGroupPlaceholder: '请输入分组名称（可选）',
     deviceNameRequired: '请输入设备名称',
     noGroup: '未分组',
+    currentScene: '当前画面',
+    noScene: '未显示',
     sceneBtn: '画面',
     createdSuccess: '设备创建成功',
     createdHint: '设备已创建，请保存以下信息用于客户端连接',

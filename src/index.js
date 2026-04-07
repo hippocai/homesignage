@@ -59,6 +59,12 @@ async function start() {
     initSocketService(server);
     logger.info('Socket.IO initialized');
 
+    // Initialize scene planner (backend-controlled scene switching)
+    const scenePlannerService = require('./services/scenePlannerService');
+    scenePlannerService.setSocketService(require('./services/socketService'));
+    scenePlannerService.startPlanner();
+    logger.info('Scene planner initialized');
+
     // Initialize weather service (caching + push)
     const weatherService = require('./services/weatherService');
     const socketService  = require('./services/socketService');

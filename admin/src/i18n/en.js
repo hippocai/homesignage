@@ -110,6 +110,8 @@ export default {
     deviceGroupPlaceholder: 'Enter group name (optional)',
     deviceNameRequired: 'Please enter device name',
     noGroup: 'No Group',
+    currentScene: 'Current Scene',
+    noScene: 'None',
     sceneBtn: 'Scenes',
     createdSuccess: 'Device Created',
     createdHint: 'Device created. Please save the following info for client connection.',
