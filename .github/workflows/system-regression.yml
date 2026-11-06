@@ -21,14 +21,23 @@ jobs:
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
-      - name: Build from a clean checkout, then restart with persisted data
+      - name: Build image from clean checkout
+        run: docker compose build
+      - name: Start container and verify persistence across restart
         shell: bash
         run: |
           set -euo pipefail
           export JWT_SECRET="$(openssl rand -hex 32)"
-          docker compose up -d --build
+          docker compose up -d --no-build
           trap 'docker compose logs --tail 40; docker compose down' EXIT
-          wait_for_server() { curl -fsS --retry 15 --retry-delay 1 --retry-connrefused http://localhost:3000/api/v1/health; }
+          wait_for_server() {
+            for attempt in {1..30}; do
+              if curl --max-time 3 -fsS http://localhost:3000/api/v1/health | jq -e '.status == "ok"'; then return 0; fi
+              sleep 1
+            done
+            docker compose ps -a
+            return 1
+          }
           wait_for_server
           curl -fsSL http://localhost:3000/admin/ | grep -q 'id="app"'
           curl -fsS http://localhost:3000/api/docs.json | jq -e '.paths["/file-repo/{filename}/stream"].get' >/dev/null
