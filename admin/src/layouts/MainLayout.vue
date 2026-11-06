@@ -36,6 +36,7 @@
         </el-menu-item>
         <el-menu-item index="/news"><el-icon><List /></el-icon><span>资讯</span></el-menu-item>
         <el-menu-item index="/companion"><el-icon><Bell /></el-icon><span>猪猪伙伴</span></el-menu-item>
+        <el-menu-item index="/model"><el-icon><Setting /></el-icon><span>模型设置</span></el-menu-item>
         <el-menu-item index="/info-items">
           <el-icon><List /></el-icon>
           <span>{{ $t('nav.infoItems') }}</span>

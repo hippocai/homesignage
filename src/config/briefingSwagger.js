@@ -21,8 +21,8 @@ module.exports = function extend(spec) {
     dislikes: {...list(str), description:'任意一项命中即排除，优先于关注列表'},
     blocked: str,
     familyAI: bool,
-    dailyCalls: num,
-    dailyTokens: num,
+    dailyCalls: {...num, minimum:-1, maximum:10000, description:'UTC 每日模型调用次数，-1 不限额，0 为零额度'},
+    dailyTokens: {...num, minimum:-1, maximum:10000000, description:'UTC 每日模型令牌数，-1 不限额，0 为零额度'},
     braveCalls: num
   });
   const source = obj(
@@ -187,6 +187,8 @@ module.exports = function extend(spec) {
     })
   );
   path('put', '/news/settings', '保存模型和发布设置', settings, settings);
+  path('put', '/model/credentials/{provider}', '设置或更换服务商 API Key', obj({ready:bool}),
+    obj({apiKey:{...str,writeOnly:true}},['apiKey']), '支持 glm、deepseek、brave。保存后立即生效，优先于环境变量。');
   path('get', '/news/presets', '常用订阅来源及当前订阅状态',
     list(obj({key:str, name:str, group:str, type:choice('rss','ranking','zaobao'), subscribedId:{...str,nullable:true}})));
   path('post', '/news/presets/{key}/subscribe', '订阅一个常用来源', obj({id:str, added:bool}), null,

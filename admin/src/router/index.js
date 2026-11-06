@@ -20,6 +20,7 @@ const routes = [
       {path:'briefing',redirect:'/news'},
       {path:'news',name:'News',component:()=>import('../views/BriefingView.vue')},
       {path:'companion',name:'Companion',component:()=>import('../views/CompanionView.vue')},
+      {path:'model',name:'ModelSettings',component:()=>import('../views/ModelSettingsView.vue')},
       {
         path: 'dashboard',
         name: 'Dashboard',

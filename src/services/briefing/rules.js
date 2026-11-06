@@ -38,8 +38,8 @@ function config(input) {
   const s = { ...defaults, ...input };
   if (!Object.hasOwn(providers, s.provider) || !/^[\w.-]{1,80}$/.test(s.model))
     throw fault('无效的模型');
-  int(s.dailyCalls, 0, 10000, '调用上限');
-  int(s.dailyTokens, 0, 10000000, '令牌上限');
+  int(s.dailyCalls, -1, 10000, '调用上限');
+  int(s.dailyTokens, -1, 10000000, '令牌上限');
   int(s.braveCalls, 0, 10000, '搜索上限');
   return {
     provider: s.provider,

@@ -61,7 +61,7 @@ describe('来源与发布规则', () => {
   test.each([
     { provider: '__proto__' },
     { model: 'a?token=b' },
-    { dailyCalls: -1 },
+    { dailyCalls: -2 },
     { dailyTokens: 0.5 }
   ])('拒绝无效模型设置 %j', (bad) => expect(() => r.config(bad)).toThrow());
   test('榜单不能自报权威', () => expect(r.source({ ...source, type: 'ranking' }).trusted).toBe(false));
@@ -105,6 +105,7 @@ describe('网络与订阅边界', () => {
   );
 });
 describe('模型与第三方失败', () => {
+  beforeAll(() => require('../src/config/database').initDatabase());
   const orig = global.fetch,
     key = process.env.GLM_API_KEY;
   beforeEach(() => {

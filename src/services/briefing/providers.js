@@ -4,6 +4,7 @@ const dns = require('dns').promises;
 const crypto = require('crypto');
 const ipaddr = require('ipaddr.js');
 const { XMLParser, XMLValidator } = require('fast-xml-parser');
+const db = require('./storage');
 
 function fault(message, status = 400) {
   return Object.assign(new Error(message), { status });
@@ -243,7 +244,8 @@ async function collectZaobao(config, previous) {
 async function collect(config, previous = {}) {
   if (config.type === 'zaobao') return collectZaobao(config, previous);
   if (config.type === 'brave') {
-    if (!process.env.BRAVE_API_KEY) throw fault('未配置 BRAVE_API_KEY', 503);
+    const key = await credential('brave');
+    if (!key) throw fault('请在模型设置中配置 Brave API Key', 503);
     const u = new URL('https://api.search.brave.com/res/v1/news/search');
     u.search = new URLSearchParams({
       q: config.query,
@@ -252,7 +254,7 @@ async function collect(config, previous = {}) {
       search_lang: config.language || 'zh-hans',
       country: config.country || 'ALL'
     });
-    const data = await remote(u, { headers: { 'X-Subscription-Token': process.env.BRAVE_API_KEY } });
+    const data = await remote(u, { headers: { 'X-Subscription-Token': key } });
     return {
       articles: (data.results || [])
         .filter((x) => webUrl(x.url))
@@ -295,15 +297,28 @@ const providers = {
   glm: ['https://open.bigmodel.cn/api/paas/v4/chat/completions', 'GLM_API_KEY', 'glm-4.6'],
   deepseek: ['https://api.deepseek.com/chat/completions', 'DEEPSEEK_API_KEY', 'deepseek-chat']
 };
+async function credential(provider) {
+  const row = await db.one('SELECT api_key FROM provider_credentials WHERE provider=?', provider);
+  const env = provider === 'brave' ? 'BRAVE_API_KEY' : providers[provider][1];
+  return row?.api_key || process.env[env];
+}
+async function saveCredential(provider, value) {
+  if (!Object.hasOwn(providers, provider) && provider !== 'brave') throw fault('不支持的服务商');
+  const key = typeof value === 'string' ? value.trim() : '';
+  if (!/^[!-~]{1,4096}$/.test(key) || /^\*+$/.test(key)) throw fault('请输入有效的 API Key');
+  await db.run('INSERT INTO provider_credentials(provider,api_key) VALUES(?,?) ON CONFLICT(provider) DO UPDATE SET api_key=excluded.api_key', provider, key);
+  return {ready:true};
+}
 async function jsonCompletion(settings, messages, maxTokens) {
-  const [url, env, defaultModel] = providers[settings.provider];
-  if (!process.env[env]) throw fault('未配置 ' + env, 503);
+  const [url, , defaultModel] = providers[settings.provider];
+  const key = await credential(settings.provider);
+  if (!key) throw fault('请在模型设置中配置 ' + settings.provider + ' API Key', 503);
   const body = {model: settings.model || defaultModel, max_tokens:maxTokens,
     response_format:{type:'json_object'}, messages};
   if (settings.provider === 'glm') body.thinking = { type: 'disabled' };
   const b = await remote(url, {
     method: 'POST',
-    headers: { Authorization: 'Bearer ' + process.env[env], 'Content-Type': 'application/json' },
+    headers: { Authorization: 'Bearer ' + key, 'Content-Type': 'application/json' },
     body: JSON.stringify(body)
   });
   try {
@@ -358,6 +373,8 @@ module.exports = {
   zaobaoDescription,
   collect,
   providers,
+  credential,
+  saveCredential,
   model,
   jsonCompletion,
   remote

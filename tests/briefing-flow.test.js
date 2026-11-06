@@ -378,6 +378,37 @@ test('预算并发预留不会透支，模型失败自动使用新闻标题', as
     payload: { summary: make().title, speak: true }
   });
 });
+test('不限额时仍累计次数和令牌，两项可独立限额', async () => {
+  const saved = await admin('put','/news/settings',{dailyCalls:-1,dailyTokens:-1});
+  expect(saved.body.data).toMatchObject({dailyCalls:-1,dailyTokens:-1});
+  await Promise.all([api.reserve('glm',-1,-1,2000),api.reserve('glm',-1,-1,3000)]);
+  await expect(api.reserve('glm',2,-1,1)).rejects.toThrow('调用次数');
+  await expect(api.reserve('glm',-1,5000,1)).rejects.toThrow('剩余令牌');
+  await expect(api.reserve('glm',0,-1,1)).rejects.toThrow('调用次数');
+  await expect(api.reserve('glm',-1,0,1)).rejects.toThrow('剩余令牌');
+  expect(await db.one("SELECT calls,tokens FROM briefing_usage WHERE provider='glm'")).toEqual({calls:2,tokens:5000});
+});
+test('管理员可轮换服务商密钥，新调用读取新值，访客不能写入，设置接口不回显', async () => {
+  const url='/model/credentials/deepseek';
+  await request(app).put('/api/v1'+url).send({apiKey:'anonymous'}).expect(401);
+  const upstream=jest.spyOn(global,'fetch').mockResolvedValue({
+    ok:true, json:async()=>({choices:[{message:{content:'{}'}}],usage:{total_tokens:8}})
+  });
+  try {
+    for(const key of ['unit-test-first','unit-test-second']) {
+      const saved=await admin('put',url,{apiKey:key});
+      expect(saved.body).toEqual({data:{ready:true}});
+      expect(await providers.credential('deepseek')).toBe(key);
+      await providers.jsonCompletion({provider:'deepseek',model:'deepseek-chat'},[],20);
+      expect(upstream.mock.lastCall[1].headers.Authorization).toBe('Bearer '+key);
+      const settings=await admin('get','/news/settings');
+      expect(settings.body.data.ready.deepseek).toBe(true);
+      expect(settings.text).not.toContain(key);
+    }
+    expect((await admin('put',url,{apiKey:'   '})).status).toBe(400);
+    expect(await providers.credential('deepseek')).toBe('unit-test-second');
+  } finally { await db.run("DELETE FROM provider_credentials WHERE provider='deepseek'"); }
+});
 test('排行名次变更只更新卡片，同一版本不产生新提醒', async () => {
   const s = { ...cfg, type: 'ranking', trusted: false, keywords: '', region: '' };
   await ingest(make({ rank: 3 }), s, false);

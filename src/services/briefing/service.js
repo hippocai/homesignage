@@ -36,19 +36,25 @@ function unpack(row) {
   return row && { ...row, payload: JSON.parse(row.payload), targets: JSON.parse(row.targets) };
 }
 async function reserve(provider, maxCalls, maxTokens, amount) {
-  if (!maxCalls || amount > maxTokens) throw p.fault('今日预算不足', 429);
+  const callsError = provider === 'brave' ? 'Brave 今日搜索次数已达到上限' : '模型今日调用次数已达到上限';
+  const tokensError = '模型今日剩余令牌不足以完成本次请求';
+  if (maxCalls === 0) throw p.fault(callsError, 429);
+  if (maxTokens !== -1 && amount > maxTokens) throw p.fault(tokensError, 429);
   const day = new Date().toISOString().slice(0, 10);
   const changed = await db.run(
     `INSERT INTO briefing_usage(day,provider,calls,tokens) VALUES(?,?,1,?)
     ON CONFLICT(day,provider) DO UPDATE SET calls=calls+1,tokens=tokens+excluded.tokens
-    WHERE calls<? AND tokens+excluded.tokens<=?`,
+    WHERE (?=-1 OR calls<?) AND (?=-1 OR tokens+excluded.tokens<=?)`,
     day,
     provider,
     amount,
-    maxCalls,
+    maxCalls, maxCalls, maxTokens,
     maxTokens
   );
-  if (!changed) throw p.fault('今日预算已用完', 429);
+  if (!changed) {
+    const usage = await db.one('SELECT calls FROM briefing_usage WHERE day=? AND provider=?', day, provider);
+    throw p.fault(maxCalls !== -1 && usage.calls >= maxCalls ? callsError : tokensError, 429);
+  }
   return day;
 }
 async function generate(s, a, generateResult = p.model, reserved = 2400) {

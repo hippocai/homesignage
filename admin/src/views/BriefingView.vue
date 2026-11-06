@@ -95,33 +95,6 @@
           <el-button type="primary" @click="saveTopics">保存话题偏好</el-button>
         </el-form>
       </el-tab-pane>
-      <el-tab-pane label="模型设置" name="settings"
-        ><el-form v-if="settings.provider" label-width="145px">
-          <el-form-item label="模型服务"
-            ><el-select
-              v-model="settings.provider"
-              @change="settings.model = settings.provider === 'glm' ? 'glm-5.3-flash' : 'deepseek-chat'"
-              ><el-option value="glm" label="智谱 GLM" /><el-option
-                value="deepseek"
-                label="DeepSeek" /></el-select
-          ></el-form-item>
-          <el-form-item label="模型名称"><el-input v-model="settings.model" /></el-form-item
-          ><el-form-item label="服务端密钥"
-            >{{ settings.ready?.[settings.provider] ? '已配置' : '尚未配置' }} · Brave
-            {{ settings.braveReady ? '已配置' : '尚未配置' }}</el-form-item
-          >
-          <el-form-item v-for="(label, key) in limits" :key="key" :label="label"
-            ><el-input-number v-model="settings[key]" :min="0"
-          /></el-form-item>
-          <el-form-item label="今日用量（UTC）"
-            ><span v-for="u in settings.usage" :key="u.provider"
-              >{{ u.provider }} · {{ u.calls }} 次 / {{ u.tokens }} tokens　</span
-            ></el-form-item
-          >
-          <el-button type="primary" @click="saveSettings">保存设置</el-button
-          ><el-button @click="testModel">测试已保存的模型</el-button>
-        </el-form></el-tab-pane
-      >
     </el-tabs>
     <el-dialog v-model="sourceDialog" title="订阅来源" width="min(600px,95%)"
       ><el-form label-width="118px">
@@ -270,11 +243,6 @@ async function saveTopics() {
   await loadEvents();
   ElMessage.success('话题偏好已保存');
 }
-const limits = {
-  dailyCalls: '模型每日调用上限',
-  dailyTokens: '每日令牌上限',
-  braveCalls: 'Brave 每日上限'
-};
 const date = (n) => (n ? new Date(n).toLocaleString() : '尚无记录');
 async function call(method, url, body) {
   try {
@@ -344,18 +312,6 @@ async function removeSource(row) {
   await ElMessageBox.confirm('移除订阅「' + row.name + '」？');
   await call('delete', '/news/sources/' + row.id);
   await loadSources();
-}
-async function saveSettings() {
-  const {provider, model, dailyCalls, dailyTokens, braveCalls}=settings.value;
-  const values={provider, model, dailyCalls, dailyTokens, braveCalls};
-  await call('put', '/news/settings', values);
-  await loadSettings();
-  ElMessage.success('设置已保存');
-}
-async function testModel() {
-  const r = await call('post', '/news/model/test');
-  ElMessage.success('模型已连接：' + r.speech);
-  await loadSettings();
 }
 const mergeId = ref('');
 async function group(action, a = {}) {

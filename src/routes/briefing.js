@@ -13,6 +13,8 @@ const handle = (fn) => async (req, res) => {
 };
 router.use('/news', authenticateJWT);
 router.use('/companion', authenticateJWT);
+router.use('/model', authenticateJWT);
+router.put('/model/credentials/:provider', handle(r => p.saveCredential(r.params.provider, r.body.apiKey)));
 router.use('/companion/agent',(req,res,next)=>{res.set('Cache-Control','no-store');next();});
 const household = require('../services/briefing/household');
 router.get('/companion/agent', handle(async () => ({ ...await household.household(), history:await household.history() })));
@@ -27,8 +29,8 @@ router.get(
   '/news/settings',
   handle(async () => ({
     ...(await api.settings()),
-    ready: Object.fromEntries(Object.entries(p.providers).map(([k, v]) => [k, !!process.env[v[1]]])),
-    braveReady: !!process.env.BRAVE_API_KEY,
+    ready: Object.fromEntries(await Promise.all(Object.keys(p.providers).map(async k => [k, !!(await p.credential(k))]))),
+    braveReady: !!(await p.credential('brave')),
     usage: await db.all("SELECT * FROM briefing_usage WHERE day=date('now')")
   }))
 );

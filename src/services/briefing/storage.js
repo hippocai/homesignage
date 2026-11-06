@@ -80,6 +80,7 @@ CREATE TRIGGER IF NOT EXISTS pig_context_changed AFTER UPDATE ON pig_household
  WHEN OLD.profile!=NEW.profile OR OLD.plans!=NEW.plans BEGIN DELETE FROM pig_impact; END;
 CREATE TABLE IF NOT EXISTS briefing_weather (city TEXT, day TEXT, high REAL NOT NULL, PRIMARY KEY(city,day));
 CREATE TABLE IF NOT EXISTS briefing_usage (day TEXT, provider TEXT, calls INTEGER DEFAULT 0, tokens INTEGER DEFAULT 0, PRIMARY KEY(day,provider));
+CREATE TABLE IF NOT EXISTS provider_credentials (provider TEXT PRIMARY KEY, api_key TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS briefing_info (item TEXT PRIMARY KEY REFERENCES info_items(id) ON DELETE CASCADE, targets TEXT NOT NULL, edition INTEGER DEFAULT 1);
 CREATE UNIQUE INDEX IF NOT EXISTS one_companion_per_scene ON components(scene_id) WHERE type='companion';
 `;
