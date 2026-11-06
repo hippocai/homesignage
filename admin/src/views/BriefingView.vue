@@ -303,7 +303,8 @@ async function scan(row, op) {
     samples.value = r;
     sampleVisible.value = true;
   } else {
-    ElMessage.success('采集完成，共 ' + r.count + ' 条');
+    ElMessage.success(r.unchanged ? row.name + '：来源内容未更新' :
+      row.name + '：读取 ' + r.received + ' 条，通过筛选并处理 ' + r.count + ' 条');
     await loadEvents();
   }
   await loadSources();

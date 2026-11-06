@@ -237,7 +237,11 @@ async function scan(id, preview = false) {
   try {
     const opts = await settings();
     if (cfg.type === 'brave') await reserve('brave', opts.braveCalls, 0, 0);
-    const result = await p.collect(cfg, preview ? {} : row);
+    const result = await p.collect(cfg, preview ? {} : row).catch(error => {
+      const reason = p.networkIssue(error) || (error instanceof SyntaxError ? '来源返回的数据格式无效' : '');
+      if (reason) throw p.fault(cfg.name + '：' + reason + '，请稍后再试', 502);
+      throw error;
+    });
     const now = Date.now();
     const matches = result.articles.filter(a => !rules.evaluate(cfg, opts, a, now).skip);
     const selected = cfg.type === 'zaobao' ? matches.slice(0, 12) : matches;
@@ -251,7 +255,7 @@ async function scan(id, preview = false) {
       result.unchanged ? row.modified : result.modified || null,
       id
     );
-    return { count: selected.length };
+    return { count: selected.length, received:result.articles.length, unchanged:!!result.unchanged };
   } catch (e) {
     if (!preview)
       await db.run(

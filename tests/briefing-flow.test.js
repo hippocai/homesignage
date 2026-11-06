@@ -127,7 +127,7 @@ test('联合早报先筛选再截取，最新十二条本地报道不会挤掉�
   const china = make({title:'发布新产业规划',excerpt:'',url:'https://www.zaobao.com.sg/news/china/story13'});
   jest.spyOn(providers,'collect').mockResolvedValue({articles:[...local,china]});
   expect((await api.scan(id,true)).map(e=>e.title)).toEqual([china.title]);
-  expect(await api.scan(id)).toEqual({count:1});
+  expect(await api.scan(id)).toEqual({count:1,received:13,unchanged:false});
   expect((await api.newsCards('hall')).map(e=>e.payload.title)).toEqual([china.title]);
   expect((await api.newsCards('hall'))[0].payload.excerpt).toBe('新规划将覆盖三个工业园区。');
   await api.scan(id);
@@ -171,7 +171,7 @@ test('新建订阅、仅试采集、正式采集、304 及启动后去重', asyn
     .mockResolvedValue({ articles: [article], etag: 'tag' });
   expect((await admin('post', '/news/sources/' + id + '/test')).body.data).toHaveLength(1);
   expect(await db.all('SELECT * FROM briefing_events')).toHaveLength(0);
-  await admin('post', '/news/sources/' + id + '/scan');
+  expect((await admin('post', '/news/sources/' + id + '/scan')).body.data).toEqual({count:1,received:1,unchanged:false});
   await api.scan(id);
   fetcher.mockResolvedValueOnce({ articles: [], unchanged: true });
   await api.scan(id);
@@ -287,6 +287,15 @@ test('采集失败保留原记录并退避', async () => {
     error: '订阅超时',
     due: expect.any(Number)
   });
+});
+test('来源连接异常在试采集和手动采集返回具体原因，不泄露底层地址', async () => {
+  const id=await api.saveSource(cfg);
+  jest.spyOn(providers,'collect').mockRejectedValue(Object.assign(new TypeError('fetch failed'),{cause:{code:'EAI_AGAIN'}}));
+  for (const op of ['test','scan']) {
+    const res=await admin('post','/news/sources/'+id+'/'+op);
+    expect(res.status).toBe(502);
+    expect(res.body.error).toContain(cfg.name+'：域名解析失败');
+  }
 });
 test('自动发布定向、领取竞争、回执幂等、撤回', async () => {
   const id = await ingest();

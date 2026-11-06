@@ -9,6 +9,14 @@ const db = require('./storage');
 function fault(message, status = 400) {
   return Object.assign(new Error(message), { status });
 }
+function networkIssue(error) {
+  const code = error.cause?.code || error.code || '';
+  if (error.name === 'TimeoutError' || error.name === 'AbortError' || /TIMEOUT|TIMEDOUT/.test(code)) return '连接超时';
+  if (['ENOTFOUND','EAI_AGAIN'].includes(code)) return '域名解析失败';
+  if (/CERT|TLS|SSL/.test(code)) return '安全连接失败';
+  if (error.message === 'fetch failed' || /^(ECONN|EHOST|ENET|EPIPE|UND_ERR_SOCKET)/.test(code)) return '与来源的连接失败';
+  return '';
+}
 function webUrl(value) {
   try {
     const u = new URL(value);
@@ -213,21 +221,12 @@ function parseZaobaoListing(html, section = 'all') {
   if (!items.size) throw fault('联合早报即时新闻页面缺少可验证的发布时间',502);
   return [...items.values()].filter(x=>section==='all' || zaobaoSections[section]?.test(x.ref)).sort((a,b)=>b.time-a.time);
 }
-async function collectZaobao(config, previous) {
-  const headers = { 'User-Agent': 'HomeSignage/1.0' };
-  if (previous.etag) headers['If-None-Match'] = previous.etag;
-  if (previous.modified) headers['If-Modified-Since'] = previous.modified;
-  let listing = false;
-  let r = await fetch(zaobaoUrl, { headers, redirect: 'manual', signal: AbortSignal.timeout(15000) });
-  if ([301,302,307,308].includes(r.status)) {
-    const dest = new URL(r.headers.get('location') || '',zaobaoUrl);
-    await r.body?.cancel();
-    if (dest.href !== zaobaoChina+'/googlenews.xml') throw fault('联合早报索引跳转到未知地址',502);
-    listing = true;
-    r = await fetch(zaobaoChina+'/realtime',{headers,redirect:'error',signal:AbortSignal.timeout(15000)});
-  }
+async function readZaobao(r, parse, section) {
   if (r.status === 304) return { unchanged: true, articles: [] };
-  if (!r.ok) throw fault('联合早报 HTTP ' + r.status, 502);
+  if (!r.ok) {
+    await r.body?.cancel();
+    throw fault('联合早报 HTTP ' + r.status, 502);
+  }
   const chunks = [];
   let size = 0;
   for await (const part of r.body) {
@@ -236,10 +235,34 @@ async function collectZaobao(config, previous) {
     chunks.push(part);
   }
   return {
-    articles: (listing ? parseZaobaoListing : parseZaobao)(Buffer.concat(chunks).toString('utf8'), config.section),
+    articles: parse(Buffer.concat(chunks).toString('utf8'), section),
     etag: r.headers.get('etag'),
     modified: r.headers.get('last-modified')
   };
+}
+async function collectZaobao(config, previous) {
+  const headers = { 'User-Agent': 'HomeSignage/1.0' };
+  if (previous.etag) headers['If-None-Match'] = previous.etag;
+  if (previous.modified) headers['If-Modified-Since'] = previous.modified;
+  try {
+    const index = await fetch(zaobaoUrl,{headers,redirect:'manual',signal:AbortSignal.timeout(15000)});
+    if (![301,302,307,308].includes(index.status)) return await readZaobao(index, parseZaobao, config.section);
+    const location = index.headers.get('location');
+    await index.body?.cancel();
+    if (!location || new URL(location,zaobaoUrl).href !== zaobaoChina+'/googlenews.xml')
+      throw fault('联合早报索引跳转到未知地址',502);
+  } catch (error) {
+    if (!networkIssue(error)) throw error;
+  }
+  async function listing() {
+    const page = await fetch(zaobaoChina+'/realtime',{headers,redirect:'error',signal:AbortSignal.timeout(15000)});
+    return readZaobao(page, parseZaobaoListing, config.section);
+  }
+  try { return await listing(); }
+  catch (error) {
+    if (!networkIssue(error)) throw error;
+    return listing();
+  }
 }
 async function collect(config, previous = {}) {
   if (config.type === 'zaobao') return collectZaobao(config, previous);
@@ -323,7 +346,7 @@ async function jsonCompletion(settings, messages, maxTokens) {
   });
   try {
     return {data:JSON.parse(b.choices[0].message.content), tokens:Number(b.usage?.total_tokens) || 0};
-  } catch { throw fault('模型未返回有效 JSON', 502); }
+  } catch { throw Object.assign(fault('模型未返回有效 JSON', 502), {code:'MODEL_JSON_FORMAT'}); }
 }
 async function model(settings, article) {
   const phrases = [article.title, ...String(article.excerpt || '').split(/(?<=[。！？；.!?])/u)]
@@ -360,6 +383,7 @@ async function model(settings, article) {
 }
 module.exports = {
   fault,
+  networkIssue,
   webUrl,
   publicIP,
   publicText,

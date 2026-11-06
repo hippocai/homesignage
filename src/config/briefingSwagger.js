@@ -216,7 +216,7 @@ module.exports = function extend(spec) {
   path('patch', '/news/sources/{id}', '更新部分来源配置', obj({ id: str }), obj(source.properties));
   path('delete', '/news/sources/{id}', '移除订阅，保留已发布事件', num);
   path('post', '/news/sources/{id}/test', '试采集最多三条，不创建事件', list(article));
-  path('post', '/news/sources/{id}/scan', '立即采集并处理', obj({ count: num }));
+  path('post', '/news/sources/{id}/scan', '立即采集并处理', obj({ count: num, received:num, unchanged:bool }));
   path('get', '/news/events', '按更新时间列出最近一页事件', list(event));
   spec.paths['/news/events'].get.parameters.push(
     { name: 'scope', in: 'query', schema: choice('news'), description: '资讯管理页仅显示新闻和榜单' },

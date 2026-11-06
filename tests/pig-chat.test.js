@@ -20,6 +20,31 @@ const say=(cookie,message='吃饭',id='same',nickname='小明')=>request(app).po
   .set('Cookie',cookie).send({requestId:id,message,nickname});
 const refresh=cookie=>request(app).post(base+'/session').set('Cookie',cookie).send({});
 const model=()=>jest.spyOn(provider,'jsonCompletion').mockResolvedValue({data:{reply:'收到',add:[],remove:[]},tokens:8});
+test('模型省略空计划列表也能正常聊天；格式异常只重试一次并复用同一回执',async()=>{
+  const actor={scope:'format-test',name:'测试访客',ip:'127.0.0.1'};
+  const send=(message,requestId)=>h.chat({message,requestId},Date.now(),actor);
+  const mock=jest.spyOn(provider,'jsonCompletion').mockResolvedValueOnce({data:{reply:'你好',remove:null},tokens:5})
+    .mockRejectedValueOnce(Object.assign(provider.fault('模型未返回有效 JSON',502),{code:'MODEL_JSON_FORMAT'}))
+    .mockResolvedValueOnce({data:{reply:'晚安'},tokens:5});
+  expect((await send('你好','a')).reply).toBe('你好');
+  expect((await send('晚安','b')).reply).toBe('晚安');
+  await send('晚安','b');
+  expect(mock).toHaveBeenCalledTimes(3);
+  expect(await h.history(40,actor.scope)).toHaveLength(2);
+});
+test('两次格式均无效不执行模型提议的操作，失败写入审计',async()=>{
+  const mock=jest.spyOn(provider,'jsonCompletion').mockResolvedValue({
+    data:{actions:[{type:'info',text:'不要写入'}],add:[{text:'不要保存'}]},tokens:12
+  });
+  const before=await db.all('SELECT id FROM info_items');
+  await expect(h.chat({message:'帮我在信息列表添加留言',requestId:'bad-shape'})).rejects.toMatchObject({
+    status:502,message:expect.stringContaining('重新发送')
+  });
+  expect(mock).toHaveBeenCalledTimes(2);
+  expect(await db.all('SELECT id FROM info_items')).toEqual(before);
+  expect((await h.household()).plans).toEqual([]);
+  expect(await db.one('SELECT status FROM pig_chat_audit')).toEqual({status:'failed'});
+});
 test('将旧家庭资料生成为可编辑文档；自由文本保持原样参与聊天，清除后旧资料不会重新出现',async()=>{
   await db.run('UPDATE pig_household SET profile=?',JSON.stringify({members:3,route:'青禾路',zone:'Asia/Shanghai'}));
   expect((await h.household()).profile.memory).toContain('上班路线：青禾路');

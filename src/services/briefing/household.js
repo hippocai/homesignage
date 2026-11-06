@@ -89,6 +89,23 @@ function validDay(value) {
   }
   throw p.fault('模型返回的计划日期无效，请重试',502);
 }
+async function askChat(settings, input) {
+  for (let attempt=0; attempt<2; attempt++) {
+    const prompt=attempt===0 ? chatPrompt : chatPrompt+' 上一次回答格式不完整。请重新回答原消息，使用顶层对象。普通对话示例：{"reply":"你好！","add":[],"remove":[],"actions":[]}。';
+    let data;
+    try { data=await ask(settings,prompt,input); }
+    catch(error) {
+      if(error.code!=='MODEL_JSON_FORMAT') throw error;
+      continue;
+    }
+    if (!data || typeof data.reply!=='string' || !data.reply.trim()) continue;
+    const add=data.add ?? [], remove=data.remove ?? [], actions=data.actions ?? [];
+    if (Array.isArray(add) && add.length<=6 && Array.isArray(remove) && Array.isArray(actions)) {
+      return {reply:data.reply, add, remove, actions};
+    }
+  }
+  throw p.fault('猪猪这次没能整理好答复，请重新发送。这条消息没有修改计划或提醒。',502);
+}
 async function chat(input, now=Date.now(), actor={scope:'admin',name:'后台',ip:''}) {
   const message = bounded(input.message,1600), requestId = bounded(input.requestId,100);
   if (!message || !requestId) throw p.fault('请输入消息和请求编号');
@@ -122,13 +139,11 @@ async function chat(input, now=Date.now(), actor={scope:'admin',name:'后台',ip
   const tools=!readNews && (Boolean(mode) || control.intent(message));
   const ownedRecords=mode?await records.owned(actor.scope):[];
   const listing=mode==='view'?records.list(ownedRecords,message,now,h.profile.zone):null;
-  const response = listing?{reply:listing.reply,add:[],remove:[]}:await ask(settings,chatPrompt,{today:ctx.day,now:new Date(now).toISOString(),tools,mode,
+  const response = listing?{reply:listing.reply,add:[],remove:[]}:await askChat(settings,{today:ctx.day,now:new Date(now).toISOString(),tools,mode,
     ownedRecords:ownedRecords.map(row=>({id:row.id,type:row.type,text:row.text,window:records.display(row,h.profile.zone)})),
     profile:{memory:h.profile.memory,zone:h.profile.zone},plans:visiblePlans,
     history:(await history(6,actor.scope)).map(({message,reply})=>({message,reply})),
     news:tools?[]:(await news(now,settings)).slice(0,12).map(articleData),message});
-  if (!response || typeof response.reply !== 'string' || !response.reply.trim() || !Array.isArray(response.add) ||
-      !Array.isArray(response.remove) || response.add.length>6) throw p.fault('模型返回的对话格式无效',502);
   if(mode){response.add=[];response.remove=[];}
   if (response.remove.some(id=>!visiblePlans.some(plan=>plan.id===id))) throw p.fault('计划已变化，请重新发送',409);
   const plans = ctx.plans.filter(plan=>!response.remove.includes(plan.id));

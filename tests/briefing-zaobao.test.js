@@ -9,6 +9,16 @@ const row = (path, title, date) =>
   date +
   '</news:publication_date></news:news></url>';
 const base = 'https://www.zaobao.com.sg';
+test('索引连接失败时使用固定官网列表，列表连接中断只重试一次', async () => {
+  const network=Object.assign(new TypeError('fetch failed'),{cause:{code:'ECONNRESET'}});
+  const page='<a title="测试新闻" href="/news/china/story20261106-42"><span>18:12</span></a>';
+  const fetcher=jest.spyOn(global,'fetch').mockRejectedValueOnce(network).mockRejectedValueOnce(network)
+    .mockResolvedValueOnce(new Response(page));
+  try {
+    expect((await collect({type:'zaobao',section:'china'})).articles[0].title).toBe('测试新闻');
+    expect(fetcher.mock.calls.map(([url])=>url)).toEqual([zaobaoUrl,'https://www.zaobao.com/realtime','https://www.zaobao.com/realtime']);
+  } finally { fetcher.mockRestore(); }
+});
 test('区域跳转使用官网即时新闻，按带日期的文章路径和东八区发布时间采集', async () => {
   const redirect = new Response(null,{status:302,headers:{location:'https://www.zaobao.com/googlenews.xml'}});
   const page = '<a title="测试新闻" href="/news/china/story20261106-42"><span>18:12</span></a>';
