@@ -52,6 +52,9 @@ CREATE TABLE IF NOT EXISTS briefing_claims (
  edition INTEGER NOT NULL, claimed INTEGER NOT NULL, result TEXT DEFAULT 'claimed', PRIMARY KEY(device,event,edition)
 );
 CREATE INDEX IF NOT EXISTS briefing_claim_clock ON briefing_claims(device,claimed);
+CREATE TABLE IF NOT EXISTS briefing_topic_cache (
+ key TEXT PRIMARY KEY, matched INTEGER NOT NULL, decided INTEGER NOT NULL
+);
 CREATE TABLE IF NOT EXISTS pig_household (
  id INTEGER PRIMARY KEY CHECK(id=1), profile TEXT NOT NULL DEFAULT '{}', plans TEXT NOT NULL DEFAULT '[]', revision INTEGER NOT NULL DEFAULT 0
 );
@@ -87,6 +90,9 @@ CREATE UNIQUE INDEX IF NOT EXISTS one_companion_per_scene ON components(scene_id
 const exec = (sql) => new Promise((resolve, reject) => db.exec(sql, (e) => (e ? reject(e) : resolve())));
 async function init() {
   await exec(schema);
+  if (!(await all('PRAGMA table_info(briefing_sources)')).some(c=>c.name==='topic_policy')) {
+    await run('ALTER TABLE briefing_sources ADD COLUMN topic_policy TEXT');
+  }
   const turns = await all('PRAGMA table_info(pig_conversation)');
   if (!turns.some(c=>c.name==='scope')) await run("ALTER TABLE pig_conversation ADD COLUMN scope TEXT NOT NULL DEFAULT 'admin'");
   if (!turns.some(c=>c.name==='actions')) await run("ALTER TABLE pig_conversation ADD COLUMN actions TEXT NOT NULL DEFAULT '[]'");

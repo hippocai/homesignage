@@ -17,7 +17,7 @@ module.exports = function extend(spec) {
     provider: choice('glm', 'deepseek'),
     model: { ...str, example: 'glm-4.6' },
     preview: {...bool, deprecated:true, description:'兼容旧配置，始终为 false'},
-    interests: list(str),
+    interests: {...list(str), description:'按语义判断相关性，任一话题相关即可。模型不可用或额度不足时回退关键词规则。'},
     dislikes: {...list(str), description:'任意一项命中即排除，优先于关注列表'},
     blocked: str,
     familyAI: bool,
@@ -81,6 +81,7 @@ module.exports = function extend(spec) {
     occurrence: {...num,description:'可领取任务的播放序号，从 1 开始'},
     targets: ids,
     starts: num,
+    topicComponents: {...ids, description:'设备资讯中，设置了关注词且匹配本条资讯的组件 ID'},
     expires: num,
     updated: num,
     payload: obj({
@@ -216,7 +217,8 @@ module.exports = function extend(spec) {
   path('patch', '/news/sources/{id}', '更新部分来源配置', obj({ id: str }), obj(source.properties));
   path('delete', '/news/sources/{id}', '移除订阅，保留已发布事件', num);
   path('post', '/news/sources/{id}/test', '试采集最多三条，不创建事件', list(article));
-  path('post', '/news/sources/{id}/scan', '立即采集并处理', obj({ count: num, received:num, unchanged:bool }));
+  path('post', '/news/sources/{id}/scan', '立即采集并处理', obj({ count: num, received:num, unchanged:bool,
+    topicFallback:{...str,description:'本次有条目使用关键词回退时给出原因'} }));
   path('get', '/news/events', '按更新时间列出最近一页事件', list(event));
   spec.paths['/news/events'].get.parameters.push(
     { name: 'scope', in: 'query', schema: choice('news'), description: '资讯管理页仅显示新闻和榜单' },

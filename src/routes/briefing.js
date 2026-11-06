@@ -100,8 +100,7 @@ router.get(
         let skipped = 0;
         for (let start = 0; matches.length < 100; start += 200) {
           const batch = await db.all("SELECT * FROM briefing_events WHERE kind IN ('news','ranking') AND (?='' OR state=?) ORDER BY updated DESC,id LIMIT 200 OFFSET ?", state,state,start);
-          for (const row of batch.map(api.unpack)) {
-            if (!rules.topicMatches(policy,row.payload)) continue;
+          for (const row of await api.filterEvents(batch.map(api.unpack),policy)) {
             if (skipped++ >= offset) matches.push(row);
             if (matches.length === 100) break;
           }

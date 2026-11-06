@@ -52,10 +52,12 @@
     };
   }
 
-  function matchesNews(items, cfg, now) {
+  function matchesNews(items, cfg, now, componentId) {
     const words = cfg.keywords.map(word => word.toLowerCase());
     return items.filter(event => {
       if (event.expires <= now || !cfg.categories.includes(event.kind)) return false;
+      if (words.length && componentId && Array.isArray(event.topicComponents))
+        return event.topicComponents.includes(componentId);
       const a = event.payload;
       const text = [a.topic, a.title, a.summary, a.excerpt].filter(Boolean).join(' ').toLowerCase();
       return !words.length || words.some(word => text.includes(word));
@@ -142,7 +144,7 @@
       carousels.set(host,carousel);
     }
     const cfg = newsConfig(config);
-    carousel.update(matchesNews(items, cfg, now), cfg);
+    carousel.update(matchesNews(items, cfg, now, host.dataset && host.dataset.componentId), cfg);
   }
   function disposeCards(host) {
     const carousel = carousels.get(host);

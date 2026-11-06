@@ -124,6 +124,7 @@ async function tick() {
     await db.run('DELETE FROM briefing_claims WHERE claimed<?', Date.now() - 30 * 86400000);
     await db.run('DELETE FROM briefing_events WHERE expires<?', Date.now() - 30 * 86400000);
     await db.run('DELETE FROM briefing_history WHERE at<?', Date.now() - 30 * 86400000);
+    await db.run('DELETE FROM briefing_topic_cache WHERE decided<?', Date.now() - 31 * 86400000);
     await db.run("DELETE FROM briefing_weather WHERE day<date('now','-8 days')");
   } finally {
     running = false;

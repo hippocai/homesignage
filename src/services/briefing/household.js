@@ -65,7 +65,7 @@ function articleData(e) {
 }
 async function news(now, policy) {
   const rows = await db.all("SELECT * FROM briefing_events WHERE kind IN ('news','ranking') AND state='published' AND starts<=? AND expires>? ORDER BY updated DESC",now,now);
-  return rows.map(api.unpack).filter(e=>rules.topicMatches(policy,e.payload));
+  return api.filterEvents(rows.map(api.unpack),policy);
 }
 async function ask(settings, instruction, input) {
   const messages = [{role:'system',content:instruction},{role:'user',content:JSON.stringify(input)}];

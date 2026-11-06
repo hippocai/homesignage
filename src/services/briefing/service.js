@@ -2,6 +2,7 @@ const { randomUUID } = require('crypto');
 const db = require('./storage');
 const p = require('./providers');
 const rules = require('./rules');
+const topics = require('./topics');
 const settingsDao = require('../../dao/settingsDao');
 const sockets = require('../socketService');
 const hour = 3600000;
@@ -96,8 +97,23 @@ function transitStatus(text) {
   if (/停运|暂停运营|暂停运行|暂停通行/.test(text)) return 'suspended';
   return '';
 }
-async function recordOne(sourceId, s, article, opts, now = Date.now()) {
-  const decision = rules.evaluate(s, opts, article, now);
+async function topicItems(items, opts, articleOf) {
+  return topics.filter(items, articleOf, opts, topics.preferences(opts), a=>rules.topicMatches(opts,a), generate);
+}
+async function filterEvents(events, opts) {
+  return (await topicItems(events,opts,e=>e.payload)).items;
+}
+async function selectArticles(articles, s, opts, now, report) {
+  const recent = articles.filter(a=>rules.timely(a,now));
+  const global = await topicItems(recent,opts,a=>a);
+  const source = await topics.filter(global.items,a=>a,opts,topics.sourcePolicy(s),
+    a=>!rules.evaluate(s,rules.defaults,a,now).skip,generate);
+  report.fallback ||= global.fallback || source.fallback;
+  return source.items;
+}
+async function recordOne(sourceId, s, article, opts, now = Date.now(), scanReport) {
+  if (!scanReport && !(await selectArticles([article],s,opts,now,{})).length) return;
+  const decision = rules.evaluate(s, opts, article, now, true);
   if (decision.skip) return;
   const previous = await db.one(
     'SELECT * FROM briefing_evidence WHERE source_id=? AND ref=?',
@@ -108,10 +124,10 @@ async function recordOne(sourceId, s, article, opts, now = Date.now()) {
   if (s.type === 'zaobao' && !article.excerpt) {
     const cached = priorArticle?.title === article.title && priorArticle.excerpt;
     article = { ...article, excerpt: cached || await p.zaobaoDescription(article.url) };
-    if (rules.evaluate(s, opts, article, now).skip) return;
+    if (article.excerpt && !(await selectArticles([article],s,opts,now,scanReport || {})).length) return;
   }
   const fingerprint = p.hash([article.title, article.excerpt, article.rank].join('|'));
-  if (previous?.fingerprint === fingerprint && s.type !== 'ranking') return;
+  if (previous?.fingerprint === fingerprint && s.type !== 'ranking') return previous.event_id;
   const sameLink = await db.one(
     "SELECT event_id FROM briefing_evidence WHERE json_extract(article,'$.url')=? LIMIT 1",
     article.url
@@ -237,25 +253,32 @@ async function scan(id, preview = false) {
   try {
     const opts = await settings();
     if (cfg.type === 'brave') await reserve('brave', opts.braveCalls, 0, 0);
-    const result = await p.collect(cfg, preview ? {} : row).catch(error => {
+    const policyKey = topics.signature(opts,[topics.preferences(opts),topics.sourcePolicy(cfg)]);
+    const result = await p.collect(cfg, preview || policyKey !== row.topic_policy ? {} : row).catch(error => {
       const reason = p.networkIssue(error) || (error instanceof SyntaxError ? '来源返回的数据格式无效' : '');
       if (reason) throw p.fault(cfg.name + '：' + reason + '，请稍后再试', 502);
       throw error;
     });
     const now = Date.now();
-    const matches = result.articles.filter(a => !rules.evaluate(cfg, opts, a, now).skip);
+    const report = {};
+    const matches = await selectArticles(result.articles,cfg,opts,now,report);
     const selected = cfg.type === 'zaobao' ? matches.slice(0, 12) : matches;
     if (preview) return selected.slice(0, 3);
-    for (const a of selected) await record(id, cfg, a, opts);
+    let count = 0;
+    for (const a of selected) {
+      if (await record(id, cfg, a, opts, now, report)) count++;
+    }
     await db.run(
-      'UPDATE briefing_sources SET last_ok=?,error=NULL,due=?,etag=?,modified=? WHERE id=?',
+      'UPDATE briefing_sources SET last_ok=?,error=NULL,due=?,etag=?,modified=?,topic_policy=? WHERE id=?',
       Date.now(),
       Date.now() + cfg.interval * 60000,
       result.unchanged ? row.etag : result.etag || null,
       result.unchanged ? row.modified : result.modified || null,
+      report.fallback ? null : policyKey,
       id
     );
-    return { count: selected.length, received:result.articles.length, unchanged:!!result.unchanged };
+    return { count, received:result.articles.length, unchanged:!!result.unchanged,
+      ...(report.fallback ? {topicFallback:report.fallback} : {}) };
   } catch (e) {
     if (!preview)
       await db.run(
@@ -413,7 +436,21 @@ async function newsCards(deviceId, now = Date.now()) {
       AND (targets='[]' OR EXISTS(SELECT 1 FROM json_each(targets) WHERE value=?))
     ORDER BY json_extract(payload,'$.important') DESC,updated DESC`, now, now, deviceId);
   const policy = await settings();
-  return rows.map(unpack).filter(e => rules.topicMatches(policy, e.payload));
+  const cards = await filterEvents(rows.map(unpack),policy);
+  if (!cards.length) return cards;
+  const components = await db.all(`SELECT DISTINCT c.id,c.config FROM components c
+    JOIN device_scenes ds ON ds.scene_id=c.scene_id WHERE ds.device_id=? AND ds.enabled=1 AND c.type='headlines'`, deviceId);
+  for (const {id,config} of components) {
+    const cfg = JSON.parse(config);
+    const words = Array.isArray(cfg.keywords) ? cfg.keywords : String(cfg.theme || '').split(/[,，、\n]/);
+    const interests = words.map(s=>String(s).trim().toLowerCase()).filter(Boolean);
+    if (!interests.length) continue;
+    const componentPolicy = {...policy, interests, dislikes:[], blocked:''};
+    const matched = await filterEvents(cards,componentPolicy);
+    for (const card of cards) card.topicComponents ||= [];
+    for (const card of matched) card.topicComponents.push(id);
+  }
+  return cards;
 }
 async function feed(deviceId, now = Date.now(), component) {
   const {id:componentId,prefs:d} = await boundPig(deviceId,component);
@@ -491,6 +528,7 @@ async function result(device, id, edition, status, occurrence = 1, component) {
   if (!ok) throw p.fault('无此领取记录或已结束', 409);
 }
 module.exports = {
+  filterEvents,
   newsCards,
   settings,
   prefs,

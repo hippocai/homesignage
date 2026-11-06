@@ -57,6 +57,7 @@ beforeEach(async () => {
     'briefing_events',
     'briefing_history',
     'briefing_sources',
+    'briefing_topic_cache',
     'briefing_usage',
     'briefing_weather',
     'briefing_info',
@@ -127,12 +128,74 @@ test('联合早报先筛选再截取，最新十二条本地报道不会挤掉�
   const china = make({title:'发布新产业规划',excerpt:'',url:'https://www.zaobao.com.sg/news/china/story13'});
   jest.spyOn(providers,'collect').mockResolvedValue({articles:[...local,china]});
   expect((await api.scan(id,true)).map(e=>e.title)).toEqual([china.title]);
-  expect(await api.scan(id)).toEqual({count:1,received:13,unchanged:false});
+  expect(await api.scan(id)).toEqual({count:1,received:13,unchanged:false,topicFallback:'模型密钥未配置'});
   expect((await api.newsCards('hall')).map(e=>e.payload.title)).toEqual([china.title]);
   expect((await api.newsCards('hall'))[0].payload.excerpt).toBe('新规划将覆盖三个工业园区。');
   await api.scan(id);
   expect(providers.zaobaoDescription).toHaveBeenCalledTimes(1);
   expect(providers.model).toHaveBeenCalledTimes(1);
+});
+test('语义命中贯穿试采集、自动发布、设备和后台；同文同偏好复用肯定及否定判断', async () => {
+  await admin('put','/news/settings',{interests:['影响苏州通勤的事件'],dislikes:['娱乐花边']});
+  const id = await api.saveSource({type:'rss',name:'市政',url:'https://example.org/news'});
+  const road = make({title:'姑苏区人民路明早封闭施工',excerpt:'车辆请绕行。'});
+  const show = make({ref:'show',url:'https://example.org/show',title:'影响苏州通勤的事件？艺人借此炒作',excerpt:''});
+  const old = make({ref:'old',title:'昨日施工',time:Date.now()-2*86400000});
+  jest.spyOn(providers,'collect').mockResolvedValue({articles:[road,show,old]});
+  jest.spyOn(providers,'credential').mockResolvedValue('fixture');
+  const model = jest.spyOn(providers,'jsonCompletion').mockImplementation(async (s,m)=>{
+    const input = JSON.parse(m[1].content);
+    expect(input.articles.map(a=>a.title)).toEqual([road.title,show.title]);
+    expect(input.exclude).toEqual(['娱乐花边']);
+    return {data:{matches:input.include.includes('影响苏州通勤的事件') ? [true,false] : [false,false]},tokens:70};
+  });
+  expect(await api.scan(id,true)).toEqual([road]);
+  expect(await api.scan(id)).toEqual({count:1,received:3,unchanged:false});
+  expect((await display('get','/news')).body.data.cards.map(e=>e.payload.title)).toEqual([road.title]);
+  expect((await admin('get','/news/events?scope=news')).body.data.map(e=>e.payload.title)).toEqual([road.title]);
+  expect(model).toHaveBeenCalledTimes(1);
+  expect(providers.model).toHaveBeenCalledTimes(1);
+  await admin('put','/news/settings',{interests:['航空']});
+  expect(await api.scan(id)).toMatchObject({count:0});
+  expect((await api.feed('hall')).cards).toEqual([]);
+  expect(model).toHaveBeenCalledTimes(2);
+});
+test.each(['次数','令牌','服务错误','响应不完整'])('话题判断遇到%s回退，模型恢复后重读相同 RSS 并发布非字面命中', async failure=>{
+  await admin('put','/news/settings',{interests:['苏州'],dailyCalls:failure==='次数'?0:500,dailyTokens:failure==='令牌'?0:-1});
+  const id = await api.saveSource({type:'rss',name:'本地',url:'https://example.org/rss'});
+  const articles = [make({title:'苏州公交调整',excerpt:''}),make({ref:'b',url:'https://example.org/b',title:'姑苏区明早交通管制',excerpt:''})];
+  const collector = jest.spyOn(providers,'collect').mockResolvedValue({articles,etag:'tag'});
+  jest.spyOn(providers,'credential').mockResolvedValue('fixture');
+  const model = jest.spyOn(providers,'jsonCompletion').mockResolvedValue({data:{matches:[true,true]},tokens:44});
+  if (failure==='服务错误') model.mockRejectedValueOnce(providers.fault('供应商 HTTP 503',502));
+  if (failure==='响应不完整') model.mockResolvedValueOnce({data:{matches:[true]},tokens:25});
+  const first = await api.scan(id);
+  expect(first).toMatchObject({count:1,topicFallback:expect.any(String)});
+  expect(model).toHaveBeenCalledTimes(['次数','令牌'].includes(failure)?0:1);
+  await admin('put','/news/settings',{dailyCalls:500,dailyTokens:-1});
+  expect(await api.scan(id)).toEqual({count:2,received:2,unchanged:false});
+  expect(collector.mock.calls[1][1]).toEqual({});
+  expect((await api.newsCards('hall')).map(e=>e.payload.title).sort()).toEqual(articles.map(a=>a.title).sort());
+});
+test('来源地区和关注词支持同义表达，设备上多个资讯组件按各自的语义偏好播放',async()=>{
+  const id = await api.saveSource({type:'ranking',name:'热搜',url:'https://example.org/rank',region:'苏州',keywords:'交通管制'});
+  const road = make({title:'姑苏区人民路车辆请绕行',excerpt:'明早临时封闭。',rank:1});
+  jest.spyOn(providers,'collect').mockResolvedValue({articles:[road]});
+  jest.spyOn(providers,'credential').mockResolvedValue('fixture');
+  const model = jest.spyOn(providers,'jsonCompletion').mockImplementation(async(s,m)=>{
+    const input = JSON.parse(m[1].content);
+    if (input.include.includes('交通管制')) expect(input.region).toBe('苏州');
+    return {data:{matches:[!input.include.includes('体育')]},tokens:32};
+  });
+  for (const [cid,keyword] of [['commute','出行'],['sports','体育']]) {
+    await db.run("INSERT INTO components(id,scene_id,type,position,config) VALUES(?,'hall-scene','headlines','{}',?)",cid,JSON.stringify({keywords:[keyword]}));
+  }
+  try {
+    expect(await api.scan(id)).toMatchObject({count:1});
+    expect((await display('get','/news')).body.data.cards[0].topicComponents).toEqual(['commute']);
+    expect((await api.feed('hall')).cards[0].topicComponents).toEqual(['commute']);
+    expect(model).toHaveBeenCalledTimes(3);
+  } finally { await db.run("DELETE FROM components WHERE id IN ('commute','sports')"); }
 });
 test('同一设备可领取三类提醒，关闭某类立即停止该类，资讯卡仍可读', async () => {
   const now = Date.parse('2026-11-05T00:00:00Z');
@@ -171,7 +234,7 @@ test('新建订阅、仅试采集、正式采集、304 及启动后去重', asyn
     .mockResolvedValue({ articles: [article], etag: 'tag' });
   expect((await admin('post', '/news/sources/' + id + '/test')).body.data).toHaveLength(1);
   expect(await db.all('SELECT * FROM briefing_events')).toHaveLength(0);
-  expect((await admin('post', '/news/sources/' + id + '/scan')).body.data).toEqual({count:1,received:1,unchanged:false});
+  expect((await admin('post', '/news/sources/' + id + '/scan')).body.data).toEqual({count:1,received:1,unchanged:false,topicFallback:'模型密钥未配置'});
   await api.scan(id);
   fetcher.mockResolvedValueOnce({ articles: [], unchanged: true });
   await api.scan(id);

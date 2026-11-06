@@ -64,17 +64,19 @@ async function main() {
       );
       assert.ok(sample, 'RSS should contain a recent item');
       const saved = await api('POST', '/news/sources', { ...source, keywords: sample.title });
-      await api('POST', '/news/sources/' + saved.id + '/scan');
+      const scan = await api('POST', '/news/sources/' + saved.id + '/scan');
+      assert.ok(!scan.topicFallback, scan.topicFallback);
       const hits = await api('GET', '/news/events');
-      assert.equal(hits.length, 1);
-      assert.ok(!/供应商|未通过|预算/.test(hits[0].payload.reason), hits[0].payload.reason);
+      const hit = hits.find(event=>event.payload.url===sample.url);
+      assert.ok(hit, 'sample article passed semantic topic selection');
+      assert.ok(!/供应商|未通过|预算/.test(hit.payload.reason), hit.payload.reason);
       const usage = (await api('GET', '/news/settings')).usage;
       assert.ok(
-        usage.some((x) => x.provider === 'glm' && x.calls === 1 && x.tokens > 0 && x.tokens !== 2400),
-        'GLM usage was reconciled: ' + JSON.stringify(usage) + ' ' + hits[0].payload.reason
+        usage.some((x) => x.provider === 'glm' && x.calls >= 2 && x.tokens > 0),
+        'GLM topic selection and summary usage: ' + JSON.stringify(usage)
       );
-      id = hits[0].id;
-      title = hits[0].payload.title;
+      id = hit.id;
+      title = hit.payload.title;
     } else {
       id = await service.record(
         'fixture',

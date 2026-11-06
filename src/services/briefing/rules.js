@@ -126,7 +126,10 @@ function topicMatches(settings, article) {
   const excluded = [...(settings.dislikes || []), ...terms(settings.blocked)];
   return !excluded.some(match) && (!settings.interests?.length || settings.interests.some(match));
 }
-function evaluate(s, settings, a, now) {
+function timely(a, now) {
+  return !a.time || (a.time <= now + 300000 && now - a.time < 86400000);
+}
+function evaluate(s, settings, a, now, acceptedByFilter = false) {
   const text = (a.title + ' ' + (a.excerpt || '')).toLowerCase();
   const blocked = terms(settings.blocked + ',' + s.blocked).some((t) => text.includes(t));
   const keys = terms(s.keywords);
@@ -134,12 +137,12 @@ function evaluate(s, settings, a, now) {
   const region = !s.region || text.includes(s.region.toLowerCase());
   const recent = !!a.time && a.time <= now + 300000 && now - a.time < 86400000;
   const major = /地震|海啸|紧急|重大|红色预警|停火|进入紧急状态/.test(a.title);
-  const important = (match || major) && region;
+  const important = acceptedByFilter ? (keys.length > 0 || major) : (match || major) && region;
   return {
-    skip: blocked || !topicMatches(settings, a) || (keys.length > 0 && !match) || !region || (!!a.time && !recent),
+    skip: !timely(a, now) || (!acceptedByFilter && (blocked || !topicMatches(settings, a) || (keys.length > 0 && !match) || !region)),
     important,
     speak: s.type !== 'ranking' && important && recent,
-    reason: blocked
+    reason: !acceptedByFilter && blocked
       ? '命中屏蔽词'
       : !recent
         ? '缺少近期发布时间'
@@ -176,4 +179,4 @@ function component(options) {
   if(options!==undefined && (!options || Array.isArray(options) || typeof options!=='object')) throw fault('组件提醒规则无效');
   return device({...require('../../../shared/pig-reminders.json'),...options});
 }
-module.exports = { defaults, deviceDefaults, int, config, device, component, source, evaluate, topicMatches, localTime, between };
+module.exports = { defaults, deviceDefaults, int, config, device, component, source, terms, timely, evaluate, topicMatches, localTime, between };

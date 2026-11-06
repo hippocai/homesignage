@@ -91,7 +91,7 @@
             <el-input-tag v-model="settings[key]" :aria-label="label" :max="100" :maxlength="80"
               :delimiter="/[,，、\n]/" placeholder="输入话题，按回车添加" style="width:100%"/>
           </el-form-item>
-          <p>例如添加「中国」，可匹配中国相关地名和联合早报中港台栏目，也可添加「人工智能」等关键词。</p>
+          <p>可以写「中国发生的重要事件」或「影响苏州通勤的消息」。系统优先按语义判断，模型不可用或额度不足时按关键词筛选。</p>
           <el-button type="primary" @click="saveTopics">保存话题偏好</el-button>
         </el-form>
       </el-tab-pane>
@@ -303,8 +303,10 @@ async function scan(row, op) {
     samples.value = r;
     sampleVisible.value = true;
   } else {
-    ElMessage.success(r.unchanged ? row.name + '：来源内容未更新' :
-      row.name + '：读取 ' + r.received + ' 条，通过筛选并处理 ' + r.count + ' 条');
+    const message = r.unchanged ? row.name + '：来源内容未更新' :
+      row.name + '：读取 ' + r.received + ' 条，通过筛选并处理 ' + r.count + ' 条';
+    if (r.topicFallback) ElMessage.warning(message + '。部分或全部条目使用关键词匹配（' + r.topicFallback + '）');
+    else ElMessage.success(message);
     await loadEvents();
   }
   await loadSources();
