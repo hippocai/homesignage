@@ -168,14 +168,30 @@ test.each(['次数','令牌','服务错误','响应不完整'])('话题判断遇
   jest.spyOn(providers,'credential').mockResolvedValue('fixture');
   const model = jest.spyOn(providers,'jsonCompletion').mockResolvedValue({data:{matches:[true,true]},tokens:44});
   if (failure==='服务错误') model.mockRejectedValueOnce(providers.fault('供应商 HTTP 503',502));
-  if (failure==='响应不完整') model.mockResolvedValueOnce({data:{matches:[true]},tokens:25});
+  if (failure==='响应不完整') {
+    const invalid = {data:{matches:[true]},tokens:25};
+    model.mockResolvedValueOnce(invalid).mockResolvedValueOnce(invalid);
+  }
   const first = await api.scan(id);
   expect(first).toMatchObject({count:1,topicFallback:expect.any(String)});
-  expect(model).toHaveBeenCalledTimes(['次数','令牌'].includes(failure)?0:1);
+  expect(model).toHaveBeenCalledTimes(['次数','令牌'].includes(failure)?0:failure==='响应不完整'?2:1);
   await admin('put','/news/settings',{dailyCalls:500,dailyTokens:-1});
   expect(await api.scan(id)).toEqual({count:2,received:2,unchanged:false});
   expect(collector.mock.calls[1][1]).toEqual({});
   expect((await api.newsCards('hall')).map(e=>e.payload.title).sort()).toEqual(articles.map(a=>a.title).sort());
+});
+test('GLM 截断 JSON 时按实际用量结算并重试，成功判断覆盖字面规则',async()=>{
+  await admin('put','/news/settings',{interests:['苏州'],dailyCalls:2,dailyTokens:-1});
+  const id = await api.saveSource({type:'rss',name:'本地',url:'https://example.org/rss'});
+  const road = make({title:'姑苏区明早交通管制',excerpt:''});
+  jest.spyOn(providers,'collect').mockResolvedValue({articles:[road]});
+  jest.spyOn(providers,'credential').mockResolvedValue('fixture');
+  const model = jest.spyOn(providers,'jsonCompletion')
+    .mockRejectedValueOnce(Object.assign(new Error('截断'),{code:'MODEL_JSON_FORMAT',tokens:1050}))
+    .mockResolvedValueOnce({data:{matches:[true]},tokens:900});
+  expect(await api.scan(id,true)).toEqual([road]);
+  expect(model.mock.calls.map(call=>call[2])).toEqual([1024,2048]);
+  expect(await db.one('SELECT calls,tokens FROM briefing_usage')).toEqual({calls:2,tokens:1950});
 });
 test('来源地区和关注词支持同义表达，设备上多个资讯组件按各自的语义偏好播放',async()=>{
   const id = await api.saveSource({type:'ranking',name:'热搜',url:'https://example.org/rank',region:'苏州',keywords:'交通管制'});

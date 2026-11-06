@@ -60,15 +60,20 @@ async function reserve(provider, maxCalls, maxTokens, amount) {
 }
 async function generate(s, a, generateResult = p.model, reserved = 2400) {
   const day = await reserve(s.provider, s.dailyCalls, s.dailyTokens, reserved);
-  const result = await generateResult(s, a);
-  await db.run(
-    'UPDATE briefing_usage SET tokens=tokens-?+? WHERE day=? AND provider=?',
-    reserved,
-    result.tokens,
-    day,
-    s.provider
-  );
-  return result;
+  let tokens;
+  try {
+    const result = await generateResult(s, a);
+    tokens = result.tokens;
+    return result;
+  } catch (error) {
+    tokens = error.tokens;
+    throw error;
+  } finally {
+    if (Number.isInteger(tokens) && tokens >= 0) {
+      await db.run('UPDATE briefing_usage SET tokens=tokens-?+? WHERE day=? AND provider=?',
+        reserved,tokens,day,s.provider);
+    }
+  }
 }
 async function saveSource(input, id = randomUUID()) {
   const cfg = rules.source(input);

@@ -26,12 +26,21 @@ function evidence(article) {
 async function judge(settings, policy, batch, generate) {
   const messages = [{role:'system',content:instruction},
     {role:'user',content:JSON.stringify({ ...policy, articles:batch.map(item=>item.input) })}];
-  const budget = Math.ceil(JSON.stringify(messages).length * 1.2) + 256;
-  const result = await generate(settings,messages,(s,m)=>p.jsonCompletion(s,m,256),budget);
-  const flags = result.data?.matches;
-  if (!Array.isArray(flags) || flags.length !== batch.length || flags.some(v=>typeof v !== 'boolean'))
-    throw p.fault('模型返回的话题判断格式无效',502);
-  return flags;
+  const inputBudget = Math.ceil(JSON.stringify(messages).length * 1.2);
+  // Some GLM endpoints count internal reasoning against max_tokens even for JSON output.
+  for (const maxTokens of [1024,2048]) {
+    let result;
+    try {
+      result = await generate(settings,messages,(s,m)=>p.jsonCompletion(s,m,maxTokens),inputBudget+maxTokens);
+    } catch (error) {
+      if (maxTokens===1024 && error.code==='MODEL_JSON_FORMAT') continue;
+      throw error;
+    }
+    const flags = result.data?.matches;
+    if (Array.isArray(flags) && flags.length===batch.length && flags.every(v=>typeof v==='boolean'))
+      return flags;
+  }
+  throw p.fault('模型返回的话题判断格式无效',502);
 }
 
 // Serialize cache misses and check the cache again inside the queue. Several screens
