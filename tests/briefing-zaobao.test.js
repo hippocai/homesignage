@@ -9,6 +9,21 @@ const row = (path, title, date) =>
   date +
   '</news:publication_date></news:news></url>';
 const base = 'https://www.zaobao.com.sg';
+test('区域跳转使用官网即时新闻，按带日期的文章路径和东八区发布时间采集', async () => {
+  const redirect = new Response(null,{status:302,headers:{location:'https://www.zaobao.com/googlenews.xml'}});
+  const page = '<a title="测试新闻" href="/news/china/story20261106-42"><span>18:12</span></a>';
+  const upstream = jest.spyOn(global,'fetch').mockResolvedValueOnce(redirect)
+    .mockResolvedValueOnce(new Response(page+page+'<a href="//evil.test/story20261106-43" title="站外"><span>19:00</span></a>'));
+  try {
+    const result = await collect({type:'zaobao',section:'china'});
+    expect(result.articles).toHaveLength(1);
+    expect(result.articles[0]).toMatchObject({title:'测试新闻',url:'https://www.zaobao.com/news/china/story20261106-42',time:Date.parse('2026-11-06T10:12Z')});
+    expect(upstream.mock.calls[1][0]).toBe('https://www.zaobao.com/realtime');
+    upstream.mockResolvedValueOnce(new Response(null,{status:302,headers:{location:'https://example.com/'}}));
+    await expect(collect({type:'zaobao'})).rejects.toThrow('未知地址');
+    expect(upstream).toHaveBeenCalledTimes(3);
+  } finally {upstream.mockRestore();}
+});
 test('取原文公开简介时按属性识别，并限制为早报官网', async () => {
   const { zaobaoDescription } = require('../src/services/briefing/providers');
   const fetcher = jest.spyOn(global,'fetch').mockResolvedValueOnce(new Response(

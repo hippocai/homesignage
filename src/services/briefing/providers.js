@@ -132,6 +132,11 @@ async function remote(url, opts = {}) {
   return r.json();
 }
 const zaobaoUrl = 'https://www.zaobao.com.sg/googlenews.xml';
+const zaobaoChina = 'https://www.zaobao.com';
+const zaobaoSections = {
+  china: /\/(china|greater-china)\//, world: /\/(world|international)\//,
+  singapore: /\/singapore\//, finance: /^\/finance\/|\/zfinance\//
+};
 const baiduBoardUrl = 'https://top.baidu.com/api/board?platform=pc&tab=realtime';
 function baiduRanking(body) {
   const items=body?.data?.cards?.[0]?.content;
@@ -142,7 +147,7 @@ function baiduRanking(body) {
 async function zaobaoDescription(address) {
   try {
     const url = new URL(address);
-    if (url.origin !== 'https://www.zaobao.com.sg' || url.username || url.password) return '';
+    if (!['https://www.zaobao.com.sg',zaobaoChina].includes(url.origin) || url.username || url.password) return '';
     const response = await fetch(url, { redirect:'error', signal:AbortSignal.timeout(5000) });
     if (!response.ok || !response.body) {
       await response.body?.cancel();
@@ -170,12 +175,6 @@ function parseZaobao(xml, section = 'all') {
     throw fault('联合早报新闻索引 XML 无效', 502);
   const root = new XMLParser({ removeNSPrefix: true, parseTagValue: false }).parse(xml).urlset;
   if (!root?.url) throw fault('联合早报新闻索引结构已变化', 502);
-  const sectionMatch = {
-    china: /\/(china|greater-china)\//,
-    world: /\/(world|international)\//,
-    singapore: /\/singapore\//,
-    finance: /^\/finance\/|\/zfinance\//
-  };
   const seen = new Set();
   return []
     .concat(root.url)
@@ -192,17 +191,40 @@ function parseZaobao(xml, section = 'all') {
         seen.has(u.pathname)
       )
         return [];
-      if (section !== 'all' && !sectionMatch[section]?.test(u.pathname)) return [];
+      if (section !== 'all' && !zaobaoSections[section]?.test(u.pathname)) return [];
       seen.add(u.pathname);
       return [{ ref: u.pathname, url, title, excerpt: '', time, publisher: '联合早报' }];
     })
     .sort((a, b) => b.time - a.time);
 }
+function parseZaobaoListing(html, section = 'all') {
+  const items = new Map();
+  for (const match of html.matchAll(/<a\b([^>]+)>([\s\S]*?)<\/a>/gi)) {
+    const path = match[1].match(/\bhref="(\/[^"?#]+\/story(\d{4})(\d{2})(\d{2})-\d+)"/);
+    const title = match[1].match(/\btitle="([^"]+)"/)?.[1];
+    const clock = match[2].match(/>\s*(\d{2}:\d{2})\s*</)?.[1];
+    if (!path || !title || !clock || path[1].startsWith('//')) continue;
+    const time = Date.parse(path[2]+'-'+path[3]+'-'+path[4]+'T'+clock+':00+08:00');
+    if (Number.isFinite(time)) items.set(path[1], {ref:path[1],url:zaobaoChina+path[1],
+      title:plain(title.replace(/&quot;/g,'"').replace(/&#39;|&apos;/g,"'").replace(/&amp;/g,'&')),
+      time,excerpt:'',publisher:'联合早报'});
+  }
+  if (!items.size) throw fault('联合早报即时新闻页面缺少可验证的发布时间',502);
+  return [...items.values()].filter(x=>section==='all' || zaobaoSections[section]?.test(x.ref)).sort((a,b)=>b.time-a.time);
+}
 async function collectZaobao(config, previous) {
   const headers = { 'User-Agent': 'HomeSignage/1.0' };
   if (previous.etag) headers['If-None-Match'] = previous.etag;
   if (previous.modified) headers['If-Modified-Since'] = previous.modified;
-  const r = await fetch(zaobaoUrl, { headers, redirect: 'error', signal: AbortSignal.timeout(15000) });
+  let listing = false;
+  let r = await fetch(zaobaoUrl, { headers, redirect: 'manual', signal: AbortSignal.timeout(15000) });
+  if ([301,302,307,308].includes(r.status)) {
+    const dest = new URL(r.headers.get('location') || '',zaobaoUrl);
+    await r.body?.cancel();
+    if (dest.href !== zaobaoChina+'/googlenews.xml') throw fault('联合早报索引跳转到未知地址',502);
+    listing = true;
+    r = await fetch(zaobaoChina+'/realtime',{headers,redirect:'error',signal:AbortSignal.timeout(15000)});
+  }
   if (r.status === 304) return { unchanged: true, articles: [] };
   if (!r.ok) throw fault('联合早报 HTTP ' + r.status, 502);
   const chunks = [];
@@ -213,7 +235,7 @@ async function collectZaobao(config, previous) {
     chunks.push(part);
   }
   return {
-    articles: parseZaobao(Buffer.concat(chunks).toString('utf8'), config.section),
+    articles: (listing ? parseZaobaoListing : parseZaobao)(Buffer.concat(chunks).toString('utf8'), config.section),
     etag: r.headers.get('etag'),
     modified: r.headers.get('last-modified')
   };
