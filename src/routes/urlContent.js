@@ -11,22 +11,27 @@ router.get('/', async (req, res) => {
   const url = req.query.url;
   if (!url) return res.status(400).send('Missing url parameter');
 
-  // Only proxy http/https URLs
-  if (!/^https?:\/\//i.test(url)) return res.status(400).send('Invalid URL');
-
-  const ttlMs = req.query.ttl ? parseInt(req.query.ttl, 10) * 60 * 1000 : undefined;
+  try {
+    const parsed = new URL(url);
+    if (!['http:', 'https:'].includes(parsed.protocol) || parsed.username || parsed.password)
+      return res.status(400).send('Invalid URL');
+  } catch { return res.status(400).send('Invalid URL'); }
+  const minutes = req.query.ttl === undefined ? undefined : Number(req.query.ttl);
+  if (minutes !== undefined && (!Number.isFinite(minutes) || minutes < 0))
+    return res.status(400).send('Invalid cache interval');
+  const ttlMs = minutes === undefined ? undefined : minutes * 60000;
 
   try {
-    const { body, contentType } = await urlCacheService.getCachedContent(url, ttlMs);
+    const { body, contentType, url:finalUrl } = await urlCacheService.getCachedContent(url, ttlMs);
     res.set('Content-Type', contentType);
     res.set('Cache-Control', 'no-store'); // client always asks server; server manages staleness
     res.set('X-Frame-Options', 'SAMEORIGIN');
+    res.set('Content-Security-Policy', 'sandbox allow-scripts allow-forms');
 
     // For HTML responses, inject <base href> so relative URLs inside the proxied
     // page resolve against the original host rather than localhost.
     if (contentType && contentType.includes('text/html')) {
-      const origin = new URL(url).origin;
-      const tag = `<base href="${origin}/">`;
+      const tag = `<base href="${finalUrl.replace(/&/g,'&amp;').replace(/"/g,'&quot;')}">`;
       let html = body.toString('utf8');
       if (/<head[^>]*>/i.test(html)) {
         html = html.replace(/<head([^>]*)>/i, `<head$1>${tag}`);
@@ -38,7 +43,7 @@ router.get('/', async (req, res) => {
 
     res.send(body);
   } catch (e) {
-    res.status(502).send('Failed to fetch content: ' + e.message);
+    res.status(e.status === 400 ? 400 : 502).type('text').send('Failed to fetch content: ' + e.message);
   }
 });
 

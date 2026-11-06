@@ -1,0 +1,13 @@
+.git
+.env
+.env.*
+node_modules
+admin/node_modules
+admin-dist
+data
+uploads
+logs
+file-repo
+.claude
+.openclaw
+.github

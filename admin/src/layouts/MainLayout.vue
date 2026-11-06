@@ -34,6 +34,8 @@
           <el-icon><Warning /></el-icon>
           <span>{{ $t('nav.emergency') }}</span>
         </el-menu-item>
+        <el-menu-item index="/news"><el-icon><List /></el-icon><span>资讯</span></el-menu-item>
+        <el-menu-item index="/companion"><el-icon><Bell /></el-icon><span>猪猪伙伴</span></el-menu-item>
         <el-menu-item index="/info-items">
           <el-icon><List /></el-icon>
           <span>{{ $t('nav.infoItems') }}</span>
@@ -99,7 +101,7 @@ import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth.js'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { List, FolderOpened } from '@element-plus/icons-vue'
+import { List, Bell, FolderOpened } from '@element-plus/icons-vue'
 import { useI18n } from 'vue-i18n'
 
 const { t, locale } = useI18n()

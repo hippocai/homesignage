@@ -8,7 +8,7 @@ const swaggerSpec = {
 
 ## 认证方式
 
-本 API 支持两种认证方式：
+各操作的 security 字段标明所需凭据。局域网访客聊天使用服务端签发的 HttpOnly Cookie。健康检查、股票和展示用视频流可直接读取。
 
 - **JWT Token**（管理后台）：通过 \`POST /api/v1/auth/login\` 获取 Token，在请求头中携带 \`Authorization: Bearer <token>\`
 - **API Key**（外部系统集成）：在管理后台生成，在请求头中携带 \`X-API-Key: <key>\`
@@ -214,7 +214,7 @@ const swaggerSpec = {
           scene_id: { type: 'string', format: 'uuid' },
           type: {
             type: 'string',
-            enum: ['clock', 'weather', 'text', 'image', 'video', 'iframe', 'info-list'],
+            enum: ['clock', 'weather', 'stock', 'text', 'image', 'video', 'iframe', 'info-list'],
             example: 'clock',
           },
           position: {
@@ -245,7 +245,7 @@ const swaggerSpec = {
         properties: {
           type: {
             type: 'string',
-            enum: ['clock', 'weather', 'text', 'image', 'video', 'iframe', 'info-list'],
+            enum: ['clock', 'weather', 'stock', 'text', 'image', 'video', 'iframe', 'info-list'],
             example: 'clock',
           },
           position: {
@@ -261,7 +261,7 @@ const swaggerSpec = {
           config: {
             type: 'object',
             example: { format: '24h', showDate: true },
-            description: '根据组件类型不同：clock={format,showDate,timezone}; weather={city,unit}; text={content,align}; image={url,objectFit}; video={url,objectFit,autoplay,loop,muted}; iframe={url}; info-list={fontSize,color,backgroundColor,scrollSpeed,pageInterval}',
+            description: '根据组件类型不同：clock={format,showDate,timezone}; weather={city,unit}; stock={symbol,market,scaleMode,priceMin,priceMax,scalePercent,refreshInterval}; text={content,align}; image={url,objectFit}; video={url,objectFit,autoplay,loop,muted}; iframe={url}; info-list={fontSize,color,backgroundColor,scrollSpeed,pageInterval}',
           },
           style: {
             type: 'object',
@@ -552,6 +552,22 @@ const swaggerSpec = {
   // PATHS
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   paths: {
+    '/stocks': {
+      get: {
+        tags: ['股票'], summary: '获取股票最新价格和最近交易日分时走势', security: [],
+        description: 'A 股/港股使用腾讯财经，美股使用 Yahoo Finance。服务器缓存 30 秒；失败时最多返回 24 小时内取得的缓存并标记 stale。行情可能延迟，交易日期和时间按交易所时区返回。',
+        parameters: [
+          { name: 'symbol', in: 'query', required: true, schema: { type: 'string' }, example: '300750', description: '例如 600519、300750、688981、bj920001、00700、AAPL、BRK-B；沪深指数可指定 sh/sz 前缀。' },
+          { name: 'market', in: 'query', schema: { type: 'string', enum: ['auto', 'cn', 'hk', 'us'], default: 'auto' } },
+        ],
+        responses: {
+          200: { description: 'data 包含 symbol、name、currency、price、previousClose、change、changePercent、tradingDate、quoteTime、timeZone、sessions、points[{minute,time,price}]、source、fetchedAt、stale。' },
+          400: { description: '无效的股票代码或市场' },
+          429: { description: '请求过于频繁' },
+          502: { description: '行情不可用且无可用缓存' },
+        },
+      },
+    },
     // ── Auth ──
     '/auth/login': {
       post: {
@@ -679,10 +695,10 @@ const swaggerSpec = {
       get: {
         tags: ['设备管理'],
         summary: '获取设备完整配置',
+        security: [{deviceKeyAuth:[]}],
         description: '供显示客户端调用，返回设备绑定的画面列表、各画面组件，以及当前活跃的紧急警报。使用 X-Device-Key 而非 JWT 认证。',
         parameters: [
           { name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' }, description: '设备 ID' },
-          { name: 'X-Device-Key', in: 'header', required: true, schema: { type: 'string' }, description: '设备专属密钥' },
         ],
         responses: {
           200: {
@@ -1356,6 +1372,35 @@ const swaggerSpec = {
     },
 
     // ── System ──
+    '/url-content': {servers:[{url:'/'}],get:{
+      tags:['系统'], summary:'为显示屏代理公网网页，按最终页面地址解析相对链接', security:[],
+      parameters:[{name:'url',in:'query',required:true,schema:{type:'string',format:'uri'}},
+        {name:'ttl',in:'query',schema:{type:'number',minimum:0,default:10},description:'缓存分钟数；失败时优先返回已有缓存'}],
+      responses:{200:{description:'原内容类型，HTML 在沙箱中显示'},400:{description:'URL、目标网络或缓存间隔无效'},502:{description:'上游不可用且无缓存'}}
+    }},
+    '/health': {get:{
+      tags:['系统'], summary:'服务健康检查', security:[],
+      responses:{200:{description:'服务可用',content:{'application/json':{schema:{type:'object',properties:{
+        status:{type:'string',enum:['ok']}, timestamp:{type:'string',format:'date-time'}
+      }}}}}}
+    }},
+    '/settings': {
+      get:{tags:['系统'],summary:'读取系统天气设置',security:[{bearerAuth:[]}],
+        responses:{200:{description:'data 包含 weather.provider、weather.qweather.host 和天气密钥的掩码（已设置为 ***）'},401:{$ref:'#/components/responses/Unauthorized'}}},
+      put:{tags:['系统'],summary:'更新指定的天气设置',security:[{bearerAuth:[]}],
+        requestBody:{required:true,content:{'application/json':{schema:{type:'object',properties:{
+          'weather.provider':{type:'string',enum:['wttr','qweather']},'weather.qweather.host':{type:'string'},
+          'weather.qweather.apiKey':{type:'string',description:'传 *** 保留原值，空串清空'}
+        }}}}},responses:{200:{description:'设置已保存'},401:{$ref:'#/components/responses/Unauthorized'}}}
+    },
+    '/weather/locations': {get:{tags:['天气'],summary:'在配置的天气服务商搜索地点',security:[{bearerAuth:[]}],
+      parameters:[{name:'query',in:'query',schema:{type:'string'},description:'不足两个字符返回空列表'}],
+      responses:{200:{description:'data 为地点列表，各项包含 id、name、displayName 等'},401:{$ref:'#/components/responses/Unauthorized'},502:{description:'服务商不可用'}}}},
+    '/weather/providers': {get:{tags:['天气'],summary:'列出可配置的天气服务商',security:[{bearerAuth:[]}],
+      responses:{200:{description:'data 为含 name、requiresApiKey 的列表'},401:{$ref:'#/components/responses/Unauthorized'}}}},
+    '/file-repo/{filename}/stream': {get:{tags:['文件仓库'],summary:'播放视频，支持 HTTP Range 定位',security:[],
+      parameters:[{name:'filename',in:'path',required:true,schema:{type:'string'}},{name:'Range',in:'header',schema:{type:'string'},example:'bytes=-1024'}],
+      responses:{200:{description:'完整视频'},206:{description:'部分视频，Content-Range 给出本次区间和文件总大小'},404:{description:'文件不存在'},415:{description:'不支持的格式'},416:{description:'超出文件范围'}}}},
     '/system/status': {
       get: {
         tags: ['系统'],
@@ -1371,6 +1416,7 @@ const swaggerSpec = {
   },
 
   tags: [
+    { name: '股票', description: 'A 股（含创业板/科创板/北交所）、港股、美股价格和分时走势' },
     { name: '认证', description: '管理员登录、Token 验证和密码修改' },
     { name: '设备管理', description: '显示设备的注册、配置和状态管理' },
     { name: '画面管理', description: '画面和组件的 CRUD 操作' },
@@ -1380,9 +1426,10 @@ const swaggerSpec = {
     { name: 'API 密钥', description: '外部系统集成密钥管理' },
     { name: '文件上传', description: '图片和音频文件上传' },
     { name: '文件仓库', description: '文件仓库管理：上传、下载、重命名、删除（支持图片/音频/视频）' },
-    { name: '天气', description: '实时天气数据查询（wttr.in）' },
+    { name: '天气', description: '天气服务商、城市搜索与服务端缓存的实时天气' },
     { name: '系统', description: '系统运行状态监控' },
   ],
 };
 
+require('./briefingSwagger')(swaggerSpec);
 module.exports = swaggerSpec;

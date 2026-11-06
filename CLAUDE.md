@@ -4,6 +4,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Commands
 
+The release test matrix is in [docs/系统回归测试.md](docs/系统回归测试.md). Run `npm test`, build the admin dashboard, then run `npm run test:browser` with Chromium installed or `CHROME_PATH` set. `npm run test:agent:live` uses synthetic household data and a configured GLM key.
+
 ```bash
 # Backend
 npm start          # production
@@ -38,6 +40,8 @@ admin-dist/ — Vue.js 3 admin dashboard (built from admin/)
 ```
 
 **Static serving**: Admin at `/admin/*` (from `admin-dist/`), client at `/client/*`
+
+The LAN guest chat is at `/pig-chat`. News, stocks, weather and the household agent are server-side services. The agent stores household memory, plan changes and action audits in SQLite. The authoritative route inventory is served at `/api/docs.json`.
 
 ## Backend Structure (`src/`)
 

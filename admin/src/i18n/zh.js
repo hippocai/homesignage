@@ -181,11 +181,20 @@ export default {
     componentTypes: {
       clock: '时钟',
       weather: '天气',
+      stock: '股票行情',
       text: '文字',
       image: '图片',
       video: '视频',
       iframe: '网页',
       infoList: '信息列表',
+    },
+    stock: {
+      market: '股票市场', autoMarket: '自动识别', cn: 'A 股（含创业板、科创板、北交所）', hk: '港股', us: '美股',
+      symbol: '股票代码', symbolHint: '请输入代码，例如 300048、00700、AAPL', title: '备注（可选）', titleHint: '备注不会改变查询的股票',
+      scale: '价格比例尺', autoScale: '自动缩放', fixedScale: '固定价格上下限', percentScale: '昨收上下百分比',
+      priceMin: '价格下限', priceMax: '价格上限', scalePercent: '昨收上下 ±',
+      refresh: '刷新间隔', seconds: '秒', invalidRange: '价格范围需满足：0 ≤ 下限 < 上限',
+      hint: '行情由股票代码决定，填写后点击「应用更改」。组件始终显示查询到的真实股票名称与代码，备注不会改变股票。支持 A 股、创业板、科创板、北交所、港股、美股；休市显示最近交易日，行情可能延迟。',
     },
     clock: {
       timeFormat: '时间格式',

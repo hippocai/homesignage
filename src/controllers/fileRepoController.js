@@ -70,14 +70,14 @@ async function upload(req, res) {
 }
 
 async function download(req, res) {
-  const name = sanitize(decodeURIComponent(req.params.filename));
+  const name = sanitize(req.params.filename);
   const full = path.join(getRepoPath(), name);
   if (!fs.existsSync(full)) return res.status(404).json({ error: '文件不存在' });
   res.download(full, name);
 }
 
 async function deleteFile(req, res) {
-  const name = sanitize(decodeURIComponent(req.params.filename));
+  const name = sanitize(req.params.filename);
   const full = path.join(getRepoPath(), name);
   if (!fs.existsSync(full)) return res.status(404).json({ error: '文件不存在' });
   try {
@@ -90,7 +90,7 @@ async function deleteFile(req, res) {
 }
 
 async function renameFile(req, res) {
-  const oldName = sanitize(decodeURIComponent(req.params.filename));
+  const oldName = sanitize(req.params.filename);
   const newName = req.body.newName ? sanitize(req.body.newName) : '';
   if (!newName) return res.status(400).json({ error: 'newName is required' });
 
@@ -114,7 +114,7 @@ async function renameFile(req, res) {
 // Video streaming — no auth required (called directly by display clients via video.src)
 // Handles HTTP Range requests so browsers can seek and start playback immediately.
 function streamVideo(req, res) {
-  const name = sanitize(decodeURIComponent(req.params.filename));
+  const name = sanitize(req.params.filename);
   const filePath = path.join(getRepoPath(), name);
 
   if (!fs.existsSync(filePath)) return res.status(404).json({ error: '文件不存在' });
@@ -123,36 +123,12 @@ function streamVideo(req, res) {
   const contentType = VIDEO_MIME[ext];
   if (!contentType) return res.status(415).json({ error: '不支持的视频格式' });
 
-  const stat = fs.statSync(filePath);
-  const fileSize = stat.size;
-  const range = req.headers.range;
-
-  if (range) {
-    const [startStr, endStr] = range.replace(/bytes=/, '').split('-');
-    const start = parseInt(startStr, 10);
-    const end = endStr ? Math.min(parseInt(endStr, 10), fileSize - 1) : fileSize - 1;
-
-    if (isNaN(start) || isNaN(end) || start > end || start >= fileSize) {
-      return res.status(416).set('Content-Range', `bytes */${fileSize}`).end();
-    }
-
-    res.writeHead(206, {
-      'Content-Range':  `bytes ${start}-${end}/${fileSize}`,
-      'Accept-Ranges':  'bytes',
-      'Content-Length': end - start + 1,
-      'Content-Type':   contentType,
-      'Cache-Control':  'no-store',
-    });
-    fs.createReadStream(filePath, { start, end }).pipe(res);
-  } else {
-    res.writeHead(200, {
-      'Content-Length': fileSize,
-      'Accept-Ranges':  'bytes',
-      'Content-Type':   contentType,
-      'Cache-Control':  'no-store',
-    });
-    fs.createReadStream(filePath).pipe(res);
-  }
+  res.type(contentType).set('Cache-Control', 'no-store');
+  res.sendFile(filePath, {cacheControl:false}, err => {
+    if (!err || res.headersSent) return;
+    if (err.headers) res.set(err.headers);
+    res.status(err.status || 500).end();
+  });
 }
 
 module.exports = { list, upload, download, deleteFile, renameFile, streamVideo };

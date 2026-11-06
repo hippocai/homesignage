@@ -35,6 +35,7 @@ var pollTimer      = null;
 var clockIntervals = [];
 var infoListIntervals = [];
 var infoListFetchers  = [];   // fetchAndRender functions for active info-list components
+var stockDisposers = [];
 
 // Active emergency tracking
 var activeEmergency = null; // { id, audio }
@@ -271,8 +272,11 @@ function fetchAndApplyConfig() {
 }
 
 function applyConfig(config) {
+  briefingRuntime.reset();
   currentConfig = config;
   cacheConfig(config);
+  stockDisposers.forEach(function (dispose) { dispose(); });
+  stockDisposers = [];
 
   // Clear clock and info-list intervals from old scene layers
   clearClockIntervals();
@@ -374,6 +378,14 @@ function renderComponent(component) {
 
     case 'weather':
       renderWeather(el, cfg, sty);
+      break;
+
+    case 'headlines':
+    case 'companion':
+      briefingRuntime.mount(el, cfg, type);
+      break;
+    case 'stock':
+      if (window.HomeSignageStock) stockDisposers.push(window.HomeSignageStock.mount(el, cfg));
       break;
 
     case 'text':
@@ -736,8 +748,10 @@ function renderIframe(el, cfg) {
   var src = cfg.url || cfg.src || '';
   // If useProxy is enabled (or URL is external), route through server-side cache
   // so display clients without internet access can still load the content.
-  var isExternal = /^https?:\/\//i.test(src) && src.indexOf(CONFIG.SERVER_URL) !== 0;
-  if (src && (cfg.useProxy || isExternal)) {
+  var isExternal = false;
+  try { isExternal = /^https?:\/\//i.test(src) && new URL(src).origin !== CONFIG.SERVER_URL; }
+  catch (_) { el.textContent = '网页地址无效'; return; }
+  if (src && isExternal && cfg.useProxy !== false) {
     var ttl = cfg.refreshInterval || '';
     src = CONFIG.SERVER_URL + '/url-content?url=' + encodeURIComponent(src)
           + (ttl ? '&ttl=' + ttl : '');
@@ -823,6 +837,7 @@ function transitionToScene(index) {
   setTimeout(function () {
     current.classList.remove('active');
     currentSceneIndex = index;
+    briefingRuntime.scene();
 
     // In OFFLINE mode without backend control, keep the local timer going
     if (!backendControlled && state !== 'EMERGENCY') {
@@ -850,6 +865,7 @@ function showScene(index) {
     sceneLayers[index].classList.add('active');
     resumeLayerVideos(sceneLayers[index]);
     currentSceneIndex = index;
+    briefingRuntime.scene();
   }
 }
 
@@ -983,6 +999,8 @@ function connectWebSocket() {
     updateOnlineStatus(true);
   });
 
+  socket.on('briefing-updated', briefingRuntime.sync);
+  socket.on('connected', briefingRuntime.sync);
   socket.on('info-items-updated', function () {
     log('socket', 'info-items-updated received');
     for (var i = 0; i < infoListFetchers.length; i++) {
@@ -1142,6 +1160,7 @@ function _stopPosRotator(posClass) {
 }
 
 function showTimedReminder(reminder) {
+  briefingRuntime.interrupt();
   var reminderId = reminder.reminderId || reminder.id;
   var content    = reminder.content || {};
   if (typeof content === 'string') content = safeParseJSON(content) || {};
@@ -1202,6 +1221,7 @@ function hideTimedReminder(reminderId) {
    content: { text } or a plain string
 ───────────────────────────────────────────── */
 function showEmergency(alert) {
+  briefingRuntime.interrupt();
   var alertId = alert.id || alert.alertId;
   var content = alert.content || {};
 

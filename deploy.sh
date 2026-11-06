@@ -10,7 +10,10 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 # ── 读取 JWT_SECRET ──────────────────────────────────────────────────
 if [ -f "$SCRIPT_DIR/.env" ]; then
   # shellcheck disable=SC2046
-  export $(grep -v '^#' "$SCRIPT_DIR/.env" | xargs)
+  # Read the JWT value only. Docker reads optional provider keys directly from the file.
+  if [ -z "${JWT_SECRET:-}" ]; then
+    JWT_SECRET=$(sed -n 's/^JWT_SECRET=//p' "$SCRIPT_DIR/.env" | head -n 1 | tr -d '\r')
+  fi
 fi
 
 if [ -z "$JWT_SECRET" ]; then
@@ -41,7 +44,9 @@ fi
 
 # ── 启动容器 ─────────────────────────────────────────────────────────
 echo ">>> 启动容器..."
-docker run -d \
+ENV_ARGS=()
+if [ -f "$SCRIPT_DIR/.env" ]; then ENV_ARGS=(--env-file "$SCRIPT_DIR/.env"); fi
+docker run -d "${ENV_ARGS[@]}" \
   --name "$CONTAINER_NAME" \
   --restart unless-stopped \
   -p "${PORT}:3000" \

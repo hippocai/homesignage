@@ -10,7 +10,8 @@ function localNow() {
 
 function parseItem(row) {
   if (!row) return null;
-  return { ...row };
+  const {companion_targets,companion_edition,...item}=row;
+  return item;
 }
 
 function findAll() {
@@ -52,8 +53,8 @@ function create(item) {
   return new Promise((resolve, reject) => {
     const { id, type = 'info', text, start_time = null, end_time = null } = item;
     db.run(
-      `INSERT INTO info_items (id, type, text, start_time, end_time) VALUES (?, ?, ?, ?, ?)`,
-      [id, type, text, start_time, end_time],
+      `INSERT INTO info_items (id, type, text, start_time, end_time,companion_targets) VALUES (?, ?, ?, ?, ?, ?)`,
+      [id, type, text, start_time, end_time,JSON.stringify(item.companion_targets||[])],
       function (err) {
         if (err) return reject(err);
         resolve(findById(id));
@@ -73,6 +74,8 @@ function update(id, fields) {
         values.push(fields[key]);
       }
     }
+    if (fields.companion_targets !== undefined) {updates.push('companion_targets = ?');values.push(JSON.stringify(fields.companion_targets));}
+    if (fields.replay === true) updates.push('companion_edition = companion_edition + 1');
     if (updates.length === 0) return resolve(findById(id));
     updates.push("updated_at = datetime('now')");
     values.push(id);

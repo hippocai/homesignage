@@ -3,6 +3,18 @@
 | 版本  | 日期  | 作者  | 描述  |
 | --- | --- | --- | --- |
 | V3.0 | 2023-10-27 | AI 助手 | 完整需求文档，包含多画面轮播、RESTful API、定时提示和紧急提示 |
+| V3.1 | 2026-11-06 | 项目维护 | 增加家庭资讯、行情、主动提醒和局域网聊天验收范围 |
+
+## 家庭显示与助手补充需求
+
+| 需求 | 验收标准 |
+| --- | --- |
+| 行情 | 支持 A 股、创业板、港股和美股；显示当日价格与走势，支持自动、固定上下限和按昨收百分比三种比例尺。 |
+| 家庭资讯 | 自动发布，支持常用来源和自定义订阅；关注/排除词可配置多项。显示端每次展示一条标题、来源和简介，按设定时间淡入淡出。 |
+| 猪猪伙伴 | 2D/3D 和多种样貌可选。气泡常开，按组件时区显示问候及节日祝福；相关资讯、家庭事项、按市判断的降温提醒可同时启用，重要提醒优先。 |
+| 家庭助手 | 开放文本记忆，局域网聊天。依据路线与行程筛选生活影响。可创建、列出、修改、取消自己创建的提醒和信息；指定原记录修改，多次重试只执行一次，并记录审计。 |
+
+验收步骤、测试数据和预期结果详见[系统回归测试](docs/系统回归测试.md)。下文早期接口示例以运行服务的 `/api/docs.json` 为准。
 
 ## 1\. 项目概述
 
@@ -100,16 +112,16 @@
 
 | ID  | 端点  | 方法  | 描述  | 请求体示例 | 优先级 |
 | --- | --- | --- | --- | --- | --- |
-| API001 | `/api/devices` | GET | 获取所有设备列表及其状态 | \-  | 中   |
-| API002 | `/api/devices/:deviceId/config` | GET | 获取指定设备的完整配置 | \-  | 高   |
-| API003 | `/api/devices/:deviceId/scenes` | PUT | 批量更新指定设备的画面列表及轮播配置 | `{ "scenes": [{"id": "s1", "duration": 10}], "transition": "fade" }` | 高   |
-| API004 | `/api/devices/:deviceId/active-scene` | POST | 强制切换当前显示的画面 | `{ "sceneId": "s2" }` | 高   |
-| API005 | `/api/scenes/:sceneId/content/text` | PATCH | 动态更新指定画面中的文本组件内容 | `{ "componentId": "memo_1", "content": "晚上8点开会" }` | 高   |
-| API006 | `/api/reminders/timed` | POST | 创建定时提示任务 | `{ "deviceIds": ["kitchen"], "startTime": "2023-10-27T14:45:00Z", "endTime": "2023-10-27T15:15:00Z", "content": "带钱包出门", "style": "blink", "sound": "bell.mp3", "repeat": "daily" }` | 高   |
-| API006b | `/api/reminders/timed/:id` | DELETE | 取消定时提示任务 | \-  | 高   |
-| API007 | `/api/reminders/emergency` | POST | 触发紧急提示 | `{ "deviceIds": ["all"], "content": "疑似煤气泄漏，请检查！", "sound": "alarm.mp3" }` | 高   |
-| API007b | `/api/reminders/emergency/:id` | DELETE | 解除紧急提示 | \-  | 高   |
-| API008 | `/api/reminders/emergency/status` | GET | 查询当前是否有未解除的紧急提示 | \-  | 中   |
+| API001 | `/api/v1/devices` | GET | 获取所有设备列表及其状态 | \-  | 中   |
+| API002 | `/api/v1/devices/:deviceId/config` | GET | 获取指定设备的完整配置 | \-  | 高   |
+| API003 | `/api/v1/devices/:deviceId/scenes` | PUT | 批量更新指定设备的画面列表及轮播配置 | `{ "scenes": [{"sceneId": "s1", "duration": 10}] }` | 高   |
+| API004 | `/api/v1/devices/:deviceId/active-scene` | POST | 强制切换当前显示的画面 | `{ "sceneId": "s2" }` | 高   |
+| API005 | `/api/v1/scenes/:sceneId/content/text` | PATCH | 动态更新指定画面中的文本组件内容 | `{ "componentId": "memo_1", "text": "晚上8点开会" }` | 高   |
+| API006 | `/api/v1/reminders/timed` | POST | 创建定时提示任务 | `{"name":"出门","device_ids":["kitchen"],"start_time":"08:00","end_time":"08:05","content":{"text":"带钱包出门"},"repeat":"daily"}` | 高   |
+| API006b | `/api/v1/reminders/timed/:id` | DELETE | 取消定时提示任务 | \-  | 高   |
+| API007 | `/api/v1/reminders/emergency` | POST | 触发紧急提示 | `{"device_ids":["all"],"content":{"text":"测试警报"},"sound":{"file":null,"loop":false}}` | 高   |
+| API007b | `/api/v1/reminders/emergency/:id` | DELETE | 解除紧急提示 | \-  | 高   |
+| API008 | `/api/v1/reminders/emergency/active` | GET | 查询当前是否有未解除的紧急提示 | \-  | 中   |
 
 _注：所有API需进行简单的身份验证，如Header中包含预共享的API Key。_
 

@@ -24,8 +24,10 @@ jest.mock('https', () => ({ get: (...args) => mockHttpsGet(...args) }));
 jest.mock('http',  () => ({ get: (...args) => mockHttpGet(...args)  }));
 
 const urlCacheService = require('../src/services/urlCacheService');
+const lookup = jest.spyOn(require('dns').promises, 'lookup');
 
 beforeEach(() => {
+  lookup.mockResolvedValue([{address:'93.184.216.34',family:4}]);
   mockHttpsGet.mockReset();
   mockHttpGet.mockReset();
   // Invalidate any cached entries from previous tests
@@ -127,7 +129,8 @@ describe('urlCacheService.getCachedContent', () => {
     mockHttpsGet.mockImplementationOnce((url, opts, cb) => {
       const res = new EventEmitter();
       res.statusCode = 302;
-      res.headers = { location: 'https://example.com/redirect-target', 'content-type': 'text/html' };
+      res.headers = { location: '/redirect-target', 'content-type': 'text/html' };
+      res.resume = jest.fn();
       process.nextTick(() => res.emit('end'));
       cb(res);
       return fakeReq;
@@ -140,8 +143,19 @@ describe('urlCacheService.getCachedContent', () => {
 
     const result = await urlCacheService.getCachedContent('https://example.com/redirect-source');
     expect(result.body.toString()).toBe('<html>Redirected</html>');
+    expect(result.url).toBe('https://example.com/redirect-target');
   });
 
+  it('rejects a redirect to a private host before connecting to it', async () => {
+    lookup.mockResolvedValueOnce([{address:'93.184.216.34',family:4}])
+      .mockResolvedValueOnce([{address:'127.0.0.1',family:4}]);
+    mockHttpsGet.mockImplementationOnce((url,opts,cb)=>{
+      cb({statusCode:302,headers:{location:'http://localhost/admin'},resume(){}});
+      return new EventEmitter();
+    });
+    await expect(urlCacheService.getCachedContent('https://example.com/bad')).rejects.toThrow('公网');
+    expect(mockHttpGet).not.toHaveBeenCalled();
+  });
   it('throws on non-200 non-redirect status', async () => {
     const fakeReq = new EventEmitter();
     mockHttpsGet.mockImplementation((url, opts, cb) => {

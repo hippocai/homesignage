@@ -40,7 +40,7 @@ function buildRule(timeStr, repeat) {
 function buildDateFromParts(dateStr, timeStr) {
   // dateStr: YYYY-MM-DD, timeStr: HH:MM
   const [h, m] = timeStr.split(':').map(Number);
-  const d = dateStr ? new Date(dateStr) : new Date();
+  const d = dateStr ? new Date(dateStr+'T00:00:00') : new Date();
   d.setHours(h, m, 0, 0);
   return d;
 }
@@ -54,6 +54,33 @@ function emitToDevices(device_ids, event, payload) {
   }
 }
 
+function datedWindow(reminder) {
+  const start=buildDateFromParts(reminder.start_date,reminder.start_time);
+  const end=buildDateFromParts(reminder.start_date,reminder.end_time);
+  if(end<=start) end.setDate(end.getDate()+1);
+  return {start,end};
+}
+async function emitDated(reminder,event) {
+  let current=reminder;
+  if(reminder.created_by?.startsWith('pig:')) {
+    // A timer may already be queued when a chat edit cancels its job.
+    current=await reminderDao.findById(reminder.id);
+    if(!current?.enabled || current.repeat!=='none' || current.start_date!==reminder.start_date ||
+      current.start_time!==reminder.start_time || current.end_time!==reminder.end_time) return;
+  }
+  const payload={reminderId:current.id};
+  if(event==='timed-reminder-start') Object.assign(payload,{content:current.content,sound:current.sound,
+    start_time:current.start_time,end_time:current.end_time});
+  emitToDevices(current.device_ids,event,payload);
+}
+async function activeDatedFor(device,now=new Date()) {
+  const day=d=>[d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-');
+  const prior=new Date(now);prior.setDate(prior.getDate()-1);
+  return (await reminderDao.datedForDevice(device,day(now),day(prior))).filter(r=>{
+    const {start,end}=datedWindow(r);return start<=now && now<end;
+  });
+}
+
 function scheduleReminder(reminder) {
   if (!reminder.enabled) return;
 
@@ -65,19 +92,18 @@ function scheduleReminder(reminder) {
 
   if (repeat === 'none' && start_date) {
     // One-time: schedule at specific date+time
-    const startDate = buildDateFromParts(start_date, start_time);
-    const endDate = buildDateFromParts(start_date, end_time);
+    const {start:startDate,end:endDate}=datedWindow(reminder);
 
     if (startDate > new Date()) {
       startJob = schedule.scheduleJob(`reminder-start-${id}`, startDate, () => {
         logger.info('Timed reminder starting (one-time)', { reminderId: id });
-        emitToDevices(device_ids, 'timed-reminder-start', { reminderId: id, content, sound, start_time, end_time });
+        return emitDated(reminder,'timed-reminder-start');
       });
     }
     if (endDate > new Date()) {
       endJob = schedule.scheduleJob(`reminder-end-${id}`, endDate, () => {
         logger.info('Timed reminder ending (one-time)', { reminderId: id });
-        emitToDevices(device_ids, 'timed-reminder-end', { reminderId: id });
+        return emitDated(reminder,'timed-reminder-end');
       });
     }
   } else {
@@ -142,4 +168,4 @@ async function rescheduleAll() {
   await initScheduler();
 }
 
-module.exports = { initScheduler, scheduleReminder, cancelReminder, rescheduleAll };
+module.exports = { initScheduler, scheduleReminder, cancelReminder, rescheduleAll,activeDatedFor };

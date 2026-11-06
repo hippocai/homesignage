@@ -5,6 +5,7 @@ const socketService = require('../services/socketService');
 const weatherService = require('../services/weatherService');
 const { localizeUrl } = require('../services/assetDownloadService');
 const logger = require('../utils/logger');
+const { validateConfig: validateStockConfig } = require('../services/stockService');
 
 // Asset types whose URL should be downloaded to local file-repo
 const ASSET_URL_TYPES = new Set(['image', 'video']);
@@ -29,7 +30,13 @@ async function maybeRestartWeatherScheduler(type) {
   logger.info('Weather scheduler restarted', { intervalMinutes: minIntervalMinutes, locations: locations.length });
 }
 
-async function localizeComponentConfig(type, config) {
+async function localizeComponentConfig(type, config, previous) {
+  if(type==='companion') {
+    const reminders = require('../services/briefing/rules').component(config.reminders);
+    if (reminders.cold && (!previous?.cold || previous.city !== reminders.city))
+      await require('../services/briefing/weatherCity').resolveCity(reminders.city);
+    return {...config, reminders};
+  }
   if (!ASSET_URL_TYPES.has(type)) return config;
   const url = config.url || config.src;
   if (!url) return config;
@@ -135,6 +142,11 @@ async function addComponent(req, res) {
     return res.status(400).json({ error: 'type, position, and config are required' });
   }
 
+  if (type === 'stock') {
+    const error = validateStockConfig(config);
+    if (error) return res.status(400).json({ error });
+  }
+
   try {
     const scene = await sceneDao.findById(sceneId);
     if (!scene) {
@@ -158,6 +170,8 @@ async function addComponent(req, res) {
     await maybeRestartWeatherScheduler(type);
     return res.status(201).json({ data: component, message: 'Component added successfully' });
   } catch (err) {
+    if (type === 'companion' && err.code === 'SQLITE_CONSTRAINT') return res.status(409).json({error:'每个场景只能添加一个猪猪伙伴'});
+    if(err.status===400 || err.status===502) return res.status(err.status).json({error:err.message});
     logger.error('Add component error', { error: err.message });
     return res.status(500).json({ error: 'Internal server error' });
   }
@@ -171,8 +185,14 @@ async function updateComponent(req, res) {
       return res.status(404).json({ error: 'Component not found' });
     }
     const body = { ...req.body };
+    if ((body.type || component.type) === 'stock') {
+      const error = validateStockConfig(body.config || component.config);
+      if (error) return res.status(400).json({ error });
+    }
     if (body.config) {
-      body.config = await localizeComponentConfig(component.type, body.config);
+        if(component.type==='companion' && !Object.hasOwn(body.config,'reminders'))
+          body.config={...body.config,reminders:component.config.reminders};
+      body.config = await localizeComponentConfig(component.type, body.config, component.config.reminders);
     }
     const updated = await componentDao.update(componentId, body);
     logger.info('Component updated', { componentId, sceneId });
@@ -180,6 +200,7 @@ async function updateComponent(req, res) {
     await maybeRestartWeatherScheduler(component.type);
     return res.json({ data: updated, message: 'Component updated successfully' });
   } catch (err) {
+    if(err.status===400 || err.status===502) return res.status(err.status).json({error:err.message});
     logger.error('Update component error', { error: err.message });
     return res.status(500).json({ error: 'Internal server error' });
   }

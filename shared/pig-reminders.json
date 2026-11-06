@@ -1,0 +1,19 @@
+{
+  "enabled": true,
+  "sound": false,
+  "volume": 0.8,
+  "zone": "Asia/Shanghai",
+  "quietFrom": "22:00",
+  "quietTo": "07:00",
+  "gap": 10,
+  "repeatMinutes": 60,
+  "maxPlays": 3,
+  "cold": false,
+  "family": true,
+  "news": true,
+  "city": "",
+  "threshold": 5,
+  "from": "07:00",
+  "to": "09:00",
+  "weekdays": true
+}

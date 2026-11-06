@@ -1,0 +1,39 @@
+name: System regression
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - run: npm --prefix admin ci && npm --prefix admin run build
+      - run: npm test
+      - run: npx playwright-core install --with-deps chromium
+      - run: npm run test:browser
+  container:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build from a clean checkout, then restart with persisted data
+        shell: bash
+        run: |
+          set -euo pipefail
+          export JWT_SECRET="$(openssl rand -hex 32)"
+          docker compose up -d --build
+          trap 'docker compose logs --tail 40; docker compose down' EXIT
+          wait_for_server() { curl -fsS --retry 15 --retry-delay 1 --retry-connrefused http://localhost:3000/api/v1/health; }
+          wait_for_server
+          curl -fsSL http://localhost:3000/admin/ | grep -q 'id="app"'
+          curl -fsS http://localhost:3000/api/docs.json | jq -e '.paths["/file-repo/{filename}/stream"].get' >/dev/null
+          token=$(curl -fsS -H 'Content-Type: application/json' -d '{"username":"admin","password":"admin123"}' http://localhost:3000/api/v1/auth/login | jq -er .data.token)
+          device=$(curl -fsS -H "Authorization: Bearer $token" -H 'Content-Type: application/json' -d '{"name":"CI test screen"}' http://localhost:3000/api/v1/devices | jq -er .data.id)
+          docker compose restart
+          wait_for_server
+          curl -fsS -H "Authorization: Bearer $token" "http://localhost:3000/api/v1/devices/$device" | jq -e '.data.name == "CI test screen"'

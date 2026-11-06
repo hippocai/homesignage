@@ -96,6 +96,7 @@ async function start() {
 
     // Initialize scheduler
     await initScheduler();
+    require('./services/briefing/worker').start();
     logger.info('Scheduler initialized');
 
     // Start listening

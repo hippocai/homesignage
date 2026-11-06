@@ -17,6 +17,9 @@ const routes = [
     component: MainLayout,
     meta: { requiresAuth: true },
     children: [
+      {path:'briefing',redirect:'/news'},
+      {path:'news',name:'News',component:()=>import('../views/BriefingView.vue')},
+      {path:'companion',name:'Companion',component:()=>import('../views/CompanionView.vue')},
       {
         path: 'dashboard',
         name: 'Dashboard',

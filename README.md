@@ -22,6 +22,8 @@ HomeSignage is a self-hosted digital signage system for the home. It supports mu
 
 ## Features
 
+- **News, stocks and Pig Companion** — Rotate filtered news and hot searches on screen, chart intraday quotes across mainland China, Hong Kong and US markets, and let the companion announce items that affect the household. Family members can use the LAN chat page to schedule, change and cancel their own reminders. Administrators can review the chat and action audit.
+
 - **Multi-scene carousel** — Each device shows multiple scenes in rotation with fade transitions; switching is driven by the backend (epoch-clock) to eliminate client-side timer drift and black-screen issues on long-running displays
 - **Rich components** — Clock, weather, text, image, video, iframe, info list
 - **Video component** — Plays local or remote video files with configurable autoplay, loop, and mute settings
@@ -57,7 +59,7 @@ docker-compose logs -f
 
 ### Option 2: Local Node.js
 
-**Requires**: Node.js v16+
+**Tested local runtime**: Node.js 24. The container uses Node.js 22 and builds the admin dashboard from source.
 
 ```bash
 npm install
@@ -84,6 +86,7 @@ Once running:
 | `LOG_LEVEL` | `info` | Log level: `debug` / `info` / `warn` / `error` |
 | `NODE_ENV` | `development` | Runtime environment |
 | `FILE_REPO_PATH` | `./file-repo` | Path to the file repository directory |
+| `GLM_API_KEY`, `DEEPSEEK_API_KEY`, `BRAVE_API_KEY` | Optional | Server-side credentials for the selected model or Brave News source |
 
 ---
 
@@ -159,6 +162,7 @@ Once uploaded, files can be selected directly when configuring an **Image**, **V
 |-----------|---------|------------|
 | Clock | Current time and date | 24h/12h format, timezone — displays **server time**, unaffected by device clock accuracy |
 | Weather | Live weather data | City name (or search if using QWeather), °C / °F, refresh interval (hours) |
+| Stocks | Latest price, change and intraday trend | Mainland (including ChiNext/STAR/BSE), Hong Kong and US; automatic, fixed-price or previous-close percentage scale |
 | Text | Notices, reminders | Content, font size, color |
 | Image | Display a photo | URL or pick from file repository |
 | Video | Play a video file | URL or pick from file repository; autoplay / loop / mute |
@@ -169,6 +173,10 @@ Once uploaded, files can be selected directly when configuring an **Image**, **V
 5. Click **Save Scene** — connected displays update instantly
 
 ---
+
+### Stock component
+
+Choose **Add Component → Stocks**, enter a symbol (`600519`, `300750`, `688981`, `bj920001`, `00700`, `AAPL`, `BRK-B`), then click **Apply**. The price scale can fit automatically, use fixed price bounds, or show a percentage range around the previous close. Refresh defaults to 60 seconds (configurable from 30 to 3600). Mainland/Hong Kong data comes from Tencent Finance; US regular-session data comes from Yahoo Finance. Quotes may be delayed. The widget shows the exchange timezone and quote date, including the latest trading day when markets are closed, and retains marked cached data on failure. See `GET /api/v1/stocks?symbol=AAPL&market=us` in Swagger.
 
 ### 6. Assign scenes to devices
 
@@ -302,6 +310,8 @@ curl -X POST http://<server>:3000/api/v1/file-repo \
 ```
 
 ### API Reference
+
+The table lists frequently used calls. Interactive OpenAPI is served at `/api/docs/` and its JSON at `/api/docs.json`. These include the news catalog and preferences, companion memory, chat audit, display receipts, stock quotes and video byte ranges. Guest chat uses a LAN session cookie at `/pig-chat`. See the [system regression procedure](docs/系统回归测试.md) for executable acceptance cases and verification limits.
 
 | Method | Path | Description |
 |--------|------|-------------|
@@ -439,6 +449,8 @@ HomeSignage 是一个自托管的家庭数字标牌系统，支持多画面轮�
 
 ## 功能概览
 
+- **资讯、股票和猪猪伙伴**：资讯与热搜自动轮播。股票展示 A 股（含创业板）、港股和美股的最新价格与分时走势。猪猪根据家庭记忆、行程和资讯判断生活影响；家人可在局域网聊天页创建、改期、取消提醒，管理员可查看操作审计。
+
 - **多画面轮播** — 每台设备可配置多个画面按序轮播，淡入淡出切换；画面切换由后端通过纪元时钟驱动，消除客户端定时器漂移导致的闪烁和黑屏问题，长时间运行也稳定
 - **丰富组件** — 时钟、天气、文本、图片、视频、网页嵌入（iframe）、信息列表
 - **视频组件** — 播放本地或远程视频，支持自动播放、循环播放、静音配置
@@ -474,7 +486,7 @@ docker-compose logs -f
 
 ### 方式二：本地直接运行
 
-**环境要求**：Node.js v16+
+**已验证的本地运行环境**：Node.js 24。容器使用 Node.js 22，并从源码构建管理后台。
 
 ```bash
 npm install
@@ -501,6 +513,7 @@ npm start
 | `LOG_LEVEL` | `info` | 日志级别（debug/info/warn/error） |
 | `NODE_ENV` | `development` | 运行环境 |
 | `FILE_REPO_PATH` | `./file-repo` | 文件仓库目录路径 |
+| `GLM_API_KEY`、`DEEPSEEK_API_KEY`、`BRAVE_API_KEY` | 可选 | 服务端读取所选模型或 Brave News 来源的凭据 |
 
 ---
 
@@ -576,6 +589,7 @@ npm start
 |----------|------|----------|
 | 时钟 | 显示当前时间和日期 | 24h/12h 格式、时区 — 显示**服务器时间**，不受设备系统时间影响 |
 | 天气 | 实时天气（自动获取） | 城市名称（和风天气支持搜索）、温度单位、刷新频率（小时） |
+| 股票行情 | 最新价格、涨跌幅和分时走势 | A 股/创业板/科创板/北交所、港股、美股；自动、固定价格、昨收百分比三种比例尺 |
 | 文本 | 备忘录、公告等 | 内容、字号、颜色 |
 | 图片 | 展示图片 | URL 或从文件仓库选择 |
 | 视频 | 播放视频 | URL 或从文件仓库选择；自动播放 / 循环 / 静音 |
@@ -586,6 +600,16 @@ npm start
 5. 点击「保存画面」— 已连接的显示设备**即时更新**
 
 ---
+
+### 股票组件配置
+
+在画面编辑器中选择「添加组件 → 股票行情」，填写代码后点击「应用更改」。支持 `600519`、`300750`（创业板）、`688981`（科创板）、`bj920001`（北交所）、`00700`（港股）、`AAPL`、`BRK-B`（美股）。可自动识别市场或手动选择；`000001` 默认深市，`sh000001` 指上证指数。
+
+新组件不会默认查询示例股票；必须填写股票代码才会显示行情。股票名称由行情自动返回，不能被备注覆盖。备注只用于标注，不会改变查询对象。例如合康新能应填写 `300048` 或 `sz300048`。
+
+价格轴提供三种比例尺：自动根据价格和昨收缩放；固定价格上下限（例如 330–360）；以昨收为中心上下浮动指定百分比（例如 ±5%）。固定范围外的曲线会裁剪并提示。横轴使用交易所当地时间，A 股与港股压缩午休时段，美股显示常规交易时段。默认每 60 秒刷新，可设 30–3600 秒。
+
+A 股及港股行情来自腾讯财经，美股来自 Yahoo Finance，由服务器访问外网并缓存；展示设备只访问本系统。组件会标明行情时间、时区和来源，休市时显示最近交易日，外部数据可能延迟或暂不可用。更新失败会保留上次行情并标记缓存；同一代码在多个设备间共享服务端请求。接口为 `GET /api/v1/stocks?symbol=AAPL&market=us`，具体字段参见 Swagger。
 
 ### 第六步：为设备分配画面
 
@@ -721,6 +745,8 @@ curl -X POST http://<server>:3000/api/v1/file-repo \
 
 ### 完整 API 列表
 
+完整接口以运行中的 `/api/docs/` 和 `/api/docs.json` 为准。下面列常用调用。股票使用 `/api/v1/stocks`，资讯订阅和话题偏好在 `/api/v1/news` 下，家庭记忆和审计在 `/api/v1/companion/agent` 下。局域网聊天入口为 `/pig-chat`，使用独立访客 Cookie。全系统的准备步骤、逐项用例、通过条件和实测范围见[系统回归测试](docs/系统回归测试.md)。
+
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | GET | `/api/v1/devices` | 获取所有设备（含每台设备当前画面信息） |
@@ -831,6 +857,30 @@ npm test
 ```
 
 ---
+
+## 资讯与猪猪伙伴
+
+打开管理后台的「资讯 → 订阅来源」，从「选择常用来源」中选择一个频道，再点「订阅所选来源」。可选中新网（国内、社会、财经）、IT之家、少数派、Solidot、百度热搜和联合早报，无需填写网址或申请密钥。百度热搜按榜单名次采集，属于组件中的「热搜」；其他频道属于「新闻」。已订阅的来源会标出，不会覆盖已有设置。订阅后可编辑采集间隔、停用或移除；新来源沿用「话题偏好」的关注和排除规则。
+
+「自定义来源」仍支持 RSS/Atom、联合早报、Brave News 或榜单 JSON。联合早报直接读取官网新闻索引，提供标题、发布时间与原文链接，支持中港台、国际、新加坡、财经和最新栏目。在「模型设置」测试已保存的 GLM 或 DeepSeek 设置。密钥仅由服务端的 GLM_API_KEY、DEEPSEEK_API_KEY、BRAVE_API_KEY 环境变量提供。每日请求和令牌配额可在后台调整。
+
+在画面编辑器可独立添加「资讯列表」或「猪猪伙伴」。资讯列表每次展示一条标题、来源和简述，自动淡入淡出轮播。新闻和热搜可同时勾选，多个关注词命中任一项即可。每条默认停留 10 秒，可设置为 2–600 秒。选中猪猪组件，在「猪猪形象」选择「3D 玩偶」或「2D 插画」，从「选择样貌」挑选 16 款造型之一，再点击「应用更改」。新建组件默认使用 3D，旧组件可手动切换。设备无法运行 WebGL 时自动使用插画。猪猪和说话气泡会随场景一起显示。待机气泡按组件时区每五分钟换一句，节日当天会送上祝福，中国大陆放假期间也会显示假期问候。当前内置 2026、2027 年公布的放假安排。问候只显示文字，重要提醒优先播报，结束后恢复当时的问候。订阅资讯自动发布。在「资讯 → 话题偏好」输入感兴趣和不感兴趣的话题。关注列表留空时接收全部，排除列表优先。偏好适用于在屏卡片和猪猪新闻提醒。
+
+打开「猪猪伙伴 → 家庭记忆」，像写 MEMORY.md 一样用自由文本记录任何想让助手记住的事，最多 12,000 个字符。原先的家庭人数、地址和路线会自动整理到文档里；家庭时区单独设置。记忆供全家聊天与资讯影响判断共同使用，连同必要的对话与计划发送给「资讯 → 模型设置」选定的 GLM 或 DeepSeek。
+
+管理页顶部提供「家庭聊天链接」，可以复制给连上家里网络的人；如果服务器有多个网卡，可选择与家人设备同网段的地址。访客从独立页面 `/pig-chat` 聊天，不需要后台账号。可选填称呼，也可直接发消息，如“下个月 12 日坐 MU5123 从上海虹桥去北京”。同一浏览器保留 30 天会话，刷新可看到自己的最近 40 次成功对话；其他访客看不到这些聊天或修改你的计划。管理员仍可在后台管理全家的计划。聊天入口要求直连服务器，不接受反向代理的转发头。
+
+「猪猪伙伴 → 聊天审计」仅管理员可访问。后台和访客的有效发送都会先在本机数据库记录，再调用模型；保留发送时间、来源 IP、自填称呼或后台用户名、会话、原文、回复和处理结果。记录按时间倒序分页，模型失败和重试也留痕；升级前的成功对话标作“历史后台”，不补造来源地址。访客称呼不是实名验证。
+
+打开「画面编辑器」，选中猪猪组件，展开「提醒、声音与免打扰」，修改后点击「应用更改」。同一场景投放到多个屏幕时共用组件设置；同一屏幕上的不同场景可以有不同规则。旧猪猪首次升级会从已绑定设备的规则迁移；若同一场景绑定了多个规则不同的设备，优先启用的绑定，再按播放顺序和设备 ID 选择一套。提醒播放次数按屏幕及组件分别计算。封路等持续影响默认间隔 60 分钟，最多 3 次（含首次）；设为 1 次关闭重复。
+
+后台或局域网聊天都可请猪猪创建系统记录。“明早八点提醒我准备出门去机场”会创建一次性定时提示，默认显示 5 分钟。“今晚 18:00 至 23:00 在信息列表提示给特斯拉充电”会创建这段时间有效的家庭信息。
+
+在同一段聊天里说“查看我的提醒和信息列表”，可以看到记录编号和按家庭时区显示的时间。说“航班改了，明早去机场的提醒推迟半小时”，猪猪会保留原编号和时长，把 08:00–08:05 调整到 08:30–08:35。也可以说“把充电信息的正文改成‘拔掉充电枪’”或“取消去机场的提醒”。同名记录可用清单中的短编号指定，如“取消提醒 #12ab34cd”。后台的聊天审计保留操作类型、原编号以及修改前后的内容和时间。每个访客会话只管理自己创建的记录。
+
+在场景的猪猪伙伴组件中，可同时勾选家庭事项和降温提醒。打开降温提醒后只需填写城市，例如「深圳市」；同名城市可写「省份/城市」。保存时会核对城市名称。系统按该市连续两天的晨间最高温预报和所设温差判断是否提醒，换市后重新积累记录。字幕自动显示；首次启用声音时需在屏幕触摸一次，解锁浏览器朗读。
+
+完整接口见服务的 `/api/docs`，机器可读文档为 `/api/docs.json`。[接口指南](docs/接口指南.md)列出接入流程、凭据与重试规则；[系统回归测试](docs/系统回归测试.md)和[资讯与伙伴测试用例](docs/资讯与猪猪伙伴测试用例.md)提供复跑步骤。
 
 ## 硬件推荐
 

@@ -15,6 +15,8 @@ if (!fs.existsSync(uploadsDir)) {
 }
 
 // --- Middleware ---
+const pigChat = require('./routes/pigChat');
+app.use(pigChat.router);
 app.use(cors({
   origin: process.env.CORS_ORIGIN || '*',
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
@@ -49,11 +51,13 @@ if (fs.existsSync(adminDistPath)) {
 }
 
 const clientPath = path.join(process.cwd(), 'client');
+app.get('/client/assets/pigs/:look.svg', require('./routes/pigPortrait'));
 if (fs.existsSync(clientPath)) {
   app.use('/client', express.static(clientPath));
 }
 
 // --- API Routes ---
+app.use('/api/v1', require('./routes/briefing'));
 app.use('/api/v1/auth', require('./routes/auth'));
 app.use('/api/v1/devices', require('./routes/devices'));
 app.use('/api/v1/scenes', require('./routes/scenes'));
@@ -62,6 +66,7 @@ app.use('/api/v1/api-keys', require('./routes/apiKeys'));
 app.use('/api/v1/system', require('./routes/system'));
 app.use('/api/v1/uploads', require('./routes/uploads'));
 app.use('/api/v1/weather', require('./routes/weather'));
+app.use('/api/v1/stocks', require('./routes/stocks'));
 app.use('/api/v1/settings', require('./routes/settings'));
 app.use('/api/v1/info-items', require('./routes/infoItems'));
 app.use('/api/v1/file-repo', require('./routes/fileRepo'));
@@ -84,6 +89,9 @@ app.use((req, res) => {
 
 // --- Global error handler ---
 app.use((err, req, res, next) => {
+  if (res.headersSent) return next(err);
+  if (err.type === 'entity.parse.failed') return res.status(400).json({error:'Invalid JSON'});
+  if (err.type === 'entity.too.large') return res.status(413).json({error:'Request body too large'});
   res.status(500).json({ error: 'Internal server error' });
 });
 

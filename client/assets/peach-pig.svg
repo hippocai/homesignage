@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 218" role="img" aria-label="桃桃猪">
+<defs>
+ <radialGradient id="skin" cx=".37" cy=".25" r=".85"><stop stop-color="#fff1df"/><stop offset=".58" stop-color="#ffc5b8"/><stop offset="1" stop-color="#ee9e9a"/></radialGradient>
+ <linearGradient id="coat" x2="0" y2="1"><stop stop-color="#63b6a6"/><stop offset="1" stop-color="#297772"/></linearGradient>
+ <linearGradient id="peach" x2="1" y2="1"><stop stop-color="#ffda9d"/><stop offset="1" stop-color="#ff978a"/></linearGradient>
+ <g id="eye"><ellipse rx="6.2" ry="8.3" fill="#503c43"/><circle cx="-1.6" cy="-3" r="2.3" fill="#fff8eb"/></g>
+</defs>
+<style>
+ #wrap,#snow,#notice{opacity:0}#scarf:target~#figure #wrap,#scarf:target~#snow,#serious:target~#notice{opacity:1}
+ #wave:target~#figure #hand,#point:target~#figure #hand{transform-origin:166px 151px;animation:wave .8s ease-in-out infinite alternate}
+ #figure{transform-origin:120px 200px;animation:breathe 3s ease-in-out infinite}
+ @keyframes wave{from{transform:rotate(-14deg)}to{transform:rotate(-43deg)}}@keyframes breathe{50%{transform:translateY(-2px) rotate(-1deg)}}
+ @media(prefers-reduced-motion:reduce){#figure,#figure #hand{animation:none!important}}
+</style>
+<g id="wave"/><g id="point"/><g id="scarf"/><g id="serious"/>
+<ellipse cx="122" cy="201" rx="58" ry="7" fill="#413239" opacity=".14"/>
+<g id="figure" stroke="#885551" stroke-width="3.4" stroke-linejoin="round" stroke-linecap="round">
+ <path d="M164 161q32 8 29-9c-2-9-15-4-10 4s21 1 22-8" fill="none" stroke="#dd9991" stroke-width="5"/>
+ <path d="M90 179q-9 18 0 19h17l6-18m16 0 5 18h15q8-4 0-19" fill="#ab756b"/>
+ <path d="M80 147q-9 17-2 27c5 6 13 1 18-9" fill="url(#skin)"/>
+ <path d="M90 131c-10 13-16 40-9 52 13 12 67 14 80-1 8-15-1-40-11-51" fill="url(#coat)"/>
+ <path d="M98 135v20h47v-20m-39 23v12q14 12 28 0v-12z" fill="#8ac8b5" stroke="#376f67" stroke-width="2.6"/>
+ <circle cx="101" cy="151" r="3" fill="#ffd787" stroke="none"/><circle cx="141" cy="151" r="3" fill="#ffd787" stroke="none"/>
+ <g id="hand"><path d="M153 155q13 18 21 8c7-9 1-17-9-22" fill="url(#skin)"/></g>
+ <path d="M58 76Q43 49 52 28q12-7 42 20m51 0q25-23 40-18 10 11-4 46" fill="url(#skin)"/>
+ <path d="M61 61q-7-15-5-22 11 0 24 13m77-1q13-12 22-13 1 8-6 25" fill="#f29d9b" stroke="none"/>
+ <path d="M52 91c0-39 32-57 68-57s70 20 70 59c0 39-28 57-68 57-42 0-70-18-70-59z" fill="url(#skin)"/>
+ <path d="M78 68q6-5 12-4m60-1q6-1 11 4" fill="none" stroke-width="3"/>
+ <use href="#eye" x="88" y="86"/><use href="#eye" x="153" y="86"/>
+ <ellipse cx="69" cy="104" rx="10" ry="5.8" fill="#f6979d" stroke="none"/><ellipse cx="172" cy="104" rx="10" ry="5.8" fill="#f6979d" stroke="none"/>
+ <path d="M111 124q10 9 20-1" fill="none"/>
+ <ellipse cx="121" cy="106" rx="23" ry="16" fill="#f4a3a3" stroke="#ba7777" stroke-width="2.5"/>
+ <ellipse cx="112" cy="106" rx="3.5" ry="5.2" fill="#aa686c" stroke="none"/><ellipse cx="130" cy="106" rx="3.5" ry="5.2" fill="#aa686c" stroke="none"/>
+ <g transform="translate(104 12) rotate(-12 15 12)"><path d="M13 10Q1 1 1 14q2 12 14 16 12-5 15-15 3-14-13-7" fill="url(#peach)"/><path d="M15 9Q16-2 27-2q-1 10-12 11z" fill="#82b59b" stroke-width="2"/></g>
+ <g id="wrap" fill="#f8bd62"><path d="m145 141 12 27-13 7-14-30"/><path d="M84 135q36 18 73-1l1 13q-36 17-74 1z"/></g>
+</g>
+<g id="snow" fill="#a3dfec"><path d="m26 64 3 8 8 3-8 3-3 8-3-8-8-3 8-3zm174-41 2 6 6 2-6 2-2 6-2-6-6-2 6-2z"/></g>
+<g id="notice"><circle cx="201" cy="68" r="14" fill="#ffe2a5"/><path d="M201 60v8m0 5v1" stroke="#815143" stroke-width="3.5" stroke-linecap="round"/></g>
+</svg>

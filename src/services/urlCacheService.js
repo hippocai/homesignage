@@ -1,41 +1,19 @@
 /**
  * URL Cache Service
  * Server-side fetches and caches external web pages.
- * Display clients access /api/v1/url-content?url=... instead of the external URL.
+ * Display clients access /url-content?url=... instead of the external URL.
  */
-const https = require('https');
-const http  = require('http');
+const {publicResource} = require('./briefing/providers');
 const logger = require('../utils/logger');
 
 // cache: Map<url -> { body, contentType, fetchedAt }>
 const cache = new Map();
 const DEFAULT_TTL_MS = 10 * 60 * 1000; // 10 minutes
 
-function fetchUrl(url) {
-  return new Promise((resolve, reject) => {
-    const lib = url.startsWith('https') ? https : http;
-    const req = lib.get(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; HomeSignage/1.0)',
-        'Accept': 'text/html,application/xhtml+xml,*/*',
-      },
-      timeout: 15000,
-    }, (res) => {
-      // Follow single redirect
-      if ((res.statusCode === 301 || res.statusCode === 302) && res.headers.location) {
-        return fetchUrl(res.headers.location).then(resolve).catch(reject);
-      }
-      if (res.statusCode !== 200) {
-        return reject(new Error(`HTTP ${res.statusCode} for ${url}`));
-      }
-      const contentType = res.headers['content-type'] || 'text/html';
-      const chunks = [];
-      res.on('data', (c) => chunks.push(c));
-      res.on('end', () => resolve({ body: Buffer.concat(chunks), contentType }));
-    });
-    req.on('error', reject);
-    req.on('timeout', () => { req.destroy(); reject(new Error('Request timeout')); });
-  });
+async function fetchUrl(url) {
+  const response = await publicResource(url, {'User-Agent':'HomeSignage/1.0'}, 8*1024*1024);
+  if (response.status !== 200) throw new Error('HTTP ' + response.status);
+  return {body:response.body, contentType:response.headers['content-type'] || 'text/html', url:response.url};
 }
 
 async function getCachedContent(url, ttlMs) {
@@ -45,10 +23,10 @@ async function getCachedContent(url, ttlMs) {
     return cached;
   }
   try {
-    const { body, contentType } = await fetchUrl(url);
-    const entry = { body, contentType, fetchedAt: Date.now(), error: null };
+    const entry = { ...await fetchUrl(url), fetchedAt: Date.now(), error: null };
+    if (cache.size >= 32 && !cache.has(url)) cache.delete(cache.keys().next().value);
     cache.set(url, entry);
-    logger.info('URL cache updated', { url, size: body.length });
+    logger.info('URL cache updated', { url, size: entry.body.length });
     return entry;
   } catch (e) {
     logger.warn('URL cache fetch failed', { url, error: e.message });

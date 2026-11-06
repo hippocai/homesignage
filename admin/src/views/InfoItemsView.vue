@@ -77,6 +77,8 @@
             :placeholder="$t('infoItems.itemContentPlaceholder')"
           />
         </el-form-item>
+        <el-form-item v-if="form.type !== 'info'" label="猪猪提醒"><el-select multiple clearable v-model="form.companion_targets" placeholder="选择播报设备"><el-option v-for="d in devices" :key="d.id" :value="d.id" :label="d.name"/></el-select></el-form-item>
+        <el-form-item v-if="editingItem && form.companion_targets?.length" label="重新播报"><el-switch v-model="form.replay"/></el-form-item>
         <el-form-item :label="$t('infoItems.startTime')">
           <el-date-picker
             v-model="form.start_time"
@@ -113,7 +115,8 @@
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
-import { infoItemsApi } from '../api/index.js'
+import api, { infoItemsApi,devicesApi } from '../api/index.js'
+const devices=ref([])
 import { useI18n } from 'vue-i18n'
 
 const { t } = useI18n()
@@ -137,7 +140,7 @@ const rules = computed(() => ({
   text: [{ required: true, message: t('infoItems.itemContentRequired'), trigger: 'blur' }]
 }))
 
-function openDialog(item = null) {
+async function openDialog(item = null) {
   editingItem.value = item
   if (item) {
     form.value = {
@@ -149,7 +152,11 @@ function openDialog(item = null) {
   } else {
     form.value = { type: 'info', text: '', start_time: null, end_time: null }
   }
-  dialogVisible.value = true
+  try {
+    devices.value=(await devicesApi.list()).data.data
+    form.value.companion_targets=item ? (await api.get('/companion/info/'+item.id)).data.data : []
+    dialogVisible.value=true
+  } catch {ElMessage.error('无法读取设备播报设置')}
 }
 
 function resetForm() {
@@ -177,6 +184,8 @@ async function handleSave() {
     const payload = {
       type: form.value.type,
       text: form.value.text,
+      companion_targets: form.value.type==='info' ? [] : form.value.companion_targets,
+      replay: !!form.value.replay,
       start_time: form.value.start_time || null,
       end_time: form.value.end_time || null,
     }

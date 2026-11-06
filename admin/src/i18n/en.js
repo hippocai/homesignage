@@ -181,11 +181,20 @@ export default {
     componentTypes: {
       clock: 'Clock',
       weather: 'Weather',
+      stock: 'Stocks',
       text: 'Text',
       image: 'Image',
       video: 'Video',
       iframe: 'Webpage',
       infoList: 'Info List',
+    },
+    stock: {
+      market: 'Market', autoMarket: 'Auto detect', cn: 'Mainland (ChiNext, STAR, BSE)', hk: 'Hong Kong', us: 'US',
+      symbol: 'Symbol', symbolHint: 'Enter a ticker, e.g. 300048, 00700, AAPL', title: 'Note (optional)', titleHint: 'Notes do not change the queried stock',
+      scale: 'Price scale', autoScale: 'Automatic', fixedScale: 'Fixed price bounds', percentScale: 'Percent from previous close',
+      priceMin: 'Minimum price', priceMax: 'Maximum price', scalePercent: 'Previous close ±',
+      refresh: 'Refresh every', seconds: 'seconds', invalidRange: 'Price bounds require 0 ≤ minimum < maximum',
+      hint: 'Enter the stock code and click Apply. Quotes always show the actual stock name and ticker; notes do not change the security. Supports mainland, Hong Kong and US markets. Closed markets show the latest trading date. Quotes may be delayed.',
     },
     clock: {
       timeFormat: 'Time Format',

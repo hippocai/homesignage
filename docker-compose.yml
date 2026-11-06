@@ -21,6 +21,9 @@ services:
       - SQLITE_PATH=/app/data/signage.db
       - LOG_LEVEL=info
       - FILE_REPO_PATH=/app/file-repo
+      - GLM_API_KEY=${GLM_API_KEY:-}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
+      - BRAVE_API_KEY=${BRAVE_API_KEY:-}
     logging:
       driver: "json-file"
       options:

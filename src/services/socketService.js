@@ -66,6 +66,10 @@ function initSocketService(server) {
 
       // Push correct scene immediately
       scenePlannerService.onDeviceConnect(deviceId).catch(() => {});
+      try {
+        for(const r of await require('./schedulerService').activeDatedFor(deviceId))
+          socket.emit('timed-reminder-start',{reminderId:r.id,content:r.content,sound:r.sound,start_time:r.start_time,end_time:r.end_time});
+      } catch(err) { logger.warn('Unable to restore dated reminders',{deviceId,error:err.message}); }
 
       // Send any active emergency alerts to newly connected device
       try {

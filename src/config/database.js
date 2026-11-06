@@ -189,6 +189,8 @@ async function initDatabase() {
     });
   });
 
+  await require('../services/briefing/storage').init();
+
   // Migrations: add columns that may not exist in older DBs
   await new Promise((resolve) => {
     db.all('PRAGMA table_info(scenes)', [], (err, cols) => {

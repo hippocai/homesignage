@@ -24,6 +24,16 @@ afterAll(() => {
 });
 
 describe('POST /api/v1/file-repo', () => {
+  it('streams a suffix range and downloads a filename containing a literal percent sign', async () => {
+    const name = 'clip-100%.mp4', content = Buffer.from('0123456789');
+    fs.writeFileSync(path.join(repoDir,name),content);
+    const url = '/api/v1/file-repo/'+encodeURIComponent(name);
+    const last = await request(app).get(url+'/stream').set('Range','bytes=-3').expect(206);
+    expect(last.headers['content-range']).toBe('bytes 7-9/10');
+    expect(Buffer.from(last.body).toString()).toBe('789');
+    await request(app).get(url+'/stream').set('Range','bytes=15-20').expect(416);
+    await request(app).get(url+'/download').set('Authorization','Bearer '+token).expect(200);
+  });
   it('uploads an image file', async () => {
     const pngBuffer = Buffer.from(
       '89504e470d0a1a0a0000000d4948445200000001000000010802000000' +

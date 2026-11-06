@@ -133,6 +133,10 @@
                 <template v-else-if="comp.type === 'clock'">
                   <div class="clock-preview">{{ getClockDisplay(comp) }}</div>
                 </template>
+                <BriefingPreview v-else-if="['headlines','companion'].includes(comp.type)" :kind="comp.type" :config="getStockPreviewConfig(comp)" :news="previewNews" />
+                <template v-else-if="comp.type === 'stock'">
+                  <StockPreview :config="getStockPreviewConfig(comp)" />
+                </template>
                 <template v-else-if="comp.type === 'info-list'">
                   <div class="info-list-preview" :style="{ backgroundColor: comp.config?.backgroundColor || 'rgba(0,0,0,0.5)', padding: (comp.config?.padding || 10) + 'px' }">
                     <div v-for="n in 3" :key="n" class="info-list-preview-row" :style="{ fontSize: Math.min(comp.config?.fontSize || 18, 14) + 'px', color: comp.config?.color || '#fff', marginBottom: (comp.config?.itemSpacing || 6) + 'px' }">
@@ -277,6 +281,78 @@
                 />
                 <span style="margin-left:8px;color:#909399;font-size:12px">{{ $t('sceneEditor.weather.refreshIntervalUnit') }}</span>
               </el-form-item>
+            </el-form>
+
+            <el-form v-else-if="selectedComponent.type === 'headlines'" label-width="80px" size="small">
+              <el-form-item label="关注词"><el-input-tag v-model="editForm.config.keywords" aria-label="组件关注词"
+                :delimiter="/[,，、\n]/" placeholder="输入后按回车，匹配任一词" /></el-form-item>
+              <el-form-item label="资讯类型">
+                <el-checkbox-group v-model="editForm.config.categories" :min="1">
+                  <el-checkbox value="news">新闻</el-checkbox>
+                  <el-checkbox value="ranking">热搜</el-checkbox>
+                </el-checkbox-group>
+              </el-form-item>
+              <el-form-item label="每条停留"><el-input-number v-model="editForm.config.seconds" :min="2" :max="600" :precision="0"/> 秒</el-form-item>
+              <el-form-item label="字号"><el-input-number v-model="editForm.config.fontSize" :min="12" :max="72"/></el-form-item>
+            </el-form>
+            <el-form v-else-if="selectedComponent.type === 'companion'">
+              <el-form-item label="猪猪形象">
+                <el-radio-group v-model="editForm.config.appearance">
+                  <el-radio-button value="2d">2D 插画</el-radio-button>
+                  <el-radio-button value="3d">3D 玩偶</el-radio-button>
+                </el-radio-group>
+              </el-form-item>
+              <el-form-item label="选择样貌">
+                <el-select v-model="editForm.config.look" filterable>
+                  <el-option v-for="look in pigLooks" :key="look.id" :value="look.id" :label="look.name">
+                    <img :src="look.id === 'peach' ? '/client/assets/peach-pig.svg' : '/client/assets/pigs/' + look.id + '.svg'"
+                      alt="" style="width:34px;height:32px;vertical-align:middle;margin-right:8px">{{ look.name }}
+                  </el-option>
+                </el-select>
+              </el-form-item>
+              <PigReminderRules :value="editForm.config.reminders" />
+            </el-form>
+            <el-form v-else-if="selectedComponent.type === 'stock'" label-width="100px" size="small">
+              <el-form-item :label="$t('sceneEditor.stock.market')">
+                <el-select v-model="editForm.config.market">
+                  <el-option :label="$t('sceneEditor.stock.autoMarket')" value="auto" />
+                  <el-option :label="$t('sceneEditor.stock.cn')" value="cn" />
+                  <el-option :label="$t('sceneEditor.stock.hk')" value="hk" />
+                  <el-option :label="$t('sceneEditor.stock.us')" value="us" />
+                </el-select>
+              </el-form-item>
+              <el-form-item :label="$t('sceneEditor.stock.symbol')">
+                <el-input v-model="editForm.config.symbol" :placeholder="$t('sceneEditor.stock.symbolHint')" />
+              </el-form-item>
+              <el-form-item :label="$t('sceneEditor.stock.title')">
+                <el-input v-model="editForm.config.title" :placeholder="$t('sceneEditor.stock.titleHint')" />
+              </el-form-item>
+              <el-form-item :label="$t('sceneEditor.stock.scale')">
+                <el-select v-model="editForm.config.scaleMode">
+                  <el-option :label="$t('sceneEditor.stock.autoScale')" value="auto" />
+                  <el-option :label="$t('sceneEditor.stock.fixedScale')" value="fixed" />
+                  <el-option :label="$t('sceneEditor.stock.percentScale')" value="percent" />
+                </el-select>
+              </el-form-item>
+              <template v-if="editForm.config.scaleMode === 'fixed'">
+                <el-form-item :label="$t('sceneEditor.stock.priceMin')">
+                  <el-input-number v-model="editForm.config.priceMin" :min="0" :precision="4" controls-position="right" />
+                </el-form-item>
+                <el-form-item :label="$t('sceneEditor.stock.priceMax')">
+                  <el-input-number v-model="editForm.config.priceMax" :min="0" :precision="4" controls-position="right" />
+                </el-form-item>
+              </template>
+              <el-form-item v-if="editForm.config.scaleMode === 'percent'" :label="$t('sceneEditor.stock.scalePercent')">
+                <el-input-number v-model="editForm.config.scalePercent" :min="0.01" :max="100" :precision="2" controls-position="right" />
+                <span style="margin-left:4px">%</span>
+              </el-form-item>
+              <el-form-item :label="$t('sceneEditor.stock.refresh')">
+                <el-input-number v-model="editForm.config.refreshInterval" :min="30" :max="3600" :step="30" controls-position="right" />
+                <span style="margin-left:4px">{{ $t('sceneEditor.stock.seconds') }}</span>
+              </el-form-item>
+              <el-form-item :label="$t('sceneEditor.text.textColor')"><el-color-picker v-model="editForm.config.color" /></el-form-item>
+              <el-form-item :label="$t('sceneEditor.text.bgColor')"><el-color-picker v-model="editForm.config.backgroundColor" show-alpha /></el-form-item>
+              <p style="font-size:12px;color:#909399;line-height:1.6">{{ $t('sceneEditor.stock.hint') }}</p>
             </el-form>
 
             <el-form v-else-if="selectedComponent.type === 'text'" label-width="80px" size="small">
@@ -447,6 +523,10 @@
               <template v-else-if="comp.type === 'weather'">
                 <div class="dialog-weather">🌤 {{ comp.config?.city || '' }}</div>
               </template>
+              <BriefingPreview v-else-if="['headlines','companion'].includes(comp.type)" :kind="comp.type" :config="getStockPreviewConfig(comp)" :news="previewNews" />
+              <template v-else-if="comp.type === 'stock'">
+                <StockPreview :config="getStockPreviewConfig(comp)" />
+              </template>
               <template v-else-if="comp.type === 'iframe'">
                 <div class="dialog-iframe">🌐 {{ comp.config?.url || '' }}</div>
               </template>
@@ -489,7 +569,12 @@ import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowLeft, Plus, Check, Delete, View, Clock, Cloudy, Document, Picture, VideoPlay, Link, List, FolderOpened } from '@element-plus/icons-vue'
 import FilePicker from '../components/FilePicker.vue'
-import { scenesApi, weatherApi } from '../api/index.js'
+import StockPreview from '../components/StockPreview.vue'
+import BriefingPreview from '../components/BriefingPreview.vue'
+import PigReminderRules from '../components/PigReminderRules.vue'
+import pigDefaults from '../../../shared/pig-reminders.json'
+const pigLooks = window.HomePigLooks.looks
+import api, { scenesApi, weatherApi } from '../api/index.js'
 import { useI18n } from 'vue-i18n'
 
 const { t } = useI18n()
@@ -541,6 +626,14 @@ const saving = ref(false)
 const sceneName = ref('')
 const sceneDescription = ref('')
 const components = ref([])
+const previewNews = ref([])
+watch(() => components.value.some(c => c.type === 'headlines'), async visible => {
+  if (!visible) return
+  try {
+    const result = await api.get('/news/events?scope=news&state=published')
+    previewNews.value = result.data.data.filter(item => item.expires > Date.now())
+  } catch { previewNews.value = [] }
+})
 const selectedComponent = ref(null)
 const addCompDialogVisible = ref(false)
 const previewVisible = ref(false)
@@ -568,8 +661,11 @@ const resizeState = ref(null)
 const editForm = reactive({ x: 0, y: 0, width: 30, height: 20, config: {} })
 
 const componentTypes = computed(() => [
+  { value:'headlines',label:'资讯列表',icon:'List',color:'#327969' },
+  { value:'companion',label:'猪猪伙伴',icon:'Picture',color:'#e79992' },
   { value: 'clock',     label: t('sceneEditor.componentTypes.clock'),     icon: 'Clock',    color: '#409EFF' },
   { value: 'weather',   label: t('sceneEditor.componentTypes.weather'),   icon: 'Cloudy',   color: '#67C23A' },
+  { value: 'stock', label: t('sceneEditor.componentTypes.stock'), icon: 'TrendCharts', color: '#f43f5e' },
   { value: 'text',      label: t('sceneEditor.componentTypes.text'),      icon: 'Document', color: '#E6A23C' },
   { value: 'image',     label: t('sceneEditor.componentTypes.image'),     icon: 'Picture',  color: '#F56C6C' },
   { value: 'video',     label: t('sceneEditor.componentTypes.video'),     icon: 'VideoPlay',color: '#E040FB' },
@@ -580,6 +676,8 @@ const componentTypes = computed(() => [
 const defaultConfigs = computed(() => ({
   clock:     { format: 'HH:mm', showDate: true, timezone: 'Asia/Shanghai' },
   weather:   { city: 'Beijing', locationId: '', unit: 'C', refreshInterval: 1 },
+  headlines: window.HomeBriefing.newsConfig({}), companion: {appearance:'3d',look:'peach'},
+  stock: { market: 'auto', symbol: '', title: '', scaleMode: 'auto', priceMin: 0, priceMax: 2000, scalePercent: 5, refreshInterval: 60, color: '#e2e8f0', backgroundColor: '#101b2e' },
   text:      { content: t('sceneEditor.placeholders.text'), fontSize: 24, color: '#ffffff', backgroundColor: 'transparent', textAlign: 'center' },
   image:     { url: '', objectFit: 'cover' },
   video:     { url: '', objectFit: 'cover', autoplay: true, loop: true, muted: true, useStream: true },
@@ -653,12 +751,17 @@ function applyCustomResolution() {
 
 // Component helpers
 function getComponentIcon(type) {
-  return { clock: 'Clock', weather: 'Cloudy', text: 'Document', image: 'Picture', video: 'VideoPlay', iframe: 'Link', 'info-list': 'List' }[type] || 'Grid'
+  return { stock: 'TrendCharts', clock: 'Clock', weather: 'Cloudy', text: 'Document', image: 'Picture', video: 'VideoPlay', iframe: 'Link', 'info-list': 'List' }[type] || 'Grid'
+}
+function getStockPreviewConfig(comp) {
+  return selectedComponent.value?.id === comp.id ? editForm.config : comp.config
 }
 function getComponentLabel(type) {
   const labels = {
     clock: t('sceneEditor.componentTypes.clock'),
     weather: t('sceneEditor.componentTypes.weather'),
+    headlines:'资讯列表', companion:'猪猪伙伴',
+    stock: t('sceneEditor.componentTypes.stock'),
     text: t('sceneEditor.componentTypes.text'),
     image: t('sceneEditor.componentTypes.image'),
     video: t('sceneEditor.componentTypes.video'),
@@ -669,6 +772,7 @@ function getComponentLabel(type) {
 }
 function getComponentSummary(comp) {
   const cfg = comp.config || {}
+  if (comp.type === 'stock') return cfg.symbol || ''
   if (comp.type === 'clock')     return cfg.format || 'HH:mm'
   if (comp.type === 'weather')   return cfg.city || t('sceneEditor.summaries.noCity')
   if (comp.type === 'text')      return (cfg.content || '').slice(0, 20) || t('sceneEditor.summaries.emptyText')
@@ -730,6 +834,12 @@ function selectComponent(comp) {
   editForm.width  = pos.width  ?? 30
   editForm.height = pos.height ?? 20
   editForm.config = { ...(comp.config || {}) }
+  if (comp.type === 'headlines') editForm.config = window.HomeBriefing.newsConfig(editForm.config)
+  if (comp.type === 'companion') {
+    editForm.config.reminders = {...pigDefaults,...comp.config?.reminders}
+    editForm.config.appearance ||= '2d'
+    editForm.config.look = window.HomePigLooks.get(editForm.config.look).id
+  }
 }
 
 // Real-time sync from number inputs to canvas
@@ -855,7 +965,7 @@ async function addComponent(type) {
   try {
     const res = await scenesApi.createComponent(sceneId.value, {
       type,
-      position: { x: 10, y: 10, width: 30, height: 20 },
+      position: { x: 10, y: 10, width: ['stock','headlines','companion'].includes(type) ? 60 : 30, height: ['stock','headlines'].includes(type) ? 50 : type === 'companion' ? 35 : 20 },
       config: { ...defaultConfigs.value[type] },
       style: {},
     })
@@ -870,6 +980,11 @@ async function addComponent(type) {
 
 async function applyComponentEdit() {
   if (!selectedComponent.value) return
+  if (selectedComponent.value.type === 'stock' && editForm.config.scaleMode === 'fixed' &&
+      !(Number.isFinite(editForm.config.priceMin) && Number.isFinite(editForm.config.priceMax) && editForm.config.priceMin >= 0 && editForm.config.priceMax > editForm.config.priceMin)) {
+    ElMessage.error(t('sceneEditor.stock.invalidRange'))
+    return
+  }
   const updates = {
     position: { x: editForm.x, y: editForm.y, width: editForm.width, height: editForm.height },
     config: { ...editForm.config },

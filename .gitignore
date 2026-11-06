@@ -7,6 +7,7 @@ admin/node_modules/
 admin-dist/
 .env
 .claude/skills/**/.token
+.openclaw/skills/**/.token
 .DS_Store
 .claude/
 draft.txt

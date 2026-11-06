@@ -37,6 +37,12 @@ function findEnabled() {
   });
 }
 
+function datedForDevice(device, day, prior) {
+  return new Promise((resolve,reject)=>db.all(`SELECT * FROM timed_reminders WHERE enabled=1 AND repeat='none'
+    AND start_date IN (?,?) AND EXISTS(SELECT 1 FROM json_each(device_ids) WHERE value IN (?,'all'))`,
+    [day,prior,device],(err,rows)=>err?reject(err):resolve(rows.map(parseReminder))));
+}
+
 function findActive() {
   const now = new Date();
   const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
@@ -138,4 +144,4 @@ function deleteReminder(id) {
   });
 }
 
-module.exports = { findById, findAll, findEnabled, findActive, create, update, delete: deleteReminder };
+module.exports = { findById, findAll, findEnabled, findActive, datedForDevice, create, update, delete: deleteReminder };
