@@ -137,6 +137,7 @@ module.exports = function extend(spec) {
     schemas[k].properties.config.description += '。headlines 自动轮播全部匹配资讯。keywords 为关注词数组（命中任一项），categories 可选 news、ranking 或两者，seconds 为每条停留秒数（2–600，默认 10），fontSize 为显示字号。';
     schemas[k].properties.config.description += '。companion 的玩偶和气泡常驻，自动显示提醒。支持 appearance（2d 插画或 3d 玩偶）和 look（样貌 ID，默认 peach）。省略 appearance 时显示插画，3D 渲染不可用时自动显示插画。';
     schemas[k].properties.config.description += '。companion 的 config.reminders 为 CompanionRules，在场景组件新增或修改接口保存。相同组件在所有绑定屏幕共享这些规则；播放次数按屏幕和组件分别统计。';
+    schemas[k].properties.config.description += ' config.fontSize 用于猪猪问候和提醒气泡，取 16–72 的整数（px），省略时显示为 28 px。';
   }
   spec.tags.push({
     name: '资讯与伙伴',

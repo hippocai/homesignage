@@ -32,6 +32,11 @@ async function maybeRestartWeatherScheduler(type) {
 
 async function localizeComponentConfig(type, config, previous) {
   if(type==='companion') {
+    if (config.fontSize != null && (!Number.isInteger(config.fontSize) || config.fontSize < 16 || config.fontSize > 72)) {
+      const error = new Error('猪猪气泡字号须为 16 至 72 的整数');
+      error.status = 400;
+      throw error;
+    }
     const reminders = require('../services/briefing/rules').component(config.reminders);
     if (reminders.cold && (!previous?.cold || previous.city !== reminders.city))
       await require('../services/briefing/weatherCity').resolveCity(reminders.city);

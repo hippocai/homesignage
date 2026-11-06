@@ -310,6 +310,10 @@
                   </el-option>
                 </el-select>
               </el-form-item>
+              <el-form-item label="气泡字号">
+                <el-input-number v-model="editForm.config.fontSize" aria-label="气泡字号" :min="16" :max="72" :precision="0" />
+                <span style="margin-left: 8px">px</span>
+              </el-form-item>
               <PigReminderRules :value="editForm.config.reminders" />
             </el-form>
             <el-form v-else-if="selectedComponent.type === 'stock'" label-width="100px" size="small">
@@ -676,7 +680,7 @@ const componentTypes = computed(() => [
 const defaultConfigs = computed(() => ({
   clock:     { format: 'HH:mm', showDate: true, timezone: 'Asia/Shanghai' },
   weather:   { city: 'Beijing', locationId: '', unit: 'C', refreshInterval: 1 },
-  headlines: window.HomeBriefing.newsConfig({}), companion: {appearance:'3d',look:'peach'},
+  headlines: window.HomeBriefing.newsConfig({}), companion: {appearance:'3d',look:'peach',fontSize:window.HomeBriefing.pigFontSize()},
   stock: { market: 'auto', symbol: '', title: '', scaleMode: 'auto', priceMin: 0, priceMax: 2000, scalePercent: 5, refreshInterval: 60, color: '#e2e8f0', backgroundColor: '#101b2e' },
   text:      { content: t('sceneEditor.placeholders.text'), fontSize: 24, color: '#ffffff', backgroundColor: 'transparent', textAlign: 'center' },
   image:     { url: '', objectFit: 'cover' },
@@ -838,6 +842,7 @@ function selectComponent(comp) {
   if (comp.type === 'companion') {
     editForm.config.reminders = {...pigDefaults,...comp.config?.reminders}
     editForm.config.appearance ||= '2d'
+    editForm.config.fontSize = window.HomeBriefing.pigFontSize(editForm.config.fontSize)
     editForm.config.look = window.HomePigLooks.get(editForm.config.look).id
   }
 }

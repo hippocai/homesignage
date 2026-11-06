@@ -7,6 +7,9 @@
     if (text) n.textContent = text;
     return n;
   }
+  function pigFontSize(value) {
+    return Number.isFinite(value) ? Math.max(16, Math.min(72, Math.round(value))) : 28;
+  }
   function pig(host, cfg, line, action) {
     host.textContent = '';
     var stage = node('div', 'pig-stage'),
@@ -31,8 +34,10 @@
       stage.appendChild(canvas);
       model.setPose(pose);
     } else useIllustration();
-    stage.appendChild(node('div', line ? 'pig-bubble' : 'pig-bubble pig-greeting',
-      line || root.HomePigGreetings.greeting(cfg)));
+    var bubble = node('div', line ? 'pig-bubble' : 'pig-bubble pig-greeting',
+      line || root.HomePigGreetings.greeting(cfg));
+    bubble.style.fontSize = pigFontSize(cfg.fontSize) + 'px';
+    stage.appendChild(bubble);
     host.appendChild(stage);
   }
   function newsConfig(cfg) {
@@ -143,5 +148,5 @@
     const carousel = carousels.get(host);
     if (carousel) { carousel.dispose(); carousels.delete(host); }
   }
-  root.HomeBriefing = { pig, cards, disposeCards, newsConfig };
+  root.HomeBriefing = { pig, pigFontSize, cards, disposeCards, newsConfig };
 })(typeof window === 'undefined' ? globalThis : window);

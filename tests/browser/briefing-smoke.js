@@ -193,6 +193,10 @@ async function main() {
     assert.equal(newsConfig.seconds,2);
     // A pre-existing component with no appearance can be upgraded in the editor.
     await page.locator('.preview-component').filter({has:page.locator('img.pig-portrait')}).click();
+    const fontSize = page.getByRole('spinbutton',{name:'气泡字号'});
+    await fontSize.fill('32');
+    await fontSize.blur();
+    assert.equal(await page.locator('.preview-component .pig-bubble').evaluate(el=>getComputedStyle(el).fontSize),'32px');
     await page.getByText('提醒、声音与免打扰',{exact:true}).click();
     assert.equal(await page.getByRole('checkbox',{name:'家庭事项'}).isChecked(),true);
     await page.locator('.pig-rules label.el-checkbox').filter({hasText:'降温提醒'}).click();
@@ -260,6 +264,7 @@ async function main() {
     const bubble = screen.locator('.pig-stage .pig-bubble');
     const idleBubble = screen.locator('.pig-stage .pig-greeting');
     await idleBubble.waitFor();
+    assert.equal(await idleBubble.evaluate(el=>getComputedStyle(el).fontSize),'32px');
     const portrait = screen.locator('canvas.pig-portrait');
     await portrait.waitFor();
     const pixels = () => portrait.evaluate(c => c.toDataURL());
@@ -305,6 +310,7 @@ async function main() {
       companion_targets: [device.id]
     });
     await screen.getByText(item.text, { exact: true }).waitFor({ timeout: 5000 });
+    assert.equal(await bubble.evaluate(el=>getComputedStyle(el).fontSize),'32px');
     if (process.env.BRIEFING_SCREENSHOT)
       await screen.screenshot({ path: path.resolve(process.env.BRIEFING_SCREENSHOT) });
     const alarm = await api('POST', '/reminders/emergency', {

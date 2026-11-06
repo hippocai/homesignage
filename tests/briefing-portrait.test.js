@@ -9,7 +9,7 @@ const scripts = ['pig-3d.js', 'pig-greetings.js', 'briefing.js'].map(file =>
 function setup(getContext) {
   function element(tag) {
     return {
-      tag, children: [], setAttribute: jest.fn(), getContext,
+      tag, style: {}, children: [], setAttribute: jest.fn(), getContext,
       appendChild(child) { this.children.push(child); child.parentNode = this; },
       replaceChild(child, previous) {
         this.children[this.children.indexOf(previous)] = child;
@@ -40,6 +40,7 @@ test.each([true,false,undefined])('待机时直接显示气泡，兼容旧常驻
   expect(stage.tag).toBe('div');
   expect(stage.onclick).toBeUndefined();
   expect(stage.children[1].className).toContain('pig-greeting');
+  expect(stage.children[1].style.fontSize).toBe('28px');
   expect(stage.children[1].textContent.length).toBeGreaterThan(4);
 });
 
