@@ -3,7 +3,6 @@ const {setupTestApp,getAdminToken}=require('./testApp');
 const db=require('../src/services/briefing/storage');
 const h=require('../src/services/briefing/household');
 const provider=require('../src/services/briefing/providers');
-const {onLan}=require('../src/routes/pigChat');
 let app,admin;
 const base='/api/v1/pig-chat', manage='/api/v1/companion/agent';
 beforeAll(async()=>{app=await setupTestApp();admin='Bearer '+await getAdminToken(app);});
@@ -34,17 +33,38 @@ test('将旧家庭资料生成为可编辑文档；自由文本保持原样参�
   await h.saveProfile({revision:1,profile:{memory:''}});
   expect((await h.household()).profile).toMatchObject({memory:'',route:''});
 });
-test('局域网范围按网卡网段判断；拒绝跨站、转发头、外部 Host',async()=>{
-  const nets=[{cidr:'192.168.10.5/24'},{cidr:'fdab::5/64'}];
-  for(const ip of ['127.0.0.1','::1','::ffff:192.168.10.23','fdab::18'])expect(onLan(ip,nets)).toBe(true);
-  for(const ip of ['192.168.11.23','8.8.8.8','fdac::18','garbage'])expect(onLan(ip,nets)).toBe(false);
-  await request(app).get('/pig-chat').expect(200);
-  for(const [k,v] of [['Origin','https://other.example'],['X-Forwarded-For','127.0.0.1'],['Host','evil.example']])
-    await request(app).post(base+'/session').set(k,v).send({}).expect(403);
+test('宿主机链接允许访客聊天；忽略转发 IP，拒绝跨站写入',async()=>{
+  const host='192.168.10.204:3000', origin='http://'+host;
+  const headers={Host:host,Origin:origin,'X-Forwarded-For':'203.0.113.20'};
+  await request(app).get('/pig-chat').set('Host',host).set('Sec-Fetch-Site','cross-site').expect(200);
+  await request(app).get('/pig-chat/assets/chat.js').set('Host',host).expect(200);
+  const visitor=request.agent(app);
+  await visitor.post(base+'/session').set(headers).send({}).expect(200);
+  model();
+  await visitor.post(base+'/messages').set(headers).send({requestId:'mapped',message:'你好'}).expect(200);
+  expect((await db.one('SELECT ip FROM pig_chat_audit')).ip).not.toBe(headers['X-Forwarded-For']);
+  for(const [k,v] of [['Origin','https://other.example'],['Sec-Fetch-Site','cross-site']]) {
+    await request(app).post(base+'/session').set('Host',host).set(k,v).send({}).expect(403);
+  }
+  await request(app).post(base+'/session').type('form').send({foo:'bar'}).expect(415);
   await request(app).post(base+'/messages').send({requestId:'x',message:'hi'}).expect(401);
   await request(app).get(manage+'/share').expect(401);
-  const links=(await request(app).get(manage+'/share').set('Authorization',admin).expect(200)).body.data.links;
-  expect(links[0]).toMatch(/\/pig-chat$/);
+});
+test('分享链接保留主机和映射端口，配置部署地址后优先返回指定链接',async()=>{
+  const original=process.env.PIG_CHAT_PUBLIC_ORIGIN;
+  const share=async host=>(await request(app).get(manage+'/share').set('Host',host)
+    .set('Authorization',admin).expect(200)).body.data.links;
+  try {
+    delete process.env.PIG_CHAT_PUBLIC_ORIGIN;
+    expect(await share('home.example:8300')).toEqual(['http://home.example:8300/pig-chat']);
+    process.env.PIG_CHAT_PUBLIC_ORIGIN='https://chat.example:8443';
+    expect(await share('172.17.0.2:3000')).toEqual(['https://chat.example:8443/pig-chat']);
+    await request(app).post(base+'/session').set('Host','172.17.0.2:3000')
+      .set('Origin','https://chat.example:8443').send({}).expect(200);
+  } finally {
+    if(original===undefined) delete process.env.PIG_CHAT_PUBLIC_ORIGIN;
+    else process.env.PIG_CHAT_PUBLIC_ORIGIN=original;
+  }
 });
 test('会话隔离、昵称仅作标签：相同请求号不能读到他人对话或取消他人计划',async()=>{
   const a=await guest(), b=await guest(), mock=model();

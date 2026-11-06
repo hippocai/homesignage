@@ -26,7 +26,7 @@
   let lunarClock;
   function lunarGreeting(year, month, day) {
     try {
-      lunarClock ||= new Intl.DateTimeFormat('en-US-u-ca-chinese', {timeZone:'UTC', month:'numeric', day:'numeric'});
+      if (!lunarClock) lunarClock = new Intl.DateTimeFormat('en-US-u-ca-chinese', {timeZone:'UTC', month:'numeric', day:'numeric'});
       if (lunarClock.resolvedOptions().calendar !== 'chinese') return '';
       const date = Date.UTC(year,month-1,day,12);
       // Keep the leap-month suffix so a festival is celebrated only once.
@@ -38,17 +38,18 @@
     } catch { return ''; }
   }
   function greeting(config, now = root.getServerNow ? root.getServerNow() : new Date()) {
-    const zone = config.reminders?.zone || 'Asia/Shanghai';
+    const zone = (config.reminders && config.reminders.zone) || 'Asia/Shanghai';
     if (!clocks.has(zone)) clocks.set(zone, new Intl.DateTimeFormat('en-GB', {
-      timeZone:zone, year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit', hourCycle:'h23'
+      timeZone:zone, year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit', hour12:false
     }));
     const local = Object.fromEntries(clocks.get(zone).formatToParts(now).map(p => [p.type,Number(p.value)]));
+    local.hour %= 24;
     const date = local.month * 100 + local.day;
     const lines = periods.find(([end]) => local.hour < end)[1];
     const line = lines[(Math.floor((local.hour * 60 + local.minute) / 5) + local.day) % lines.length];
     const festival = lunarGreeting(local.year,local.month,local.day) || solar[date];
     if (festival) return festival + line;
-    const holiday = holidayRanges[local.year]?.find(([from,to]) => date >= from && date <= to);
+    const holiday = (holidayRanges[local.year] || []).find(([from,to]) => date >= from && date <= to);
     if (!holiday) return line;
     const wish = holiday[2] === '清明' ? '清明假期，愿家人平安。' : holiday[2] + '假期愉快！';
     return wish + line;

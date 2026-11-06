@@ -249,18 +249,18 @@ module.exports = function extend(spec) {
   path('get','/companion/agent','家庭资料、已记计划及最近 40 次对话',obj({...household.properties,history:list(turn)}));
   path('put','/companion/agent/profile','保存家庭资料，版本变化时返回 409',household,obj({profile,revision:num},['profile','revision']));
   path('post','/companion/agent/messages','与猪猪对话，回复和计划一起保存；同一 requestId 可重试',turn,obj({message:str,requestId:str},['message','requestId']));
-  path('get','/companion/agent/share','生成当前服务器的家庭局域网聊天链接',obj({links:list(str)}));
+  path('get','/companion/agent/share','获取访客可打开的家庭聊天链接',obj({links:list(str)}));
   const recordSnapshot=obj({text:str,start:str,end:str,targets:ids});
   const systemAction=obj({id:str,type:choice('info','reminder'),op:choice('create','view','update','cancel'),
     text:str,start:str,end:str,targets:ids,receipt:str,before:recordSnapshot,after:{...recordSnapshot,nullable:true}});
   const auditRow=obj({id:num,created:num,finished:{...num,nullable:true},scope:str,actor:str,ip:str,message:str,reply:str,status:choice('pending','ok','failed'),error:str,actions:list(systemAction)});
   path('get','/companion/agent/audit','管理员查看聊天审计记录，按最新发送排序',obj({items:list(auditRow),next:{...num,nullable:true}}));
   spec.paths['/companion/agent/audit'].get.parameters.push({in:'query',name:'before',schema:num,description:'传上页 next，最多返回 30 条'});
-  path('post','/pig-chat/session','建立或恢复局域网访客会话',obj({alias:str,history:list(turn)}),null,
+  path('post','/pig-chat/session','建立或恢复聊天访客会话',obj({alias:str,history:list(turn)}),null,
     '从独立页面 /pig-chat 同源调用；响应设置 30 天 HttpOnly、SameSite=Strict 的 pig_guest Cookie，只返回本会话的最近 40 次成功对话。');
   spec.paths['/pig-chat/session'].post.security=[];
   path('post','/pig-chat/messages','访客发送消息（先审计，后调用模型）',turn,obj({message:{...str,maxLength:1600},requestId:{...str,maxLength:100},nickname:{...str,maxLength:32}},['message','requestId']),
-    '仅局域网直连。使用本会话 Cookie 可查看、原位修改或取消本会话创建的定时提示和信息。重复 requestId 返回已保存的回复。修改与取消的审计包含原 ID 与前后快照。目标不明确返回 422，并发变化返回 409。');
+    '任何能打开分享页面的人都可同源发送消息。使用本会话 Cookie 可查看、原位修改或取消本会话创建的定时提示和信息。重复 requestId 返回已保存的回复。修改与取消的审计包含原 ID 与前后快照。目标不明确返回 422，并发变化返回 409。');
   spec.components.securitySchemes.pigGuest={type:'apiKey',in:'cookie',name:'pig_guest'};
   spec.paths['/pig-chat/messages'].post.security=[{pigGuest:[]}];
   path('delete','/companion/agent/plans/{id}','取消计划并重新判断资讯影响',household);

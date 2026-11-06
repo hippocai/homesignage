@@ -77,7 +77,7 @@ var briefingRuntime = (function () {
     if (!comp || !task || (playing && priority(task) <= priority(playing.task))) return;
     claiming = true;
     var token = session;
-    req('/deliveries/' + task.id + '/claim', { edition: task.edition, componentId:comp.el.dataset?.componentId, occurrence:task.occurrence || 1 })
+    req('/deliveries/' + task.id + '/claim', { edition: task.edition, componentId:comp.el.dataset && comp.el.dataset.componentId, occurrence:task.occurrence || 1 })
       .then(function (job) {
         if (
           token !== session ||
@@ -160,7 +160,7 @@ var briefingRuntime = (function () {
   function sync() {
     if (!components.length || !deviceKey) return;
     var token = ++sequence;
-    var pig=currentPig(), hasPig=!!pig, id=pig && pig.el.dataset?.componentId;
+    var pig=currentPig(), hasPig=!!pig, id=pig && pig.el.dataset && pig.el.dataset.componentId;
     req(hasPig ? '/briefing'+(id?'?componentId='+encodeURIComponent(id):'') : '/news')
       .then(function (d) {
         if (token === sequence && pig===currentPig()) {

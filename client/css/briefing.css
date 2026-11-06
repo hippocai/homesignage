@@ -25,14 +25,13 @@
 .news-meta {
   display: flex;
   align-items: baseline;
-  gap: .7em;
   color: #42695e;
   font-size: .80em;
   white-space: nowrap;
 }
 .news-meta[hidden] { display: none; }
 .news-kind { flex: none; font-weight: 700; }
-.news-source { overflow: hidden; text-overflow: ellipsis; }
+.news-source { margin-left: .7em; overflow: hidden; text-overflow: ellipsis; }
 .news-title, .news-summary {
   display: -webkit-box;
   -webkit-box-orient: vertical;
@@ -80,6 +79,7 @@
   border-radius: 1.1em 1.1em 1.1em 0.28em;
   padding: 0.7em 0.9em;
   line-height: 1.45;
+  font: 600 18px/1.45 system-ui, sans-serif;
   font:
     600 clamp(12px, 1.7vw, 30px)/1.45 system-ui,
     sans-serif;

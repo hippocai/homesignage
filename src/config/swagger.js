@@ -8,7 +8,7 @@ const swaggerSpec = {
 
 ## 认证方式
 
-各操作的 security 字段标明所需凭据。局域网访客聊天使用服务端签发的 HttpOnly Cookie。健康检查、股票和展示用视频流可直接读取。
+各操作的 security 字段标明所需凭据。访客聊天使用服务端签发的 HttpOnly Cookie。健康检查、股票和展示用视频流可直接读取。
 
 - **JWT Token**（管理后台）：通过 \`POST /api/v1/auth/login\` 获取 Token，在请求头中携带 \`Authorization: Bearer <token>\`
 - **API Key**（外部系统集成）：在管理后台生成，在请求头中携带 \`X-API-Key: <key>\`

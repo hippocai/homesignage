@@ -1,12 +1,12 @@
 .stock-widget { display: flex; flex-direction: column; padding: 14px 16px; border-radius: 12px; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; width: 100%; height: 100%; min-width: 0; min-height: 0; }
-.stock-heading { display: flex; align-items: baseline; gap: 10px; min-height: 23px; }
+.stock-heading { display: flex; align-items: baseline; min-height: 23px; }
 .stock-name { font-size: 18px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.stock-symbol { font-size: 12px; opacity: .55; white-space: nowrap; }
+.stock-symbol { margin-left: 10px; font-size: 12px; opacity: .55; white-space: nowrap; }
 .stock-note { font-size: 11px; opacity: .6; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.stock-quote { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px 12px; padding-top: 4px; }
+.stock-quote { display: flex; align-items: baseline; flex-wrap: wrap; padding-top: 4px; }
 .stock-price { font-size: 32px; line-height: 1.2; font-variant-numeric: tabular-nums; }
-.stock-change { font-size: 15px; font-variant-numeric: tabular-nums; }
-.stock-currency { font-size: 11px; opacity: .5; }
+.stock-change { margin-left: 12px; font-size: 15px; font-variant-numeric: tabular-nums; }
+.stock-currency { margin-left: 12px; font-size: 11px; opacity: .5; }
 .stock-details { font-size: 11px; opacity: .65; margin-top: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .stock-chart { flex: 1; min-height: 45px; margin-top: 10px; }
 .stock-chart svg { display: block; width: 100%; height: 100%; overflow: hidden; }

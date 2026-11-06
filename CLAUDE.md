@@ -41,7 +41,7 @@ admin-dist/ — Vue.js 3 admin dashboard (built from admin/)
 
 **Static serving**: Admin at `/admin/*` (from `admin-dist/`), client at `/client/*`
 
-The LAN guest chat is at `/pig-chat`. News, stocks, weather and the household agent are server-side services. The agent stores household memory, plan changes and action audits in SQLite. The authoritative route inventory is served at `/api/docs.json`.
+The shared guest chat is at `/pig-chat`. News, stocks, weather and the household agent are server-side services. The agent stores household memory, plan changes and action audits in SQLite. The authoritative route inventory is served at `/api/docs.json`.
 
 ## Backend Structure (`src/`)
 

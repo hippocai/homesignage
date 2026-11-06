@@ -1,5 +1,4 @@
 const express = require('express');
-const os = require('node:os');
 const path = require('node:path');
 const {randomBytes,randomUUID,createHash} = require('node:crypto');
 const ipaddr = require('ipaddr.js');
@@ -8,52 +7,40 @@ const db = require('../services/briefing/storage');
 const agent = require('../services/briefing/household');
 const {fault} = require('../services/briefing/providers');
 
-function interfaces() {
-  return Object.entries(os.networkInterfaces()).flatMap(([name,list])=>
-    (list || []).filter(v=>!v.internal && v.cidr).map(v=>({...v,name})));
+function requestOrigin(req) {
+  const host=req.get('host');
+  if (!host || /[^a-zA-Z0-9.:_\[\]-]/.test(host)) throw fault('无效的访问地址');
+  return new URL(req.protocol+'://'+host).origin;
 }
-function address(value) {
-  try { return ipaddr.process(String(value).replace(/^\[|\]$/g,'').split('%')[0]); } catch {return null;}
+
+function configuredOrigin() {
+  if (!process.env.PIG_CHAT_PUBLIC_ORIGIN) return null;
+  const url=new URL(process.env.PIG_CHAT_PUBLIC_ORIGIN);
+  if (!['http:','https:'].includes(url.protocol) || url.href!==url.origin+'/') {
+    throw new Error('PIG_CHAT_PUBLIC_ORIGIN 必须是 HTTP(S) 站点地址');
+  }
+  return url.origin;
 }
-function onLan(value, nets=interfaces()) {
-  const peer=address(value);
-  if(!peer) return false;
-  if(peer.range()==='loopback') return true;
-  return nets.some(n=>{
-    try {
-      const [net,bits]=ipaddr.parseCIDR(n.cidr);
-      return peer.kind()===net.kind() && peer.match(net,bits) && bits>0;
-    } catch {return false;}
-  });
-}
-function localHost(host,nets) {
-  const name=host.toLowerCase(), peer=address(name);
-  return name==='localhost' || [os.hostname().toLowerCase(),os.hostname().toLowerCase()+'.local'].includes(name) ||
-    (peer && (peer.range()==='loopback' || nets.some(n=>address(n.address)?.toString()===peer.toString())));
-}
-function lanOnly(req,res,next) {
-  const nets=interfaces();
+
+function guestAccess(req,res,next) {
   res.set({'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer'});
-  let url;
-  try {url=new URL(req.protocol+'://'+req.headers.host);} catch {}
-  if(!url || !localHost(url.hostname,nets) || !onLan(req.socket.remoteAddress,nets) ||
-    ['forwarded','x-forwarded-for','x-forwarded-host','x-real-ip','cf-connecting-ip'].some(k=>k in req.headers) ||
-    (req.headers.origin && req.headers.origin!==url.origin) || req.headers['sec-fetch-site']==='cross-site' && req.headers['sec-fetch-mode']!=='navigate')
-    return res.status(403).json({error:'请连接家庭局域网，直接使用猪猪聊天链接'});
+  if (req.method==='GET' || req.method==='HEAD') return next();
+  const origin=req.get('origin'), site=req.get('sec-fetch-site');
+  if ((site && !['same-origin','none'].includes(site)) ||
+      (origin && origin!==requestOrigin(req) && origin!==configuredOrigin())) {
+    return res.status(403).json({error:'请从猪猪聊天页面发送消息'});
+  }
+  if (req.method==='POST' && !req.is('application/json')) {
+    return res.status(415).json({error:'请使用 JSON 发送消息'});
+  }
   next();
 }
+
 function shareLinks(req) {
-  const nets=interfaces(), port=req.socket.localPort;
-  const host=req.hostname.replace(/^\[|\]$/g,'');
-  const candidates=nets.filter(n=>!n.address.includes('%') && address(n.address)?.range()!=='linkLocal')
-    .sort((a,b)=>Number(b.address===host)-Number(a.address===host) ||
-      Number(/virtual|docker|wsl|vpn|vethernet/i.test(a.name))-Number(/virtual|docker|wsl|vpn|vethernet/i.test(b.name)) ||
-      Number(b.family==='IPv4')-Number(a.family==='IPv4'));
-  return [...new Set((candidates.length?candidates.map(n=>n.address):['127.0.0.1'])
-    .map(ip=>req.protocol+'://'+(ip.includes(':')?'['+ip+']':ip)+':'+port+'/pig-chat'))];
+  return [new URL('/pig-chat',configuredOrigin() || requestOrigin(req)).href];
 }
 const router=express.Router();
-router.use(['/pig-chat','/api/v1/pig-chat'],lanOnly);
+router.use(['/pig-chat','/api/v1/pig-chat'],guestAccess);
 router.get('/pig-chat',(req,res)=>res.sendFile(path.resolve(__dirname,'../../guest-chat/index.html')));
 router.use('/pig-chat/assets',express.static(path.resolve(__dirname,'../../guest-chat/assets')));
 router.use('/api/v1/pig-chat',express.json({limit:'16kb'}));
@@ -63,7 +50,7 @@ const run=fn=>async(req,res)=>{
   try {res.json({data:await fn(req,res)});}
   catch(e) {res.status(e.status || 500).json({error:e.status?e.message:'暂时无法处理这条消息'});}
 };
-const limit=(max)=>rateLimit({windowMs:60000,max,standardHeaders:true,legacyHeaders:false,message:{error:'消息太频繁，请稍后再试'}});
+const limit=(max)=>rateLimit({windowMs:60000,max,keyGenerator:req=>req.socket.remoteAddress,standardHeaders:true,legacyHeaders:false,message:{error:'消息太频繁，请稍后再试'}});
 const cookieName='pig_guest', cookiePath='/api/v1/pig-chat', lifetime=30*86400000;
 const hash=value=>createHash('sha256').update(value).digest('hex');
 async function session(req) {
@@ -87,7 +74,7 @@ scoped.post('/messages',limit(12),run(async req=>{
   const nickname=req.body?.nickname;
   if(nickname!=null && (typeof nickname!=='string' || nickname.length>32)) throw fault('称呼最多 32 个字符');
   return agent.chat(req.body,Date.now(),{scope:visitor.id,name:nickname?.trim() || '访客 '+visitor.id.slice(0,8),
-    ip:address(req.socket.remoteAddress).toString()});
+    ip:ipaddr.process(req.socket.remoteAddress).toString()});
 }));
 async function audit(query) {
   const before=query.before===undefined?Number.MAX_SAFE_INTEGER:Number(query.before);
@@ -98,4 +85,4 @@ async function audit(query) {
   for(const row of rows) row.actions=JSON.parse(row.actions || '[]');
   return {items:rows.slice(0,30),next:rows.length>30?rows[29].id:null};
 }
-module.exports={router,onLan,lanOnly,shareLinks,audit};
+module.exports={router,shareLinks,audit};

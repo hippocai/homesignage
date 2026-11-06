@@ -22,7 +22,7 @@ HomeSignage is a self-hosted digital signage system for the home. It supports mu
 
 ## Features
 
-- **News, stocks and Pig Companion** — Rotate filtered news and hot searches on screen, chart intraday quotes across mainland China, Hong Kong and US markets, and let the companion announce items that affect the household. Family members can use the LAN chat page to schedule, change and cancel their own reminders. Administrators can review the chat and action audit.
+- **News, stocks and Pig Companion** — Rotate filtered news and hot searches on screen, chart intraday quotes across mainland China, Hong Kong and US markets, and let the companion announce items that affect the household. Family members can use the shared chat page to schedule, change and cancel their own reminders. Administrators can review the chat and action audit.
 
 - **Multi-scene carousel** — Each device shows multiple scenes in rotation with fade transitions; switching is driven by the backend (epoch-clock) to eliminate client-side timer drift and black-screen issues on long-running displays
 - **Rich components** — Clock, weather, text, image, video, iframe, info list
@@ -311,7 +311,7 @@ curl -X POST http://<server>:3000/api/v1/file-repo \
 
 ### API Reference
 
-The table lists frequently used calls. Interactive OpenAPI is served at `/api/docs/` and its JSON at `/api/docs.json`. These include the news catalog and preferences, companion memory, chat audit, display receipts, stock quotes and video byte ranges. Guest chat uses a LAN session cookie at `/pig-chat`. See the [system regression procedure](docs/系统回归测试.md) for executable acceptance cases and verification limits.
+The table lists frequently used calls. Interactive OpenAPI is served at `/api/docs/` and its JSON at `/api/docs.json`. These include the news catalog and preferences, companion memory, chat audit, display receipts, stock quotes and video byte ranges. Guest chat uses a per-browser session cookie at `/pig-chat`. See the [system regression procedure](docs/系统回归测试.md) for executable acceptance cases and verification limits.
 
 | Method | Path | Description |
 |--------|------|-------------|
@@ -449,7 +449,7 @@ HomeSignage 是一个自托管的家庭数字标牌系统，支持多画面轮�
 
 ## 功能概览
 
-- **资讯、股票和猪猪伙伴**：资讯与热搜自动轮播。股票展示 A 股（含创业板）、港股和美股的最新价格与分时走势。猪猪根据家庭记忆、行程和资讯判断生活影响；家人可在局域网聊天页创建、改期、取消提醒，管理员可查看操作审计。
+- **资讯、股票和猪猪伙伴**：资讯与热搜自动轮播。股票展示 A 股（含创业板）、港股和美股的最新价格与分时走势。猪猪根据家庭记忆、行程和资讯判断生活影响；家人可在访客聊天页创建、改期、取消提醒，管理员可查看操作审计。
 
 - **多画面轮播** — 每台设备可配置多个画面按序轮播，淡入淡出切换；画面切换由后端通过纪元时钟驱动，消除客户端定时器漂移导致的闪烁和黑屏问题，长时间运行也稳定
 - **丰富组件** — 时钟、天气、文本、图片、视频、网页嵌入（iframe）、信息列表
@@ -540,7 +540,7 @@ npm start
    ```
 4. 在显示设备的浏览器中打开此链接，建议设置为**全屏 / Kiosk 模式**
 
-> **iOS/iPadOS 提示**：在 Safari 中点击「分享」→「添加到主屏幕」，即可全屏无地址栏运行。
+> **iOS/iPadOS 提示**：显示端支持 iOS / iPadOS 13 起的 Safari。更新后重新加载显示页面即可。可在 Safari 中点击「分享」→「添加到主屏幕」，即可全屏无地址栏运行。
 
 设备列表实时显示每台设备的在线状态和当前正在展示的画面（缩略图 + 名称），一眼确认所有屏幕内容是否正常。
 
@@ -745,7 +745,7 @@ curl -X POST http://<server>:3000/api/v1/file-repo \
 
 ### 完整 API 列表
 
-完整接口以运行中的 `/api/docs/` 和 `/api/docs.json` 为准。下面列常用调用。股票使用 `/api/v1/stocks`，资讯订阅和话题偏好在 `/api/v1/news` 下，家庭记忆和审计在 `/api/v1/companion/agent` 下。局域网聊天入口为 `/pig-chat`，使用独立访客 Cookie。全系统的准备步骤、逐项用例、通过条件和实测范围见[系统回归测试](docs/系统回归测试.md)。
+完整接口以运行中的 `/api/docs/` 和 `/api/docs.json` 为准。下面列常用调用。股票使用 `/api/v1/stocks`，资讯订阅和话题偏好在 `/api/v1/news` 下，家庭记忆和审计在 `/api/v1/companion/agent` 下。访客聊天入口为 `/pig-chat`，使用独立访客 Cookie。全系统的准备步骤、逐项用例、通过条件和实测范围见[系统回归测试](docs/系统回归测试.md)。
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
@@ -868,13 +868,13 @@ npm test
 
 打开「猪猪伙伴 → 家庭记忆」，像写 MEMORY.md 一样用自由文本记录任何想让助手记住的事，最多 12,000 个字符。原先的家庭人数、地址和路线会自动整理到文档里；家庭时区单独设置。记忆供全家聊天与资讯影响判断共同使用，连同必要的对话与计划发送给「资讯 → 模型设置」选定的 GLM 或 DeepSeek。
 
-管理页顶部提供「家庭聊天链接」，可以复制给连上家里网络的人；如果服务器有多个网卡，可选择与家人设备同网段的地址。访客从独立页面 `/pig-chat` 聊天，不需要后台账号。可选填称呼，也可直接发消息，如“下个月 12 日坐 MU5123 从上海虹桥去北京”。同一浏览器保留 30 天会话，刷新可看到自己的最近 40 次成功对话；其他访客看不到这些聊天或修改你的计划。管理员仍可在后台管理全家的计划。聊天入口要求直连服务器，不接受反向代理的转发头。
+管理页顶部提供「家庭聊天链接」，任何能打开这个链接的人都可以聊天。默认使用访问后台时的主机和端口；在 Docker 环境可通过 `PIG_CHAT_PUBLIC_ORIGIN=http://192.168.10.204:3000` 指定分享地址。访客从独立页面 `/pig-chat` 聊天，不需要后台账号。可选填称呼，也可直接发消息，如“下个月 12 日坐 MU5123 从上海虹桥去北京”。同一浏览器保留 30 天会话，刷新可看到自己的最近 40 次成功对话；其他访客看不到这些聊天或修改你的计划。管理员仍可在后台管理全家的计划。聊天页面同源提交消息，审计记录服务器实际连接的对端地址。
 
 「猪猪伙伴 → 聊天审计」仅管理员可访问。后台和访客的有效发送都会先在本机数据库记录，再调用模型；保留发送时间、来源 IP、自填称呼或后台用户名、会话、原文、回复和处理结果。记录按时间倒序分页，模型失败和重试也留痕；升级前的成功对话标作“历史后台”，不补造来源地址。访客称呼不是实名验证。
 
 打开「画面编辑器」，选中猪猪组件，展开「提醒、声音与免打扰」，修改后点击「应用更改」。同一场景投放到多个屏幕时共用组件设置；同一屏幕上的不同场景可以有不同规则。旧猪猪首次升级会从已绑定设备的规则迁移；若同一场景绑定了多个规则不同的设备，优先启用的绑定，再按播放顺序和设备 ID 选择一套。提醒播放次数按屏幕及组件分别计算。封路等持续影响默认间隔 60 分钟，最多 3 次（含首次）；设为 1 次关闭重复。
 
-后台或局域网聊天都可请猪猪创建系统记录。“明早八点提醒我准备出门去机场”会创建一次性定时提示，默认显示 5 分钟。“今晚 18:00 至 23:00 在信息列表提示给特斯拉充电”会创建这段时间有效的家庭信息。
+后台或访客聊天都可请猪猪创建系统记录。“明早八点提醒我准备出门去机场”会创建一次性定时提示，默认显示 5 分钟。“今晚 18:00 至 23:00 在信息列表提示给特斯拉充电”会创建这段时间有效的家庭信息。
 
 在同一段聊天里说“查看我的提醒和信息列表”，可以看到记录编号和按家庭时区显示的时间。说“航班改了，明早去机场的提醒推迟半小时”，猪猪会保留原编号和时长，把 08:00–08:05 调整到 08:30–08:35。也可以说“把充电信息的正文改成‘拔掉充电枪’”或“取消去机场的提醒”。同名记录可用清单中的短编号指定，如“取消提醒 #12ab34cd”。后台的聊天审计保留操作类型、原编号以及修改前后的内容和时间。每个访客会话只管理自己创建的记录。
 

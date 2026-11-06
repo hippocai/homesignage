@@ -9,7 +9,7 @@ async function call(endpoint,body) {
   return json.data;
 }
 function render() {
-  const box=el('history');box.replaceChildren();
+  const box=el('history');box.textContent='';
   if(!turns.length) {
     const empty=document.createElement('p');empty.className='empty';empty.textContent='还没有对话。可以告诉我家里的安排，或问一条资讯是否会影响你。';box.append(empty);
   }
@@ -32,12 +32,12 @@ async function openSession(){
 try{el('nickname').value=localStorage.getItem('pig-chat.nickname') || '';}catch{}
 el('message').addEventListener('input',button);
 el('message').addEventListener('keydown',e=>{
-  if(e.key==='Enter' && !e.shiftKey && !e.isComposing && e.keyCode!==229) {e.preventDefault();el('composer').requestSubmit();}
+  if(e.key==='Enter' && !e.shiftKey && !e.isComposing && e.keyCode!==229) {e.preventDefault();el('send').click();}
 });
 el('composer').addEventListener('submit',async e=>{
   e.preventDefault();const message=el('message').value.trim(),nickname=el('nickname').value.trim();
   if(!ready || busy || !message)return;
-  if(retry?.message!==message) {
+  if(!retry || retry.message!==message) {
     const bytes=crypto.getRandomValues(new Uint8Array(16));
     retry={requestId:Array.from(bytes,x=>x.toString(16).padStart(2,'0')).join(''),message};
   }

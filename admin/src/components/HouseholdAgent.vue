@@ -2,9 +2,8 @@
   <el-card class="agent">
     <h3>猪猪家庭助手</h3>
     <el-alert v-if="error" :title="error" type="error" @close="error=''" />
-    <div v-if="links.length" class="share">
-      <b>家庭聊天链接</b><small>家人连上家里的网络就能打开，无需后台账号。</small>
-      <select v-if="links.length>1" v-model="shareUrl" aria-label="选择本机网络地址"><option v-for="link in links" :key="link">{{link}}</option></select>
+    <div v-if="shareUrl" class="share">
+      <b>家庭聊天链接</b><small>任何能打开此链接的人都可以聊天，无需后台账号。</small>
       <div><a :href="shareUrl" target="_blank" rel="noopener">{{shareUrl}}</a>
         <el-button link @click="copyLink">复制链接</el-button></div>
     </div>
@@ -38,7 +37,7 @@
         </el-form>
       </el-tab-pane>
       <el-tab-pane label="聊天审计" name="audit">
-        <p>记录后台和局域网访客的每次发送。访客称呼由本人填写，会话编号用于区分浏览器。</p>
+        <p>记录后台和聊天访客的每次发送。访客称呼由本人填写，会话编号用于区分浏览器。</p>
         <el-button @click="loadAudit(false)">刷新记录</el-button>
         <p v-if="!auditRows.length">暂无聊天记录。</p>
         <article v-for="row in auditRows" :key="row.id" class="audit">
@@ -72,9 +71,9 @@ import api from '../api/index.js';
 const tab=ref('chat'), ready=ref(false), busy=ref(false), error=ref(''), draft=ref('');
 const form=ref({}), revision=ref(0), plans=ref([]), turns=ref([]), impacts=ref([]), thread=ref(null);
 const impactStatus=ref('');
-const links=ref([]),shareUrl=ref(''),auditRows=ref([]),auditNext=ref(null);
+const shareUrl=ref(''),auditRows=ref([]),auditNext=ref(null);
 async function loadLinks() {
-  links.value=(await api.get('/companion/agent/share')).data.data.links;shareUrl.value=links.value[0];
+  shareUrl.value=(await api.get('/companion/agent/share')).data.data.links[0];
 }
 async function copyLink() {
   try { await navigator.clipboard.writeText(shareUrl.value); ElMessage.success('链接已复制'); }

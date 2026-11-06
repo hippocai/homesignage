@@ -14,8 +14,9 @@ jobs:
       - run: npm ci
       - run: npm --prefix admin ci && npm --prefix admin run build
       - run: npm test
-      - run: npx playwright-core install --with-deps chromium
+      - run: npx playwright-core install --with-deps chromium webkit
       - run: npm run test:browser
+      - run: npm run test:webkit
   container:
     runs-on: ubuntu-24.04
     timeout-minutes: 25
