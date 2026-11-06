@@ -213,7 +213,63 @@ test('来源地区和关注词支持同义表达，设备上多个资讯组件�
     expect(model).toHaveBeenCalledTimes(3);
   } finally { await db.run("DELETE FROM components WHERE id IN ('commute','sports')"); }
 });
-test('同一设备可领取三类提醒，关闭某类立即停止该类，资讯卡仍可读', async () => {
+test('热搜按事件轮播，排名变化不改版本，全新链接的升级与解除更新同一张卡片',async()=>{
+  const id=await api.saveSource({type:'ranking',name:'测试热榜',url:'https://example.org/rank'});
+  const article=(ref,title,rank)=>make({ref,url:'https://example.org/'+ref,title,excerpt:title,rank});
+  const yellow=article('yellow','北京发布暴雪黄色预警',1), snow=article('snow','华北本轮降雪时段公布',2);
+  const other=article('other','南方台风登陆',3);
+  const cfg=JSON.parse((await db.one('SELECT config FROM briefing_sources WHERE id=?',id)).config);
+  await api.record(id,cfg,yellow,rules.defaults); // pre-upgrade card
+  const collect=jest.spyOn(providers,'collect').mockResolvedValue({articles:[yellow,snow,other]});
+  jest.spyOn(providers,'credential').mockResolvedValue('fixture');
+  const model=jest.spyOn(providers,'jsonCompletion').mockResolvedValueOnce({tokens:30,data:{groups:[
+    {members:[0,1],lead:0,prior:null,change:false}
+  ]}});
+  expect(await api.scan(id)).toMatchObject({count:3,eventCount:2});
+  const initial=(await display('get','/news')).body.data.cards;
+  expect(initial.map(e=>e.payload.title).sort()).toEqual([yellow.title,other.title].sort());
+  const card=initial.find(e=>e.payload.title===yellow.title);
+  collect.mockResolvedValue({articles:[other,{...snow,rank:9},{...yellow,rank:4}]});
+  await api.scan(id);
+  const repeat=(await api.newsCards('hall')).find(e=>e.id===card.id);
+  expect(repeat).toMatchObject({version:1,edition:1,updated:card.updated,payload:{rank:4,title:yellow.title}});
+  expect(model).toHaveBeenCalledTimes(1);
+  for (const [index,headline] of ['北京暴雪升级为橙色预警','北京市解除暴雪预警'].entries()) {
+    const latest=article('change'+index,headline,1);
+    collect.mockResolvedValue({articles:[latest]});
+    model.mockImplementationOnce(async(s,m)=>{
+      const previous=JSON.parse(m[1].content).previous;
+      const prior=previous.findIndex(([title])=>title.includes('暴雪'));
+      return {tokens:31,data:{groups:[{members:[0],lead:0,prior,change:true}]}};
+    });
+    expect(await api.scan(id)).toMatchObject({count:1,eventCount:1});
+    expect(await api.newsCards('hall')).toMatchObject([{id:card.id,version:index+2,edition:index+2,payload:{title:headline}}]);
+  }
+  const evidence=(await admin('get','/news/events/'+card.id)).body.data.evidence;
+  expect(evidence.map(a=>a.ref).sort()).toEqual(['change0','change1','snow','yellow']);
+});
+test('事件归并回复无效时保留已知关联，新条目单列；同一批数据恢复后可重试，重复报道保留原公告',async()=>{
+  const id=await api.saveSource({type:'ranking',name:'榜单',url:'https://example.org/ranking'});
+  const cold=make({title:'北京暴雪黄色预警',rank:1}), second=make({ref:'b',url:'https://example.org/b',title:'华北大雪',rank:2});
+  const collect=jest.spyOn(providers,'collect').mockResolvedValue({articles:[cold,second]});
+  jest.spyOn(providers,'credential').mockResolvedValue('fixture');
+  const model=jest.spyOn(providers,'jsonCompletion').mockResolvedValueOnce({tokens:5,data:{groups:[{members:[0,1],lead:0,prior:null,change:false}]}});
+  await api.scan(id);
+  const [original]=await api.newsCards('hall');
+  const follow=make({ref:'c',url:'https://example.org/c',title:'北京发布地区降雪提醒',rank:3});
+  collect.mockResolvedValue({articles:[cold,second,follow]});
+  model.mockResolvedValueOnce({tokens:5,data:{groups:[{members:[0,0],lead:0,prior:0,change:true}]}});
+  expect(await api.scan(id)).toMatchObject({eventCount:2,groupFallback:expect.any(String)});
+  model.mockImplementationOnce(async(s,m)=>({tokens:9,data:{groups:[{
+    members:[0,1,2],lead:2,prior:JSON.parse(m[1].content).previous.findIndex(([title])=>title===cold.title),change:false
+  }]}}));
+  expect(await api.scan(id)).toMatchObject({eventCount:1});
+  expect(await api.newsCards('hall')).toMatchObject([{id:original.id,version:1,payload:{title:cold.title}}]);
+  await api.review(original.id,{version:1,action:'withdraw'});
+  expect(await api.scan(id)).toMatchObject({count:0,eventCount:0});
+  expect(await api.newsCards('hall')).toEqual([]);
+});
+test('同一设备可领取三类提醒，关闭或开启设备提醒不影响资讯列表', async () => {
   const now = Date.parse('2026-11-05T00:00:00Z');
   const d = {...await api.prefs('hall'),cold:true,city:'北京'};
   await savePrefs('hall', d);

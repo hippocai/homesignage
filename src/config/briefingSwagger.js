@@ -218,7 +218,8 @@ module.exports = function extend(spec) {
   path('delete', '/news/sources/{id}', '移除订阅，保留已发布事件', num);
   path('post', '/news/sources/{id}/test', '试采集最多三条，不创建事件', list(article));
   path('post', '/news/sources/{id}/scan', '立即采集并处理', obj({ count: num, received:num, unchanged:bool,
-    topicFallback:{...str,description:'本次有条目使用关键词回退时给出原因'} }));
+    topicFallback:{...str,description:'本次有条目使用关键词回退时给出原因'},
+    eventCount:{...num,description:'热搜命中条目合并后用于轮播的事件数'},groupFallback:{...str,description:'模型归并不可用时的原因；已知关联沿用，新条目单列'} }));
   path('get', '/news/events', '按更新时间列出最近一页事件', list(event));
   spec.paths['/news/events'].get.parameters.push(
     { name: 'scope', in: 'query', schema: choice('news'), description: '资讯管理页仅显示新闻和榜单' },

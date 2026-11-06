@@ -90,6 +90,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS one_companion_per_scene ON components(scene_id
 const exec = (sql) => new Promise((resolve, reject) => db.exec(sql, (e) => (e ? reject(e) : resolve())));
 async function init() {
   await exec(schema);
+  await exec(require('./ranking-schema'));
   if (!(await all('PRAGMA table_info(briefing_sources)')).some(c=>c.name==='topic_policy')) {
     await run('ALTER TABLE briefing_sources ADD COLUMN topic_policy TEXT');
   }

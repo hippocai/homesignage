@@ -3,6 +3,7 @@ const db = require('./storage');
 const p = require('./providers');
 const rules = require('./rules');
 const topics = require('./topics');
+const rankingStories = require('./ranking-stories');
 const settingsDao = require('../../dao/settingsDao');
 const sockets = require('../socketService');
 const hour = 3600000;
@@ -106,7 +107,12 @@ async function topicItems(items, opts, articleOf) {
   return topics.filter(items, articleOf, opts, topics.preferences(opts), a=>rules.topicMatches(opts,a), generate);
 }
 async function filterEvents(events, opts) {
-  return (await topicItems(events,opts,e=>e.payload)).items;
+  if (!events.some(e=>e.payload.rankingMembers?.length))
+    return (await topicItems(events,opts,e=>e.payload)).items;
+  const entries = events.flatMap(e=>(e.payload.rankingMembers || [e.payload]).map(article=>({event:e,article})));
+  const matches = (await topicItems(entries,opts,item=>item.article)).items;
+  const visible = new Set(matches.map(item=>item.event.id));
+  return events.filter(e=>visible.has(e.id));
 }
 async function selectArticles(articles, s, opts, now, report) {
   const recent = articles.filter(a=>rules.timely(a,now));
@@ -259,7 +265,7 @@ async function scan(id, preview = false) {
     const opts = await settings();
     if (cfg.type === 'brave') await reserve('brave', opts.braveCalls, 0, 0);
     const policyKey = topics.signature(opts,[topics.preferences(opts),topics.sourcePolicy(cfg)]);
-    const result = await p.collect(cfg, preview || policyKey !== row.topic_policy ? {} : row).catch(error => {
+    const result = await p.collect(cfg, preview || cfg.type==='ranking' || policyKey !== row.topic_policy ? {} : row).catch(error => {
       const reason = p.networkIssue(error) || (error instanceof SyntaxError ? '来源返回的数据格式无效' : '');
       if (reason) throw p.fault(cfg.name + '：' + reason + '，请稍后再试', 502);
       throw error;
@@ -268,10 +274,23 @@ async function scan(id, preview = false) {
     const report = {};
     const matches = await selectArticles(result.articles,cfg,opts,now,report);
     const selected = cfg.type === 'zaobao' ? matches.slice(0, 12) : matches;
-    if (preview) return selected.slice(0, 3);
     let count = 0;
-    for (const a of selected) {
-      if (await record(id, cfg, a, opts, now, report)) count++;
+    let ranking = {};
+    if (cfg.type==='ranking' && !result.unchanged) {
+      const stories = await rankingStories.prepare(id,cfg,opts,policyKey,selected,now,generate);
+      if (preview) return stories.groups.slice(0,3).map(({payload:a})=>({
+        ref:a.url,title:a.title,url:a.url,excerpt:a.excerpt,time:a.time,rank:a.rank
+      }));
+      await rankingStories.save(id,cfg,policyKey,now,stories);
+      count = stories.count;
+      ranking = {eventCount:stories.groups.length,
+        ...(stories.fallback ? {groupFallback:stories.fallback} : {})};
+      notify(cfg.targets);
+    } else {
+      if (preview) return selected.slice(0, 3);
+      for (const a of selected) {
+        if (await record(id, cfg, a, opts, now, report)) count++;
+      }
     }
     await db.run(
       'UPDATE briefing_sources SET last_ok=?,error=NULL,due=?,etag=?,modified=?,topic_policy=? WHERE id=?',
@@ -282,7 +301,7 @@ async function scan(id, preview = false) {
       report.fallback ? null : policyKey,
       id
     );
-    return { count, received:result.articles.length, unchanged:!!result.unchanged,
+    return { count, received:result.articles.length, unchanged:!!result.unchanged,...ranking,
       ...(report.fallback ? {topicFallback:report.fallback} : {}) };
   } catch (e) {
     if (!preview)

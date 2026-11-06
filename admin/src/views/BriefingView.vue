@@ -304,8 +304,11 @@ async function scan(row, op) {
     sampleVisible.value = true;
   } else {
     const message = r.unchanged ? row.name + '：来源内容未更新' :
-      row.name + '：读取 ' + r.received + ' 条，通过筛选并处理 ' + r.count + ' 条';
-    if (r.topicFallback) ElMessage.warning(message + '。部分或全部条目使用关键词匹配（' + r.topicFallback + '）');
+      row.name + '：读取 ' + r.received + ' 条，通过筛选并处理 ' + r.count + ' 条' +
+        (r.eventCount == null ? '' : '，轮播 ' + r.eventCount + ' 个事件');
+    const warnings = [r.topicFallback && '使用关键词匹配（' + r.topicFallback + '）',
+      r.groupFallback && '沿用已有分组，新热搜单独展示（' + r.groupFallback + '）'].filter(Boolean);
+    if (warnings.length) ElMessage.warning(message + '。' + warnings.join('；'));
     else ElMessage.success(message);
     await loadEvents();
   }
