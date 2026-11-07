@@ -266,7 +266,7 @@ module.exports = function extend(spec) {
     '从独立页面 /pig-chat 同源调用；响应设置 30 天 HttpOnly、SameSite=Strict 的 pig_guest Cookie，只返回本会话的最近 40 次成功对话。');
   spec.paths['/pig-chat/session'].post.security=[];
   path('post','/pig-chat/messages','访客发送消息（先审计，后调用模型）',turn,obj({message:{...str,maxLength:1600},requestId:{...str,maxLength:100},nickname:{...str,maxLength:32}},['message','requestId']),
-    '任何能打开分享页面的人都可同源发送消息。使用本会话 Cookie 可查看、原位修改或取消本会话创建的定时提示和信息。重复 requestId 返回已保存的回复。修改与取消的审计包含原 ID 与前后快照。目标不明确返回 422，并发变化返回 409。');
+    '任何能打开分享页面的人都可同源发送消息。使用本会话 Cookie 可查看、原位修改或取消本会话创建的定时提示和信息。重复 requestId 返回已保存的回复。修改与取消的审计包含原 ID 与前后快照。“刚才那条”仅在近期操作唯一指向一条当前自建记录时可执行；正文引号内的“取消”“删除”作为内容保存。明确保持开始或结束时间时仅修改另一端。查询具体主题无匹配返回空结果。目标不明确返回 422，并发变化返回 409，模型连接失败最多重试一次。');
   spec.components.securitySchemes.pigGuest={type:'apiKey',in:'cookie',name:'pig_guest'};
   spec.paths['/pig-chat/messages'].post.security=[{pigGuest:[]}];
   path('delete','/companion/agent/plans/{id}','取消计划并重新判断资讯影响',household);

@@ -339,11 +339,18 @@ async function jsonCompletion(settings, messages, maxTokens) {
   const body = {model: settings.model || defaultModel, max_tokens:maxTokens,
     response_format:{type:'json_object'}, messages};
   if (settings.provider === 'glm') body.thinking = { type: 'disabled' };
-  const b = await remote(url, {
-    method: 'POST',
-    headers: { Authorization: 'Bearer ' + key, 'Content-Type': 'application/json' },
-    body: JSON.stringify(body)
-  });
+  let b;
+  try {
+    b = await remote(url, {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + key, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+  } catch (error) {
+    const issue=networkIssue(error);
+    if(issue) throw Object.assign(fault('模型'+issue+'，请稍后重试',502),{code:'MODEL_UNAVAILABLE'});
+    throw error;
+  }
   try {
     return {data:JSON.parse(b.choices[0].message.content), tokens:Number(b.usage?.total_tokens) || 0};
   } catch {

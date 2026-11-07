@@ -1,5 +1,8 @@
 const db=require('./storage');
 const {fault}=require('./providers');
+function instructionText(message) {
+  return message.replace(/[“「‘"][^”」’"]*[”」’"]/g,' ');
+}
 
 function mentionedKind(message) {
   const reminder=/提醒|定时|闹钟/i.test(message);
@@ -8,6 +11,7 @@ function mentionedKind(message) {
   return reminder?'reminder':'info';
 }
 function requestMode(message) {
+  message=instructionText(message);
   const records=mentionedKind(message) || /提示|这条|那条|这项|那项|刚才的|#\w+|reminder|notice/i.test(message);
   if(/^(?:假设|举例|怎么操作|如何|怎么才能)|(?:能否|是否可以).*(?:修改|取消)/.test(message)) return null;
   if(/(?:不要|别|不用|无需|不必)\s*(?:取消|删除|修改|调整|推迟)/.test(message)) return 'view';
@@ -68,10 +72,17 @@ function wordMatches(rows,text) {
   const hits=rows.filter(row=>terms.some(term=>Array.from({length:term.length-1},(_,i)=>term.slice(i,i+2)).some(word=>row.text.includes(word))));
   return hits;
 }
-function select(rows,action,message,now,zone) {
+async function recentIds(scope) {
+  const last=await db.one("SELECT actions FROM pig_conversation WHERE scope=? ORDER BY rowid DESC LIMIT 1",scope);
+  return last?JSON.parse(last.actions).map(a=>a.id):[];
+}
+function select(rows,action,message,now,zone,recent=[]) {
   let matches=forQuery(rows,message,now,zone).filter(r=>r.type===action.type);
   const proposed=typeof action.selector==='string'?action.selector.trim():'';
-  const selector=message.includes(proposed) && !/^(?:这条|那条|定时提示|提醒|信息|信息列表|留言)$/.test(proposed)?proposed:'';
+  const selector=message.includes(proposed) && !/^(?:(?:刚才|刚刚|上一条|最后)(?:的|那条|这条)?|这条|那条|定时提示|提醒|信息|信息列表|留言)$/.test(proposed)?proposed:'';
+  if(!selector && !message.includes('#') && /刚才|刚刚|这条|那条|上一条|最后一条/.test(instructionText(message))) {
+    matches=matches.filter(r=>recent.includes(r.id));
+  }
   if(selector) {
     const narrowed=matches.filter(row=>row.text.includes(selector));
     if(narrowed.length) matches=narrowed;
@@ -89,11 +100,17 @@ function select(rows,action,message,now,zone) {
   }
   return matches[0];
 }
-function list(rows,message,now,zone) {
-  const candidates=forQuery(rows,message,now,zone);
+function list(rows,message,now,zone,recent=[]) {
+  let candidates=forQuery(rows,message,now,zone);
+  if(/刚才|刚刚|这条|那条|上一条|最后一条/.test(message))
+    candidates=candidates.filter(r=>recent.includes(r.id));
+  const description=message.replace(/#[0-9a-f-]+/gi,' ')
+    .replace(/(?:\d{1,2}[:：]\d\d|[\d一二两三四五六七八九十]+点(?:半)?)/g,' ')
+    .replace(/定时提示|信息列表|定时提醒|提醒|提示|留言|公告|信息|消息|查看|查询|查查|看一下|看看|列出|列一下|哪些|有什么|几条|多少条|查一下|显示一下|什么时候|是几点|什么时间|什么内容|所有|全部|刚才|刚刚|上一条|最后一条|那条|这条|明早|明天|明晚|今晚|今天|后天|我创建的|我设置的|我建过的|自己创建的|创建过|创建的|设置的|我的|帮我|的|和/g,' ')
+    .match(/[\p{L}\d]{2,}/gu) || [];
   const matching=wordMatches(candidates,message);
-  const items=matching.length?matching:candidates;
+  const items=description.length?matching:candidates;
   const reply=items.length?'共 '+items.length+' 条（'+zone+'）\n'+items.map(r=>display(r,zone)).join('\n'):'当前没有符合条件的自建提醒或信息。';
   return {reply,actions:items.map(row=>({...row,op:'view'}))};
 }
-module.exports={requestMode,owned,display,select,list};
+module.exports={requestMode,owned,display,select,list,recentIds,instructionText};

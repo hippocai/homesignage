@@ -7,6 +7,7 @@ const socket=require('../socketService');
 const records=require('./owned-records');
 // Only a household conversation can propose writes; news/background analysis has no tools.
 function intent(message) {
+  message=records.instructionText(message);
   if(/(?:不要|不用|不必|别再|无需|不需要|暂不).{0,12}(?:提醒|设置|创建|添加|发布|安排)|^(?:假如|假设|举例|如何|怎么设置)|只是问|do not (?:set|schedule)|don't remind/i.test(message)) return false;
   return /提醒|定时|闹钟|出门|出发|去机场|赶飞机|信息列表|留言|公告|充电|请记得|别忘|点钟|\d\s*[:：点时]|[一二三四五六七八九十两]点|remind|schedule|notice|airport/i.test(message);
 }
@@ -59,31 +60,42 @@ function minuteShift(message) {
   return amount*(hit[3]==='小时'?60:1)*(/提前|提早|往前|缩短/.test(hit[1])?-1:1);
 }
 function changeExisting(proposal,message,now,zone,context) {
-  const old=records.select(context.rows,proposal,message,now,zone);
+  const old=records.select(context.rows,proposal,message,now,zone,context.recent);
   const before={text:old.text,start:old.start,end:old.end,targets:old.targets};
   const action={...old,op:context.mode,before};
   if(context.mode==='cancel') {
     return {...action,after:null,receipt:'已取消 '+records.display(old,zone)};
   }
   if(old.type==='reminder' && old.repeat!=='none') throw fault('这条提示已改为重复任务，请在定时提示页面修改。',422);
-  const timingInstruction=message.replace(/[“「‘"][^”」’"]*[”」’"]/g,'');
+  const timingInstruction=records.instructionText(message);
+  const startUnchanged=/(?:开始|起始)(?:时间)?(?:保持)?(?:不变|原样)/.test(timingInstruction);
+  const endUnchanged=/结束(?:时间)?(?:保持)?(?:不变|原样)/.test(timingInstruction);
+  const allTimesUnchanged=/(?:时间|时段)(?:保持)?(?:不变|原样)/.test(
+    timingInstruction.replace(/(?:开始|起始|结束)(?:时间)?(?:保持)?(?:不变|原样)/g,''));
   const shift=minuteShift(timingInstruction);
   let start=old.start, end=old.end;
   const textRequest=/正文|文案|内容|文字|改成[“‘「"]/.test(message);
   const timeRequest=/时间|时段|推迟|提前|延后|顺延|延长|缩短|明天|后天|明早|明晚|[\d一二两三四五六七八九十]\s*[:：点时]/.test(timingInstruction) &&
-    !/(?:时间|时段)(?:保持)?不变/.test(timingInstruction);
+    !allTimesUnchanged;
   if(shift!==null) {
     if(!start || !end) throw fault('原记录没有完整时段，请提供新的开始和结束时间',422);
     const endOnly=/结束.{0,5}(推迟|延后|提前)|延长|缩短/.test(message);
-    if(!endOnly) start=local(Date.parse(start)+shift*60000);
-    if(!/结束(?:时间)?不变/.test(message)) end=local(Date.parse(end)+shift*60000);
+    if(!endOnly && !startUnchanged) start=local(Date.parse(start)+shift*60000);
+    if(!endUnchanged) end=local(Date.parse(end)+shift*60000);
   } else if(timeRequest && (proposal.start || proposal.end)) {
-    if(proposal.start) {
-      const next=instant(proposal.start);
-      if(!proposal.end && old.start && old.end) end=local(next+Date.parse(old.end)-Date.parse(old.start));
+    const destination=timingInstruction.split(/改到|改为|改成|更改为|调整到|调整为|设为|设到/).slice(1).join(' ');
+    const days=relativeDays(destination), day=days.length===1?days[0]:undefined;
+    const evening=/(?:晚上|下午|傍晚|明晚|今晚)/.test(destination);
+    if(proposal.start && !startUnchanged) {
+      const next=groundTime(instant(proposal.start),now,zone,day,evening);
+      if(!proposal.end && !endUnchanged && old.start && old.end) end=local(next+Date.parse(old.end)-Date.parse(old.start));
       start=local(next);
     }
-    if(proposal.end) end=local(instant(proposal.end));
+    if(proposal.end && !endUnchanged) {
+      const rawEnd=instant(proposal.end);
+      const cross=proposal.start && parts(rawEnd,zone).hour<parts(instant(proposal.start),zone).hour;
+      end=local(groundTime(rawEnd,now,zone,day,evening && !cross,cross?1:0));
+    }
   }
   const rescheduling=shift!==null || timeRequest && Boolean(proposal.start || proposal.end);
   const text=proposal.text==null || rescheduling && !textRequest?old.text:proposal.text;
@@ -102,7 +114,14 @@ async function prepare(proposals,message,now,zone,context={mode:null,rows:[]}) {
   if(!Array.isArray(proposals) || proposals.length>4) throw fault('单次最多创建四项提醒或信息',422);
   if(proposals.length && !context.mode && !intent(message)) throw fault('请说明要创建的提醒或信息',422);
   const actions=[];
-  for(const a of proposals) {
+  for(const proposed of proposals) {
+    let a=proposed;
+    // Existing IDs already have an authoritative type. GLM may omit that redundant field.
+    if(a && a.type==null && context.mode && typeof a.id==='string') {
+      const id=a.id.replace(/^#/,'');
+      const found=context.rows.filter(row=>id.length>=8 && row.id.startsWith(id));
+      if(found.length===1) a={...a,type:found[0].type};
+    }
     if(!a || !['reminder','info'].includes(a.type) ||
       typeof a.basis!=='string' || a.basis.trim().length<2 || !message.includes(a.basis)) throw fault('操作缺少本条消息中的依据，未创建',422);
     if(context.mode) {

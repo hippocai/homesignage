@@ -116,6 +116,12 @@ describe('模型与第三方失败', () => {
     if (key === undefined) delete process.env.GLM_API_KEY;
     else process.env.GLM_API_KEY = key;
   });
+  test('模型网络断连转换为可重试的502，错误不暴露密钥或内部地址',async()=>{
+    global.fetch=jest.fn().mockRejectedValue(Object.assign(new Error('fetch failed'),{cause:{code:'ECONNRESET'}}));
+    await expect(p.jsonCompletion(opts,[{role:'user',content:'测试'}],1000)).rejects.toMatchObject({
+      status:502,code:'MODEL_UNAVAILABLE',message:'模型与来源的连接失败，请稍后重试'
+    });
+  });
   test.each(['not json', JSON.stringify({ summary: '编造的时间' }), '{}'])(
     '拒绝无依据或无效回答 %s',
     (content) => {
