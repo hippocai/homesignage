@@ -10,6 +10,12 @@
 
   function number(value) { return typeof value === 'number' && isFinite(value); }
   function price(value) { return number(value) ? value.toFixed(Math.abs(value) < 1 ? 4 : 2) : '--'; }
+  function refreshTime() {
+    var date = new Date();
+    function pad(value) { return value < 10 ? '0' + value : String(value); }
+    return date.getFullYear() + '-' + pad(date.getMonth() + 1) + '-' + pad(date.getDate()) + ' ' +
+      pad(date.getHours()) + ':' + pad(date.getMinutes()) + ':' + pad(date.getSeconds());
+  }
   function escape(value) { return String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;'); }
 
   function getScale(data, config) {
@@ -116,6 +122,7 @@
   function mount(element, config, options) {
     options = options || {};
     var disposed = false, timer = null, xhr = null;
+    var refreshSeconds = Math.max(30, Math.min(3600, Number(config.refreshInterval) || 60));
     var lastData = readCache(cacheKey(config));
     var clipId = 'stock-clip-' + (++nextId);
     element.classList.add('stock-widget');
@@ -124,7 +131,7 @@
     element.innerHTML = '<div class="stock-heading"><span class="stock-name"></span><span class="stock-symbol"></span></div>' +
       '<div class="stock-note"></div>' +
       '<div class="stock-quote"><strong class="stock-price">--</strong><span class="stock-change">--</span><span class="stock-currency"></span></div>' +
-      '<div class="stock-details"></div><div class="stock-chart"></div><div class="stock-meta">正在获取行情…</div>';
+      '<div class="stock-details"></div><div class="stock-chart"></div><div class="stock-refresh"></div><div class="stock-meta">正在获取行情…</div>';
     var find = function (name) { return element.querySelector('.stock-' + name); };
     find('name').textContent = config.symbol || '未配置股票';
     find('note').style.display = 'none';
@@ -132,6 +139,8 @@
       find('meta').textContent = '请在画面编辑器中填写股票代码，再点击「应用更改」';
       return function dispose() { disposed = true; };
     }
+    find('refresh').textContent = '最近刷新：等待首次请求 · 每 ' + refreshSeconds + ' 秒';
+    find('refresh').title = '屏幕完成行情请求的本地时间；与上游行情时间不同。';
 
     function render(data, offline) {
       if (disposed) return;
@@ -169,7 +178,12 @@
       function complete(data) {
         if (settled || disposed) return;
         settled = true;
-        if (data && number(data.price) && Array.isArray(data.points)) {
+        var valid = data && number(data.price) && Array.isArray(data.points);
+        var failed = !valid || !!data.stale;
+        find('refresh').textContent = '最近刷新：' + refreshTime() + ' · ' +
+          (failed ? '失败' : '成功') + ' · 每 ' + refreshSeconds + ' 秒';
+        find('refresh').classList.toggle('stock-stale', failed);
+        if (valid) {
           lastData = data;
           writeCache(cacheKey(config), data);
           render(data, false);
@@ -178,7 +192,7 @@
         } else {
           find('meta').textContent = '行情暂不可用，请检查股票代码或稍后重试';
         }
-        timer = setTimeout(refresh, Math.max(30, Math.min(3600, Number(config.refreshInterval) || 60)) * 1000);
+        timer = setTimeout(refresh, refreshSeconds * 1000);
       }
       xhr.onload = function () {
         var data = null;

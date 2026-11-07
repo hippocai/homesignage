@@ -66,20 +66,30 @@ describe('widget refresh lifecycle', () => {
     dispose();
   });
   it('renders real responses, refreshes, and cancels timers and requests on removal', () => {
+    jest.setSystemTime(new Date(2026, 10, 7, 15, 30, 0));
     const dispose = widget.mount(element, { symbol: 'LIFECYCLE', refreshInterval: 60 });
+    expect(children['.stock-refresh'].textContent).toContain('等待首次请求');
     requests[0].status = 200; requests[0].responseText = JSON.stringify({ data: quote }); requests[0].onload();
     expect(children['.stock-price'].textContent).toBe('102.00');
     expect(children['.stock-meta'].textContent).toContain('2026-11-05');
+    expect(children['.stock-refresh'].textContent).toBe('最近刷新：2026-11-07 15:30:00 · 成功 · 每 60 秒');
     jest.advanceTimersByTime(60000); expect(requests).toHaveLength(2);
+    requests[1].status = 200; requests[1].responseText = JSON.stringify({ data: quote }); requests[1].onload();
+    expect(children['.stock-refresh'].textContent).toContain('15:31:00 · 成功');
     dispose(); expect(requests[1].abort).toHaveBeenCalled();
     requests[1].onerror(); jest.advanceTimersByTime(60000); expect(requests).toHaveLength(2);
   });
   it('keeps the last dated quote visible during an outage', () => {
+    jest.setSystemTime(new Date(2026, 10, 7, 15, 30, 0));
     const dispose = widget.mount(element, { symbol: 'OUTAGE' });
     requests[0].status = 200; requests[0].responseText = JSON.stringify({ data: quote }); requests[0].onload();
     jest.advanceTimersByTime(60000); requests[1].onerror();
     expect(children['.stock-price'].textContent).toBe('102.00');
     expect(children['.stock-meta'].textContent).toContain('显示缓存');
+    expect(children['.stock-refresh'].textContent).toContain('15:31:00 · 失败');
+    jest.advanceTimersByTime(60000);
+    requests[2].status = 200; requests[2].responseText = JSON.stringify({ data: { ...quote, stale: true } }); requests[2].onload();
+    expect(children['.stock-refresh'].textContent).toContain('15:32:00 · 失败');
     dispose();
   });
 });
