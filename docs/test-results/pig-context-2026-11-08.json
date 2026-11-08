@@ -1,0 +1,364 @@
+{
+  "runAt": "2026-11-08T14:39:36.117Z",
+  "database": "disposable copy",
+  "cases": [
+    {
+      "id": "memory-admin",
+      "passed": true,
+      "memoryEqualsStored": true,
+      "memorySha256": "084d4004324ad01fe1261a3db23d715439c1c88fa5258979127518c9098d3d60",
+      "weather": {
+        "asOf": "2026-11-08T14:39:36.747Z",
+        "status": "available",
+        "observations": [
+          {
+            "city": "相城",
+            "source": "qweather",
+            "status": "fresh",
+            "fetchedAt": "2026-11-08T14:39:36.743Z",
+            "tempC": 15,
+            "description": "阴",
+            "humidity": "94",
+            "windKmph": "32"
+          }
+        ],
+        "forecasts": [
+          {
+            "city": "江苏/苏州市",
+            "zone": "Asia/Shanghai",
+            "source": "Open-Meteo",
+            "day": "2026-11-08",
+            "status": "available",
+            "todayHighC": 18.1,
+            "yesterdayForecastHighC": 19.5,
+            "dropC": 1.4
+          }
+        ],
+        "truncated": false
+      },
+      "newsCoverage": {
+        "total": 40,
+        "included": 40,
+        "truncated": false,
+        "selection": "优先已判断的家庭影响，其余按更新时间排列"
+      },
+      "newsIds": [
+        "c468542a-0a71-4d84-81b8-a65d3c6482ee",
+        "0a1451b3-4f50-4ced-b34e-759e738d83ed",
+        "98ecc3c6-0f1c-4bb6-a69c-905dbf6ae7c6",
+        "968199b8-22e4-4cee-8e05-44ac5245afc9",
+        "8619f436-e3bb-4004-bea8-4d81475b3386",
+        "6d3aa0bb-9d9e-4af1-822c-2eddcdd9468b",
+        "1ca90d32-d1aa-4535-a17f-aa31c168470a",
+        "68398828-69b4-470a-8259-3132f009237d",
+        "99960be8-4e32-48da-9416-6b1813bba73b",
+        "37f6cf72-44eb-4035-96b7-81bc03fce791",
+        "07c39778-3c4a-4163-bbcc-eb58b7b854f1",
+        "2ac94e63-0b55-4530-9bfd-ce1f53911e3e",
+        "1a2b6af4-0d29-4042-bce9-979e8fccc29c",
+        "aff99a9e-c3b8-4062-91d3-a320d19f6f91",
+        "df133aba-c777-48df-ae3c-8e6e79d2a817",
+        "c73a4ac0-3ede-4a0f-a065-a3fed8d7e015",
+        "170fd0fe-58fe-4e5b-abc8-19948253d8fe",
+        "22380829-36e2-488d-9ef4-b9b054d0b3fc",
+        "090a417c-192b-4556-ae8d-4d5dd5b0319b",
+        "f736a707-c70d-44cb-aaa7-6802b00fcecb",
+        "23af3bfb-2564-4971-abc0-dd4e9e2d7c96",
+        "29182bd9-19ed-4451-b22b-966578f34830",
+        "3a8af57b-a9f3-4ad9-a46b-0db3f05f77a7",
+        "f5662cab-3cf2-49f4-8718-ccc9b14f6d87",
+        "d92dca74-2ce3-4d31-9bb6-0b987b1d12b6",
+        "379ce38a-b212-4fe8-a937-6ce9e1f97995",
+        "8c141938-68f6-494f-9c5a-a51910e435c3",
+        "582404eb-3fc9-4908-acfc-3ea32664b20f",
+        "cd1da09f-a53c-413d-86e7-1918b765c038",
+        "df3dfc60-1b1c-4883-b8fe-8e61f91c2ba0",
+        "982e9ea7-4873-49cf-8ded-6dea0066797d",
+        "c6dca50c-278b-4fc0-aaa8-7842dc7a2890",
+        "2f723536-15cc-4485-96f5-11963898f9fe",
+        "aded6ea7-302d-4c3d-ac01-c38f5aebfca1",
+        "83bb7084-e063-4d2e-a4d8-8e3f3027caa5",
+        "96c63bf3-6954-4812-b3ff-9228cdbedff8",
+        "702b2faf-fab3-49b9-9def-555d294c5e9a",
+        "f6e4f251-6952-46ff-aeb4-0485e868cbf1",
+        "e05a9e2d-d829-408e-b46a-4faf269efade",
+        "7266d435-3a5c-44ce-96c9-56e8110fa847"
+      ],
+      "newsPayloadSha256": "81d28b95cb544271d220f0b042f8c168f333b45ee9dda0f9837ad5adbc2788b0",
+      "payloadSha256": "8759558c1ee41014a0ed085022a09e2177bce84b20de79208a48d77035793f81",
+      "replySha256": "a16f7d38633e196acfd03ef79516514a5316266a52c3c0aa4057f4a701114e6b",
+      "replyChecksPassed": true
+    },
+    {
+      "id": "memory-context-guest",
+      "passed": true,
+      "memoryEqualsStored": true,
+      "memorySha256": "084d4004324ad01fe1261a3db23d715439c1c88fa5258979127518c9098d3d60",
+      "weather": {
+        "asOf": "2026-11-08T14:39:39.903Z",
+        "status": "available",
+        "observations": [
+          {
+            "city": "相城",
+            "source": "qweather",
+            "status": "fresh",
+            "fetchedAt": "2026-11-08T14:39:36.743Z",
+            "tempC": 15,
+            "description": "阴",
+            "humidity": "94",
+            "windKmph": "32"
+          }
+        ],
+        "forecasts": [
+          {
+            "city": "江苏/苏州市",
+            "zone": "Asia/Shanghai",
+            "source": "Open-Meteo",
+            "day": "2026-11-08",
+            "status": "available",
+            "todayHighC": 18.1,
+            "yesterdayForecastHighC": 19.5,
+            "dropC": 1.4
+          }
+        ],
+        "truncated": false
+      },
+      "newsCoverage": {
+        "total": 40,
+        "included": 40,
+        "truncated": false,
+        "selection": "优先已判断的家庭影响，其余按更新时间排列"
+      },
+      "newsIds": [
+        "c468542a-0a71-4d84-81b8-a65d3c6482ee",
+        "0a1451b3-4f50-4ced-b34e-759e738d83ed",
+        "98ecc3c6-0f1c-4bb6-a69c-905dbf6ae7c6",
+        "968199b8-22e4-4cee-8e05-44ac5245afc9",
+        "8619f436-e3bb-4004-bea8-4d81475b3386",
+        "6d3aa0bb-9d9e-4af1-822c-2eddcdd9468b",
+        "1ca90d32-d1aa-4535-a17f-aa31c168470a",
+        "68398828-69b4-470a-8259-3132f009237d",
+        "99960be8-4e32-48da-9416-6b1813bba73b",
+        "37f6cf72-44eb-4035-96b7-81bc03fce791",
+        "07c39778-3c4a-4163-bbcc-eb58b7b854f1",
+        "2ac94e63-0b55-4530-9bfd-ce1f53911e3e",
+        "1a2b6af4-0d29-4042-bce9-979e8fccc29c",
+        "aff99a9e-c3b8-4062-91d3-a320d19f6f91",
+        "df133aba-c777-48df-ae3c-8e6e79d2a817",
+        "c73a4ac0-3ede-4a0f-a065-a3fed8d7e015",
+        "170fd0fe-58fe-4e5b-abc8-19948253d8fe",
+        "22380829-36e2-488d-9ef4-b9b054d0b3fc",
+        "090a417c-192b-4556-ae8d-4d5dd5b0319b",
+        "f736a707-c70d-44cb-aaa7-6802b00fcecb",
+        "23af3bfb-2564-4971-abc0-dd4e9e2d7c96",
+        "29182bd9-19ed-4451-b22b-966578f34830",
+        "3a8af57b-a9f3-4ad9-a46b-0db3f05f77a7",
+        "f5662cab-3cf2-49f4-8718-ccc9b14f6d87",
+        "d92dca74-2ce3-4d31-9bb6-0b987b1d12b6",
+        "379ce38a-b212-4fe8-a937-6ce9e1f97995",
+        "8c141938-68f6-494f-9c5a-a51910e435c3",
+        "582404eb-3fc9-4908-acfc-3ea32664b20f",
+        "cd1da09f-a53c-413d-86e7-1918b765c038",
+        "df3dfc60-1b1c-4883-b8fe-8e61f91c2ba0",
+        "982e9ea7-4873-49cf-8ded-6dea0066797d",
+        "c6dca50c-278b-4fc0-aaa8-7842dc7a2890",
+        "2f723536-15cc-4485-96f5-11963898f9fe",
+        "aded6ea7-302d-4c3d-ac01-c38f5aebfca1",
+        "83bb7084-e063-4d2e-a4d8-8e3f3027caa5",
+        "96c63bf3-6954-4812-b3ff-9228cdbedff8",
+        "702b2faf-fab3-49b9-9def-555d294c5e9a",
+        "f6e4f251-6952-46ff-aeb4-0485e868cbf1",
+        "e05a9e2d-d829-408e-b46a-4faf269efade",
+        "7266d435-3a5c-44ce-96c9-56e8110fa847"
+      ],
+      "newsPayloadSha256": "81d28b95cb544271d220f0b042f8c168f333b45ee9dda0f9837ad5adbc2788b0",
+      "payloadSha256": "cb03b22de136299b9104136b216f994e3ad751c425baf3e5de5ba58c07a66ed9",
+      "replySha256": "64d7b4cab12e1241ea631b13a98a7a47e0b166e52c9ab2d286a37cc4b7df98f2",
+      "replyChecksPassed": true
+    },
+    {
+      "id": "weather",
+      "passed": true,
+      "memoryEqualsStored": true,
+      "memorySha256": "084d4004324ad01fe1261a3db23d715439c1c88fa5258979127518c9098d3d60",
+      "weather": {
+        "asOf": "2026-11-08T14:39:41.824Z",
+        "status": "available",
+        "observations": [
+          {
+            "city": "相城",
+            "source": "qweather",
+            "status": "fresh",
+            "fetchedAt": "2026-11-08T14:39:36.743Z",
+            "tempC": 15,
+            "description": "阴",
+            "humidity": "94",
+            "windKmph": "32"
+          }
+        ],
+        "forecasts": [
+          {
+            "city": "江苏/苏州市",
+            "zone": "Asia/Shanghai",
+            "source": "Open-Meteo",
+            "day": "2026-11-08",
+            "status": "available",
+            "todayHighC": 18.1,
+            "yesterdayForecastHighC": 19.5,
+            "dropC": 1.4
+          }
+        ],
+        "truncated": false
+      },
+      "newsCoverage": {
+        "total": 40,
+        "included": 40,
+        "truncated": false,
+        "selection": "优先已判断的家庭影响，其余按更新时间排列"
+      },
+      "newsIds": [
+        "c468542a-0a71-4d84-81b8-a65d3c6482ee",
+        "0a1451b3-4f50-4ced-b34e-759e738d83ed",
+        "98ecc3c6-0f1c-4bb6-a69c-905dbf6ae7c6",
+        "968199b8-22e4-4cee-8e05-44ac5245afc9",
+        "8619f436-e3bb-4004-bea8-4d81475b3386",
+        "6d3aa0bb-9d9e-4af1-822c-2eddcdd9468b",
+        "1ca90d32-d1aa-4535-a17f-aa31c168470a",
+        "68398828-69b4-470a-8259-3132f009237d",
+        "99960be8-4e32-48da-9416-6b1813bba73b",
+        "37f6cf72-44eb-4035-96b7-81bc03fce791",
+        "07c39778-3c4a-4163-bbcc-eb58b7b854f1",
+        "2ac94e63-0b55-4530-9bfd-ce1f53911e3e",
+        "1a2b6af4-0d29-4042-bce9-979e8fccc29c",
+        "aff99a9e-c3b8-4062-91d3-a320d19f6f91",
+        "df133aba-c777-48df-ae3c-8e6e79d2a817",
+        "c73a4ac0-3ede-4a0f-a065-a3fed8d7e015",
+        "170fd0fe-58fe-4e5b-abc8-19948253d8fe",
+        "22380829-36e2-488d-9ef4-b9b054d0b3fc",
+        "090a417c-192b-4556-ae8d-4d5dd5b0319b",
+        "f736a707-c70d-44cb-aaa7-6802b00fcecb",
+        "23af3bfb-2564-4971-abc0-dd4e9e2d7c96",
+        "29182bd9-19ed-4451-b22b-966578f34830",
+        "3a8af57b-a9f3-4ad9-a46b-0db3f05f77a7",
+        "f5662cab-3cf2-49f4-8718-ccc9b14f6d87",
+        "d92dca74-2ce3-4d31-9bb6-0b987b1d12b6",
+        "379ce38a-b212-4fe8-a937-6ce9e1f97995",
+        "8c141938-68f6-494f-9c5a-a51910e435c3",
+        "582404eb-3fc9-4908-acfc-3ea32664b20f",
+        "cd1da09f-a53c-413d-86e7-1918b765c038",
+        "df3dfc60-1b1c-4883-b8fe-8e61f91c2ba0",
+        "982e9ea7-4873-49cf-8ded-6dea0066797d",
+        "c6dca50c-278b-4fc0-aaa8-7842dc7a2890",
+        "2f723536-15cc-4485-96f5-11963898f9fe",
+        "aded6ea7-302d-4c3d-ac01-c38f5aebfca1",
+        "83bb7084-e063-4d2e-a4d8-8e3f3027caa5",
+        "96c63bf3-6954-4812-b3ff-9228cdbedff8",
+        "702b2faf-fab3-49b9-9def-555d294c5e9a",
+        "f6e4f251-6952-46ff-aeb4-0485e868cbf1",
+        "e05a9e2d-d829-408e-b46a-4faf269efade",
+        "7266d435-3a5c-44ce-96c9-56e8110fa847"
+      ],
+      "newsPayloadSha256": "81d28b95cb544271d220f0b042f8c168f333b45ee9dda0f9837ad5adbc2788b0",
+      "payloadSha256": "1b838b6abd77ede6419894a69203e455089ec3f6e5d209c730b2ea1d7aca82c9",
+      "replySha256": "c28dcafb37277342344b7578f822fc89569329aeb1509392234eaafad742a6ce",
+      "replyChecksPassed": true
+    },
+    {
+      "id": "news",
+      "passed": true,
+      "memoryEqualsStored": true,
+      "memorySha256": "084d4004324ad01fe1261a3db23d715439c1c88fa5258979127518c9098d3d60",
+      "weather": {
+        "asOf": "2026-11-08T14:39:46.401Z",
+        "status": "available",
+        "observations": [
+          {
+            "city": "相城",
+            "source": "qweather",
+            "status": "fresh",
+            "fetchedAt": "2026-11-08T14:39:36.743Z",
+            "tempC": 15,
+            "description": "阴",
+            "humidity": "94",
+            "windKmph": "32"
+          }
+        ],
+        "forecasts": [
+          {
+            "city": "江苏/苏州市",
+            "zone": "Asia/Shanghai",
+            "source": "Open-Meteo",
+            "day": "2026-11-08",
+            "status": "available",
+            "todayHighC": 18.1,
+            "yesterdayForecastHighC": 19.5,
+            "dropC": 1.4
+          }
+        ],
+        "truncated": false
+      },
+      "newsCoverage": {
+        "total": 40,
+        "included": 40,
+        "truncated": false,
+        "selection": "优先已判断的家庭影响，其余按更新时间排列"
+      },
+      "newsIds": [
+        "c468542a-0a71-4d84-81b8-a65d3c6482ee",
+        "0a1451b3-4f50-4ced-b34e-759e738d83ed",
+        "98ecc3c6-0f1c-4bb6-a69c-905dbf6ae7c6",
+        "968199b8-22e4-4cee-8e05-44ac5245afc9",
+        "8619f436-e3bb-4004-bea8-4d81475b3386",
+        "6d3aa0bb-9d9e-4af1-822c-2eddcdd9468b",
+        "1ca90d32-d1aa-4535-a17f-aa31c168470a",
+        "68398828-69b4-470a-8259-3132f009237d",
+        "99960be8-4e32-48da-9416-6b1813bba73b",
+        "37f6cf72-44eb-4035-96b7-81bc03fce791",
+        "07c39778-3c4a-4163-bbcc-eb58b7b854f1",
+        "2ac94e63-0b55-4530-9bfd-ce1f53911e3e",
+        "1a2b6af4-0d29-4042-bce9-979e8fccc29c",
+        "aff99a9e-c3b8-4062-91d3-a320d19f6f91",
+        "df133aba-c777-48df-ae3c-8e6e79d2a817",
+        "c73a4ac0-3ede-4a0f-a065-a3fed8d7e015",
+        "170fd0fe-58fe-4e5b-abc8-19948253d8fe",
+        "22380829-36e2-488d-9ef4-b9b054d0b3fc",
+        "090a417c-192b-4556-ae8d-4d5dd5b0319b",
+        "f736a707-c70d-44cb-aaa7-6802b00fcecb",
+        "23af3bfb-2564-4971-abc0-dd4e9e2d7c96",
+        "29182bd9-19ed-4451-b22b-966578f34830",
+        "3a8af57b-a9f3-4ad9-a46b-0db3f05f77a7",
+        "f5662cab-3cf2-49f4-8718-ccc9b14f6d87",
+        "d92dca74-2ce3-4d31-9bb6-0b987b1d12b6",
+        "379ce38a-b212-4fe8-a937-6ce9e1f97995",
+        "8c141938-68f6-494f-9c5a-a51910e435c3",
+        "582404eb-3fc9-4908-acfc-3ea32664b20f",
+        "cd1da09f-a53c-413d-86e7-1918b765c038",
+        "df3dfc60-1b1c-4883-b8fe-8e61f91c2ba0",
+        "982e9ea7-4873-49cf-8ded-6dea0066797d",
+        "c6dca50c-278b-4fc0-aaa8-7842dc7a2890",
+        "2f723536-15cc-4485-96f5-11963898f9fe",
+        "aded6ea7-302d-4c3d-ac01-c38f5aebfca1",
+        "83bb7084-e063-4d2e-a4d8-8e3f3027caa5",
+        "96c63bf3-6954-4812-b3ff-9228cdbedff8",
+        "702b2faf-fab3-49b9-9def-555d294c5e9a",
+        "f6e4f251-6952-46ff-aeb4-0485e868cbf1",
+        "e05a9e2d-d829-408e-b46a-4faf269efade",
+        "7266d435-3a5c-44ce-96c9-56e8110fa847"
+      ],
+      "newsPayloadSha256": "81d28b95cb544271d220f0b042f8c168f333b45ee9dda0f9837ad5adbc2788b0",
+      "payloadSha256": "b8a48cecafd9eeb902ca91e14e78adb78c99b92c67ff6eb1e72abc0d4ffa415f",
+      "replySha256": "a8f87202d9a6d8cb5ac9c32d6699848060846e551afea51ec934fc7c3b35d4ba",
+      "replyChecksPassed": true
+    }
+  ],
+  "model": {
+    "provider": "glm",
+    "model": "glm-5.3-flash"
+  },
+  "memory": {
+    "characters": 137,
+    "sha256": "084d4004324ad01fe1261a3db23d715439c1c88fa5258979127518c9098d3d60"
+  },
+  "readOnlyConversation": true,
+  "passed": true
+}

@@ -255,6 +255,8 @@ module.exports = function extend(spec) {
   path('get','/companion/agent','家庭资料、已记计划及最近 40 次对话',obj({...household.properties,history:list(turn)}));
   path('put','/companion/agent/profile','保存家庭资料，版本变化时返回 409',household,obj({profile,revision:num},['profile','revision']));
   path('post','/companion/agent/messages','与猪猪对话，回复和计划一起保存；同一 requestId 可重试',turn,obj({message:str,requestId:str},['message','requestId']));
+  const contextDescription='调用聊天模型时完整传入已保存的 profile.memory、当前会话历史及可见计划；同时提供已启用屏幕场景中的天气城市（最多4个观测城市和4个降温城市，含来源、获取时间和过期/缺失状态）、降温预报，以及最多60条当前有效且符合兴趣设置的资讯，优先已判断的家庭影响，超限明确标记覆盖范围。天气请求最多等待2.5秒，缺失时不编造。天气和资讯是每轮的临时上下文，不写入长期家庭记忆。查询自建系统记录由数据库直接返回，不调用模型。';
+  spec.paths['/companion/agent/messages'].post.description=contextDescription;
   path('get','/companion/agent/share','获取访客可打开的家庭聊天链接',obj({links:list(str)}));
   const recordSnapshot=obj({text:str,start:str,end:str,targets:ids});
   const systemAction=obj({id:str,type:choice('info','reminder'),op:choice('create','view','update','cancel'),
@@ -269,6 +271,7 @@ module.exports = function extend(spec) {
     '任何能打开分享页面的人都可同源发送消息。使用本会话 Cookie 可查看、原位修改或取消本会话创建的定时提示和信息。重复 requestId 返回已保存的回复。修改与取消的审计包含原 ID 与前后快照。“刚才那条”仅在近期操作唯一指向一条当前自建记录时可执行；正文引号内的“取消”“删除”作为内容保存。明确保持开始或结束时间时仅修改另一端。查询具体主题无匹配返回空结果。目标不明确返回 422，并发变化返回 409，模型连接失败最多重试一次。');
   spec.components.securitySchemes.pigGuest={type:'apiKey',in:'cookie',name:'pig_guest'};
   spec.paths['/pig-chat/messages'].post.security=[{pigGuest:[]}];
+  spec.paths['/pig-chat/messages'].post.description+=' '+contextDescription;
   path('delete','/companion/agent/plans/{id}','取消计划并重新判断资讯影响',household);
   path('get','/companion/agent/impacts','读取当前家庭生活影响和判断状态',obj({status:str,
     items:list(obj({id:str,title:str,source:str,url:str,speech:str,until:num,repeatable:bool}))}));
