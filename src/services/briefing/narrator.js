@@ -1,9 +1,8 @@
-const fs=require('node:fs');
-const path=require('node:path');
 const {randomUUID}=require('node:crypto');
 const db=require('./storage'),api=require('./service'),p=require('./providers'),rules=require('./rules');
 const memory=require('./agent-memory');
-const prompt=()=>fs.readFileSync(path.join(__dirname,'../../prompts/pig-screen-system.md'),'utf8');
+const promptSettings=require('./narration-prompt');
+const prompt=promptSettings.defaultPrompt;
 async function interval(){const value=await require('../../dao/settingsDao').get('pig.greetingMinutes');return Number.isInteger(value)&&value>=1&&value<=1440?value:5;}
 const flights=new Map(),retries=new Map();
 async function install(exec){await exec(`
@@ -22,6 +21,7 @@ function calendar(day){
   return {region:'中国大陆',source:'沿用系统内置2026/2027放假日期表',covered:!!ranges,holiday:ranges?.find(([from,to])=>value>=from&&value<=to)?.[2]||null};
 }
 async function context(device,component,now){
+  const savedPrompt=await promptSettings.get();
   const bound=await api.boundPig(device,component);
   if(!bound.id)throw p.fault('猪猪组件未绑定',403);
   const h=await require('./household').household(),preferences=bound.prefs;
@@ -41,8 +41,8 @@ async function context(device,component,now){
     reminders:reminders.filter(r=>r.repeat!=='none'||!r.start_date||r.start_date>=local.day),
     recent:recent.map(r=>({...r,payload:JSON.parse(r.payload)})),preferences:{...preferences,quiet,greetingMinutes:await interval()}};
   const {clock,recent:ignored,...facts}=input;
-  const key=p.hash(JSON.stringify([prompt(),local.day,stable(facts),agentMemory.map(m=>now>=m.starts)]));
-  return {input,key,component:bound.id,preferences:{...preferences,sound:preferences.enabled&&preferences.sound&&!quiet},quiet};
+  const key=p.hash(JSON.stringify([savedPrompt.prompt,savedPrompt.revision,local.day,stable(facts),agentMemory.map(m=>now>=m.starts)]));
+  return {input,key,systemPrompt:savedPrompt.prompt,component:bound.id,preferences:{...preferences,sound:preferences.enabled&&preferences.sound&&!quiet},quiet};
 }
 function validate(value,ctx,now){
   const d=value;
@@ -70,11 +70,11 @@ async function decide(device,component,now=Date.now()){
   const ctx=await context(device,component,now),slot=device+':'+ctx.component;
   const old=await db.one('SELECT * FROM pig_narration WHERE device=? AND component=? ORDER BY created DESC,rowid DESC LIMIT 1',device,ctx.component);
   if(old&&old.context===ctx.key&&old.review>now&&old.expires>now)return {row:old,ctx};
-  if(retries.get(slot)>now)throw p.fault('模型暂不可用，稍后重试',503);
+  if(retries.get(slot)?.key===ctx.key&&retries.get(slot).until>now)throw p.fault('模型暂不可用，稍后重试',503);
   const settings=await api.settings();
   let correction='';
   for(let attempt=0;attempt<2;attempt++){
-  const messages=[{role:'system',content:prompt()+correction},{role:'user',content:JSON.stringify(ctx.input)}];
+  const messages=[{role:'system',content:ctx.systemPrompt+correction},{role:'user',content:JSON.stringify(ctx.input)}];
   const auditId=randomUUID();
   await db.run(`INSERT INTO pig_chat_audit(attempt,created,scope,actor,ip,turn_id,message,kind,system_prompt,model_context,model)
     VALUES(?,?,'system:narration','猪猪气泡','',?,'自动生成气泡','narration',?,?,?)`,auditId,now,auditId,messages[0].content,messages[1].content,settings.provider+'/'+settings.model);
@@ -95,7 +95,7 @@ async function decide(device,component,now=Date.now()){
       correction='\n【本次重试校验反馈】上次输出未能通过校验：'+e.message+'。当前家庭当地时间为 '+ctx.input.clock.now+'。请重新生成完整JSON，所有时间必须晚于此刻，保持正确的当地日期和时区偏移。nextReviewAt与validUntil不能是过去；只引用本上下文实际提供的编号，并遵守免打扰及功能开关。';
       continue;
     }
-    if(e.status!==409)retries.set(slot,now+(e.status===429?15:2)*60000);throw e;
+    if(e.status!==409)retries.set(slot,{key:ctx.key,until:now+(e.status===429?15:2)*60000});throw e;
   }
   }
 }

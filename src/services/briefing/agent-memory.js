@@ -37,11 +37,12 @@ async function install(exec) {
     END;`);
 }
 let writing=Promise.resolve();
+function format(rows){return '# 猪猪伙伴的独立记忆\n\n由聊天管理；到期自动移除。此文件是数据库的可读镜像，请通过聊天修改。审计另行保留。\n\n'+(rows.length?rows.map(r=>
+  '## '+r.id+'\n\n'+r.text+'\n\n- 生效：'+new Date(r.starts).toISOString()+'\n- 到期：'+(r.expires?new Date(r.expires).toISOString():'长期')+'\n').join('\n'):'目前没有有效的独立记忆。\n');}
 function project() {
   const next=writing.catch(()=>{}).then(async()=>{
     const rows=await db.all('SELECT * FROM pig_agent_memory ORDER BY starts,id');
-    const content='# 猪猪伙伴的独立记忆\n\n由聊天管理；到期自动移除。此文件是数据库的可读镜像，请通过聊天修改。审计另行保留。\n\n'+rows.map(r=>
-      '## '+r.id+'\n\n'+r.text+'\n\n- 生效：'+new Date(r.starts).toISOString()+'\n- 到期：'+(r.expires?new Date(r.expires).toISOString():'长期')+'\n').join('\n');
+    const content=format(rows);
     const target=file();
     await fs.mkdir(path.dirname(target),{recursive:true});
     const temp=target+'.'+randomUUID()+'.tmp';
@@ -105,4 +106,4 @@ function clock(ms,zone){
   return day+'T'+time+':00'+(offset>=0?'+':'-')+pad(Math.floor(Math.abs(offset)/60))+':'+pad(Math.abs(offset)%60);
 }
 function context(rows,now,zone='Asia/Shanghai'){return rows.map(r=>({...r,startAt:clock(r.starts,zone),expiresAt:r.expires?clock(r.expires,zone):null,state:now>=r.starts?'active':'upcoming'}));}
-module.exports={install,file,project,prune,list,onlyMemory,prepare,prompt,context,clock};
+module.exports={install,file,project,prune,list,onlyMemory,prepare,prompt,context,clock,format};

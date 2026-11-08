@@ -16,6 +16,7 @@
       <p>默认5分钟，最少1分钟。屏幕在线时按间隔重新生成；记忆、天气、新闻或系统事项变化及旧话语到期时提前重新判断。每次模型请求与返回均记录在聊天审计中。</p>
       <el-button type="primary" :loading="saving" @click="saveGeneration">保存生成设置</el-button>
     </el-card>
+    <PigPromptSettings />
   </main>
 </template>
 <script setup>
@@ -23,6 +24,7 @@ import { ref, onMounted } from 'vue';
 import { ElMessage } from 'element-plus';
 import api from '../api/index.js';
 import HouseholdAgent from '../components/HouseholdAgent.vue';
+import PigPromptSettings from '../components/PigPromptSettings.vue';
 const error = ref(''),
   greetingMinutes = ref(5),
   saving = ref(false);

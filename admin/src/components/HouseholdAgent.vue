@@ -39,8 +39,14 @@
       <el-tab-pane label="猪猪自己的记忆" name="memory">
         <p>通过聊天新增、修改或取消，临时事项到期自动删除。文件：data/pig-agent-memory.md（可读镜像）。</p>
         <el-button @click="loadMemory">刷新记忆</el-button>
+        <el-radio-group v-model="memoryView" aria-label="独立记忆查看方式">
+          <el-radio-button value="text" label="text">文本</el-radio-button><el-radio-button value="list" label="list">列表</el-radio-button>
+        </el-radio-group>
+        <el-input v-if="memoryView==='text'" :model-value="memoryText" type="textarea" readonly :autosize="{minRows:10,maxRows:30}" aria-label="猪猪独立记忆文本" style="margin-top:12px" />
+        <template v-else>
         <p v-if="!ownMemory.length">目前没有独立记忆。</p>
         <article v-for="m in ownMemory" :key="m.id"><b>{{m.text}}</b><p>生效：{{new Date(m.starts).toLocaleString()}} · 到期：{{m.expires?new Date(m.expires).toLocaleString():'长期保留'}}</p><small>{{m.id}}</small></article>
+        </template>
         <h4>最近记忆操作</h4>
         <p v-for="a in memoryAudit" :key="a.id">{{new Date(a.at).toLocaleString()}} · {{ {remember:'记住',update:'修改',forget:'取消',expire:'自动到期'}[a.op] || a.op }} · {{a.memory_id}}</p>
       </el-tab-pane>
@@ -93,7 +99,8 @@ const shareUrl=ref(''),auditRows=ref([]),auditNext=ref(null);
 const auditType=ref('all'),auditScope=ref(''),auditUsers=ref([]);
 const auditTypes=[{value:'all',label:'全部类型'},{value:'chat',label:'用户对话'},{value:'narration',label:'自动气泡完整对话'},{value:'system_prompt',label:'仅 System prompt'},{value:'model_context',label:'仅模型上下文'},{value:'model_response',label:'仅模型返回'}];
 const ownMemory=ref([]),memoryAudit=ref([]);
-async function loadMemory(){try{const result=(await api.get('/companion/agent/memory')).data.data;ownMemory.value=result.entries;memoryAudit.value=result.audit;}catch(e){showError(e);}}
+const memoryText=ref(''),memoryView=ref('text');
+async function loadMemory(){try{const result=(await api.get('/companion/agent/memory')).data.data;ownMemory.value=result.entries;memoryText.value=result.text;memoryAudit.value=result.audit;}catch(e){showError(e);}}
 async function loadLinks() {
   shareUrl.value=(await api.get('/companion/agent/share')).data.data.links[0];
 }

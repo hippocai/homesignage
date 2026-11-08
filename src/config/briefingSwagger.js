@@ -254,9 +254,13 @@ module.exports = function extend(spec) {
   const household=obj({profile,plans:list(plan),revision:num});
   path('get','/companion/agent','家庭资料、已记计划及最近 40 次对话',obj({...household.properties,history:list(turn)}));
   const memoryEntry=obj({id:str,scope:str,text:str,starts:num,expires:{...num,nullable:true},revision:num,created:num});
-  path('get','/companion/agent/memory','查看猪猪独立记忆及最近50条记忆审计',obj({entries:list(memoryEntry),file:str,audit:list({type:'object',additionalProperties:true})}),null,
+  path('get','/companion/agent/memory','查看猪猪独立记忆及最近50条记忆审计',obj({entries:list(memoryEntry),text:{...str,description:'与Markdown镜像同格式的有效记忆文本；读取时先清理到期条目'},file:str,audit:list({type:'object',additionalProperties:true})}),null,
     '独立于家庭资料、系统定时提示和信息列表。通过聊天新增修改删除，当前访客只能管理自己写入的记忆；屏幕以家庭共享上下文读取。到期在读取/30秒后台扫描/启动时清理，审计保留。data/pig-agent-memory.md 是自动重建的可读镜像。');
-  path('get','/companion/agent/narration-prompt','读取实际气泡system prompt',obj({prompt:str}));
+  const promptConfig=obj({prompt:str,defaultPrompt:str,isDefault:bool,revision:num});
+  path('get','/companion/agent/narration-prompt','读取当前气泡system prompt、默认文本及版本',promptConfig);
+  path('put','/companion/agent/narration-prompt','保存气泡system prompt或恢复默认，立即生效',promptConfig,
+    obj({prompt:{...str,minLength:1,maxLength:20000},reset:bool,revision:{...num,minimum:0}},['revision']),
+    '保存传prompt；恢复默认传reset=true。必须提交读取到的revision，过期版本409。保存后通知屏幕，旧决策失效，进行中的旧prompt结果不可发布；新生成与审计使用新prompt。无需重启，不改家庭资料或独立记忆。');
   path('get','/companion/agent/narrations','查看最近30条模型气泡决策与展示回执',obj({items:list({type:'object',additionalProperties:true})}));
   const narration=obj({id:str,componentId:str,speech:str,intent:str,urgency:str,action:str,validUntil:num,nextReviewAt:num,preferences:rules});
   path('get','/devices/{id}/narration','取得模型生成的气泡，包括普通问候',narration,null,
