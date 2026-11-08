@@ -33,7 +33,7 @@ recent：最近生成的话、实际展示/朗读记录。preferences：当前�
 缺失或过期的数据不得补造。stale/unavailable不能解读为没有风险；官方预警仅能引用官方原始等级和发布单位，解除消息不再作为有效危险。
 遵守功能范围：family=false不主动播报家庭事项；cold=false不主动播报天气提醒；news=false不主动播报新闻提醒。enabled=false只生成普通陪伴。quiet=true时只生成安静陪伴，不主动提醒或要求朗读。
 本次仅决定气泡内容，不能创建、修改、取消任何记忆或系统记录，也不能声称完成这些操作。
-每个事实性提醒必须在 references 中引用对应条目编号。家庭资料引用 profile，天气引用 weather，系统条目和独立记忆使用其 id；纯问候可为空。
+每个事实性提醒必须在 references 中引用对应条目编号。日期、农历或假期引用 clock，家庭资料引用 profile（也接受profile.memory），天气引用 weather，系统条目和独立记忆使用其 id；纯问候可为空。
 
 【输出】
 只返回JSON对象：

@@ -112,6 +112,7 @@ test('格式、引用、免打扰边界：拒绝无依据提醒与过期输出',
   expect(()=>narrator.validate(decision({references:[]}),ctx,now)).toThrow();
   expect(()=>narrator.validate(decision({validUntil:new Date(now-1).toISOString()}),ctx,now)).toThrow();
   expect(()=>narrator.validate(decision(),{...ctx,quiet:true},now)).toThrow();
+  expect(narrator.validate(decision({intent:'companion',references:['clock','profile.memory','weather']}),{...ctx,quiet:true},now).payload.references).toEqual(['clock','profile','weather']);
 });
 test('分钟间隔可保存、校验上下限，影响缓存截止时间',async()=>{
   const url='/api/v1/companion/settings',auth='Bearer '+token;

@@ -50,7 +50,8 @@ function validate(value,ctx,now){
     !['greeting','companion','reminder'].includes(d.intent)||!['normal','important','urgent'].includes(d.urgency)||
     !['idle','wave','scarf','point','serious'].includes(d.action)||!Array.isArray(d.references)||
     typeof d.reason!=='string'||!d.reason.trim())throw p.fault('模型气泡格式无效',502);
-  const ids=new Set(['profile','weather',...['plans','agentMemory','news','info','reminders'].flatMap(k=>ctx.input[k].map(v=>v.id))]);
+  d.references=d.references.map(id=>id==='profile.memory'?'profile':id==='clock.calendar'?'clock':id);
+  const ids=new Set(['clock','profile','weather',...['plans','agentMemory','news','info','reminders'].flatMap(k=>ctx.input[k].map(v=>v.id))]);
   if(d.references.some(id=>!ids.has(id))||d.intent==='reminder'&&(!d.references.length||!ctx.preferences.enabled||ctx.quiet))throw p.fault('模型引用或提醒权限无效',502);
   if(d.intent==='reminder'){
     const disabled=new Set([...(ctx.preferences.cold?[]:['weather']),...(ctx.preferences.news?[]:ctx.input.news.map(v=>v.id)),
