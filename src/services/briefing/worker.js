@@ -95,6 +95,14 @@ async function collectDue() {
   }
 }
 let running = false;
+let weatherAnalyzing=false,weatherDue=0;
+async function analyzeWeather(){
+  if(weatherAnalyzing || Date.now()<weatherDue)return;
+  weatherAnalyzing=true;
+  try{await require('./weather-agent').tick();weatherDue=Date.now()+60000;}
+  catch(e){weatherDue=Date.now()+(e.status===429?15:2)*60000;logger.warn('Weather impact analysis postponed',{status:e.status||500});}
+  finally{weatherAnalyzing=false;}
+}
 let analyzing = false, retryAnalysisAt = 0;
 async function analyzeDue() {
   if (analyzing || Date.now()<retryAnalysisAt) return;
@@ -109,11 +117,12 @@ async function tick() {
   if (running) return;
   running = true;
   try {
+    const advancedWeather=!!await require('../../dao/settingsDao').get('weather.qweather.apiKey');
     for (const { device,component,config } of await db.all(
       "SELECT ds.device_id AS device,c.id AS component,c.config FROM device_scenes ds JOIN components c ON ds.scene_id=c.scene_id WHERE ds.enabled=1 AND c.type='companion' AND json_extract(c.config,'$.reminders.cold')=1"
     )) {
       try {
-        await weather(device,rules.component(JSON.parse(config).reminders),Date.now(),component);
+        if(!advancedWeather)await weather(device,rules.component(JSON.parse(config).reminders),Date.now(),component);
       } catch (e) {
         logger.warn('Weather briefing unavailable', { reason: e.message });
       }
@@ -121,11 +130,13 @@ async function tick() {
     for (const { item } of await db.all('SELECT item FROM briefing_info')) await api.syncFamily(item);
     collectDue().catch((e) => logger.warn('News scheduler unavailable', { reason: e.message }));
     void analyzeDue();
+    void analyzeWeather();
     await db.run('DELETE FROM briefing_claims WHERE claimed<?', Date.now() - 30 * 86400000);
     await db.run('DELETE FROM briefing_events WHERE expires<?', Date.now() - 30 * 86400000);
     await db.run('DELETE FROM briefing_history WHERE at<?', Date.now() - 30 * 86400000);
     await db.run('DELETE FROM briefing_topic_cache WHERE decided<?', Date.now() - 31 * 86400000);
     await db.run("DELETE FROM briefing_weather WHERE day<date('now','-8 days')");
+    await db.run('DELETE FROM pig_weather_state WHERE updated<?',Date.now()-31*86400000);
   } finally {
     running = false;
   }

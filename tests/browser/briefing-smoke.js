@@ -216,7 +216,7 @@ async function main() {
     assert.equal(await page.locator('.preview-component .pig-bubble').evaluate(el=>getComputedStyle(el).fontSize),'32px');
     await page.getByText('提醒、声音与免打扰',{exact:true}).click();
     assert.equal(await page.getByRole('checkbox',{name:'家庭事项'}).isChecked(),true);
-    await page.locator('.pig-rules label.el-checkbox').filter({hasText:'降温提醒'}).click();
+    await page.locator('.pig-rules label.el-checkbox').filter({hasText:'天气提醒'}).click();
     await page.getByPlaceholder('例如：深圳市').fill('深圳市');
     assert.equal(await page.getByText(/纬度|经度/).count(),0);
     if (!live) {

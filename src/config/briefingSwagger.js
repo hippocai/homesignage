@@ -257,6 +257,9 @@ module.exports = function extend(spec) {
   path('post','/companion/agent/messages','与猪猪对话，回复和计划一起保存；同一 requestId 可重试',turn,obj({message:str,requestId:str},['message','requestId']));
   const contextDescription='调用聊天模型时完整传入已保存的 profile.memory、当前会话历史及可见计划；同时提供已启用屏幕场景中的天气城市（最多4个观测城市和4个降温城市，含来源、获取时间和过期/缺失状态）、降温预报，以及最多60条当前有效且符合兴趣设置的资讯，优先已判断的家庭影响，超限明确标记覆盖范围。天气请求最多等待2.5秒，缺失时不编造。天气和资讯是每轮的临时上下文，不写入长期家庭记忆。查询自建系统记录由数据库直接返回，不调用模型。';
   spec.paths['/companion/agent/messages'].post.description=contextDescription;
+  path('get','/companion/agent/weather','查看天气上下文及自动判断状态',obj({status:str,weather:{type:'object',additionalProperties:true}}),null,
+    '管理员读取。weather.future最多8个已配置或由家庭资料/近期计划明确提取的城市，每个含daily（今天加未来7天）、hourly（48小时）、alerts（官方预警）。每类独立返回status=fresh/stale/unavailable、fetchedAt、items、attributions。只有fresh且alerts.items为空才表示查询成功但无有效预警。官方预警保留发布单位、级别、生效/结束时间和更新/解除关系。自动提醒复用组件cold开关、免打扰、重复间隔与次数；模型判断关联并校验原文依据、城市归属及计划日期，数据失效或计划变更后旧任务不可领取。');
+  spec.paths['/companion/agent/messages'].post.description+=' weather.future还包含今天加未来7天、未来48小时及官方预警；仅在有明确城市且数据可用时回答未来天气。';
   path('get','/companion/agent/share','获取访客可打开的家庭聊天链接',obj({links:list(str)}));
   const recordSnapshot=obj({text:str,start:str,end:str,targets:ids});
   const systemAction=obj({id:str,type:choice('info','reminder'),op:choice('create','view','update','cancel'),
@@ -272,6 +275,7 @@ module.exports = function extend(spec) {
   spec.components.securitySchemes.pigGuest={type:'apiKey',in:'cookie',name:'pig_guest'};
   spec.paths['/pig-chat/messages'].post.security=[{pigGuest:[]}];
   spec.paths['/pig-chat/messages'].post.description+=' '+contextDescription;
+  spec.paths['/pig-chat/messages'].post.description+=' weather.future按同一规则提供未来预报和官方预警；目的地仅使用共享记忆或本会话可见计划。';
   path('delete','/companion/agent/plans/{id}','取消计划并重新判断资讯影响',household);
   path('get','/companion/agent/impacts','读取当前家庭生活影响和判断状态',obj({status:str,
     items:list(obj({id:str,title:str,source:str,url:str,speech:str,until:num,repeatable:bool}))}));

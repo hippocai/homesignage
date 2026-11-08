@@ -150,6 +150,10 @@ async function patchSettings(fields) {
     ON CONFLICT(key) DO UPDATE SET value=json_patch(settings.value,excluded.value),updated_at=CURRENT_TIMESTAMP`,JSON.stringify(fields));
 }
 router.get('/companion/settings', handle(async () => ({familyAI:(await api.settings()).familyAI})));
+router.get('/companion/agent/weather',handle(async()=>{
+  const h=await require('../services/briefing/household').household();
+  return {status:require('../services/briefing/weather-agent').status(),weather:await require('../services/briefing/weather-context').build(Date.now(),{household:h})};
+}));
 router.put('/companion/settings', handle(async r => {
   if(typeof r.body.familyAI!=='boolean') throw p.fault('请输入家庭提醒润色开关');
   const fields={familyAI:r.body.familyAI};

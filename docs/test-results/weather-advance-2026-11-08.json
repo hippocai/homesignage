@@ -1,0 +1,108 @@
+{
+  "runAt": "2026-11-08T15:41:40.350Z",
+  "database": "disposable copy",
+  "checks": [
+    {
+      "name": "real-weather-apis",
+      "passed": true,
+      "city": "江苏/苏州市",
+      "daily": 8,
+      "hourly": 48,
+      "alerts": [
+        {
+          "id": "202611081913344476058500",
+          "issuer": "苏州市气象台",
+          "title": "苏州市气象台发布大风蓝色预警",
+          "start": "2026-11-08T19:13+08:00",
+          "end": "2026-11-09T19:13+08:00",
+          "messageType": "alert"
+        },
+        {
+          "id": "202611071613215288651352",
+          "issuer": "江苏省气象台",
+          "title": "江苏省气象台发布寒潮黄色预警",
+          "start": "2026-11-07T16:13+08:00",
+          "end": "2026-11-09T16:13+08:00",
+          "messageType": "alert"
+        }
+      ]
+    },
+    {
+      "name": "real-household-analysis",
+      "passed": true,
+      "generated": 2
+    },
+    {
+      "name": "glm-commute-and-trip",
+      "passed": true,
+      "tasks": [
+        {
+          "id": "f1f8798a-92ed-439e-9e8f-a7da019cfc09",
+          "scope": "weather-test-trip",
+          "officialId": "fixture-official",
+          "starts": 1794180600000,
+          "expires": 1794181200000
+        },
+        {
+          "id": "e8219fca-4daa-47ff-b979-f64c6b24261c",
+          "scope": "memory",
+          "officialId": null,
+          "starts": 1794180600000,
+          "expires": 1794187800000
+        },
+        {
+          "id": "00abf049-4dc5-4a7f-9194-61f51fd53ce7",
+          "scope": "memory",
+          "officialId": null,
+          "starts": 1794180600000,
+          "expires": 1794186000000
+        }
+      ]
+    },
+    {
+      "name": "screen-claim-and-receipt",
+      "passed": true
+    },
+    {
+      "name": "stable-reminders-no-duplicates",
+      "passed": true
+    },
+    {
+      "name": "canceled-trip-invalidates-queued-context",
+      "passed": true
+    },
+    {
+      "name": "official-cancellation-withdraws-warning",
+      "passed": true
+    }
+  ],
+  "syntheticModelOutput": {
+    "reminders": [
+      {
+        "id": "alert:85e666eb242936241fcace9d1c1c9efb5615c6c1f67f02267ba707bf09c4ec4a",
+        "scope": "weather-test-trip",
+        "basis": "2026-11-09到2026-11-10去北京市旅游，在户外步行游览。",
+        "advice": "北京已发布大风橙色预警，明天白天户外步行注意防风保暖，避开临时搭建物、广告牌等。",
+        "start": "2026-11-08T23:30:00.000Z",
+        "until": "2026-11-09T02:00:00.000Z"
+      },
+      {
+        "id": "cold:苏州:2026-11-09",
+        "scope": "memory",
+        "basis": "常住江苏苏州市，每天早上8点骑车经过青禾路上班。",
+        "advice": "苏州今天最高温较昨日下降10℃、最低6℃，早上骑车上班注意添衣保暖防风。",
+        "start": "2026-11-08T23:30:00.000Z",
+        "until": "2026-11-09T01:30:00.000Z"
+      },
+      {
+        "id": "rain:苏州:2026-11-09",
+        "scope": "memory",
+        "basis": "每天早上8点骑车经过青禾路上班。",
+        "advice": "今早8点左右苏州降水概率约90%，骑车通勤建议带雨具、注意路滑。",
+        "start": "2026-11-08T23:30:00.000Z",
+        "until": "2026-11-09T01:00:00.000Z"
+      }
+    ]
+  },
+  "passed": true
+}

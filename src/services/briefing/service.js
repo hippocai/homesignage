@@ -496,13 +496,16 @@ async function feed(deviceId, now = Date.now(), component) {
   if (d.news && d.enabled) events.push(...await require('./household').relevant(cards,now));
   const receipts = new Map((await db.all(`SELECT c.* FROM briefing_claims c JOIN briefing_events e
     ON c.event=e.id AND c.edition=e.edition WHERE device=? AND c.component=? AND e.expires>?`,deviceId,componentId,now)).map(c=>[c.event,c]));
+  const weatherContext=events.some(e=>e.payload.weatherAgent)?require('./weather-agent').contextKey(await require('./household').household(),d):null;
   const active = events.filter(
     (x) =>
       x.payload.speak &&
       x.payload.speakUntil > now &&
       (!x.targets.length || x.targets.includes(deviceId)) &&
       (x.kind !== 'family' || d.family) &&
-      (x.kind !== 'weather' || (allowCold && x.identity === weatherKey && x.payload.drop >= d.threshold))
+      (x.kind !== 'weather' || (x.payload.weatherAgent
+        ? d.cold && x.payload.component===componentId && x.payload.weatherContext===weatherContext
+        : allowCold && x.identity === weatherKey && x.payload.drop >= d.threshold))
   );
   return {
     componentId,cards,

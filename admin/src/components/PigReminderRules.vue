@@ -19,7 +19,7 @@
         </el-form-item>
         <el-form-item label="提醒类型">
           <el-checkbox v-model="value.family">家庭事项</el-checkbox>
-          <el-checkbox v-model="value.cold">降温提醒</el-checkbox>
+          <el-checkbox v-model="value.cold">天气提醒（降温、降雨、官方预警）</el-checkbox>
           <el-checkbox v-model="value.news">影响家庭的资讯</el-checkbox>
         </el-form-item>
         <template v-if="value.cold"
@@ -29,11 +29,11 @@
           <el-form-item label="温差（℃）"
             ><el-input-number v-model="value.threshold" :min="1" :max="30"
           /></el-form-item>
-          <el-form-item label="出门时段"
+          <el-form-item label="日常出门时段"
             ><input type="time" v-model="value.from" /> 至
             <input type="time" v-model="value.to" /></el-form-item
           ><el-form-item label="仅周一至周五"><el-switch v-model="value.weekdays" /></el-form-item>
-          <p>连续两天取得同城晨间最高温预报后生效。天气来源为 Open-Meteo。</p></template
+          <p>配置和风天气后，结合家庭资料、计划、未来7天及48小时预报和官方预警提前提醒。日常预报提前24小时，旅行可提前72小时；官方预警不受出门时段限制，仍遵守免打扰。未配置和风天气时沿用同城两天晨间预报的降温提醒。</p></template
         >
         <el-button @click="preview">预览提醒</el-button><p v-if="sample">{{ sample }}</p>
         <el-button v-if="sample && value.sound && value.enabled" link @click="listen">本机试听</el-button></details></template>

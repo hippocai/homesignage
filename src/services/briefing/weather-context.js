@@ -23,7 +23,7 @@ async function observation(location,source,now) {
     return {city:location.city,source,status:'unavailable'};
   } finally {clearTimeout(timer);}
 }
-async function build(now=Date.now()) {
+async function build(now=Date.now(),options={}) {
   const components=await db.all(`SELECT DISTINCT c.id,c.type,c.config FROM components c
     JOIN device_scenes ds ON ds.scene_id=c.scene_id WHERE ds.enabled=1
     AND c.type IN ('weather','companion') ORDER BY c.id`);
@@ -44,6 +44,17 @@ async function build(now=Date.now()) {
     locations.set(city,{city,locationId:null});
   }
   const source=await settings.get('weather.provider') || 'wttr';
+  const futureLocations=new Map();
+  for(const d of cities.values())futureLocations.set(d.city,{city:d.city,locationId:null});
+  for(const location of locations.values())if(!futureLocations.has(location.city))futureLocations.set(location.city,location);
+  const h=options.household;
+  if(h)for(const location of await require('./weather-destinations').cached(h,now,options.plans||h.plans))
+    if(!futureLocations.has(location.city))futureLocations.set(location.city,{city:location.city,locationId:null});
+  const futurePromise=Promise.all([...futureLocations.values()].slice(0,8).map(async location=>{
+    let timer;
+    try{return await Promise.race([require('./future-weather').get(location,now),new Promise(resolve=>{timer=setTimeout(()=>resolve({city:location.city,status:'unavailable',reason:'天气服务暂未返回'}),2500);})]);}
+    finally{clearTimeout(timer);}
+  }));
   const forecasts=await Promise.all([...cities.entries()].slice(0,4).map(async([key,d])=>{
     const day=rules.localTime(now,d.zone).day;
     const yesterday=new Date(Date.parse(day+'T12:00Z')-86400000).toISOString().slice(0,10);
@@ -57,6 +68,6 @@ async function build(now=Date.now()) {
   const observations=await Promise.all([...locations.values()].slice(0,4).map(location=>observation(location,source,now)));
   return {asOf:new Date(now).toISOString(),status:!locations.size && !cities.size?'unconfigured':
     observations.some(v=>v.status==='fresh') || forecasts.some(v=>v.status==='available')?'available':'unavailable',
-    observations,forecasts,truncated:locations.size>4 || cities.size>4};
+    observations,forecasts,future:await futurePromise,truncated:locations.size>4 || cities.size>4 || futureLocations.size>8};
 }
 module.exports={build};
