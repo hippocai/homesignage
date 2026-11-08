@@ -3,12 +3,14 @@ const db=require('./storage'),api=require('./service'),p=require('./providers'),
 const memory=require('./agent-memory');
 const promptSettings=require('./narration-prompt');
 const prompt=promptSettings.defaultPrompt;
-async function interval(){const value=await require('../../dao/settingsDao').get('pig.greetingMinutes');return Number.isInteger(value)&&value>=1&&value<=1440?value:5;}
+const schedule=require('./narration-settings');
+async function interval(now=Date.now()){return schedule.state(await schedule.get(),now).minutes;}
 const flights=new Map(),retries=new Map();
 async function install(exec){await exec(`
   CREATE TABLE IF NOT EXISTS pig_narration(id TEXT PRIMARY KEY,device TEXT,component TEXT,created INTEGER,context TEXT,payload TEXT,review INTEGER,expires INTEGER);
   CREATE INDEX IF NOT EXISTS pig_narration_clock ON pig_narration(device,component,created);
   CREATE TABLE IF NOT EXISTS pig_narration_delivery(id TEXT PRIMARY KEY REFERENCES pig_narration(id) ON DELETE CASCADE,claimed INTEGER,result TEXT);
+  CREATE TABLE IF NOT EXISTS pig_shared_delivery(id TEXT NOT NULL REFERENCES pig_narration(id) ON DELETE CASCADE,device TEXT NOT NULL REFERENCES devices(id) ON DELETE CASCADE,component TEXT,claimed INTEGER,result TEXT,PRIMARY KEY(id,device));
 `);}
 function stable(value){
   if(Array.isArray(value))return value.map(stable);
@@ -24,13 +26,18 @@ async function context(device,component,now){
   const savedPrompt=await promptSettings.get();
   const bound=await api.boundPig(device,component);
   if(!bound.id)throw p.fault('猪猪组件未绑定',403);
-  const h=await require('./household').household(),preferences=bound.prefs;
-  const local=rules.localTime(now,h.profile.zone),quiet=rules.between(rules.localTime(now,preferences.zone).time,preferences.quietFrom,preferences.quietTo);
+  const h=await require('./household').household(),globalSettings=await schedule.get(),window=schedule.state(globalSettings,now);
+  const configs=(await db.all("SELECT DISTINCT c.config FROM components c JOIN device_scenes ds ON ds.scene_id=c.scene_id WHERE ds.enabled=1 AND c.type='companion'")).map(r=>rules.component(JSON.parse(r.config).reminders));
+  const active=configs.filter(c=>c.enabled);
+  const preferences={enabled:active.length>0,family:active.some(c=>c.family),cold:active.some(c=>c.cold),news:active.some(c=>c.news),
+    gap:active.length?Math.min(...active.map(c=>c.gap)):10,repeatMinutes:active.length?Math.min(...active.map(c=>c.repeatMinutes)):60,
+    maxPlays:active.length?Math.max(...active.map(c=>c.maxPlays)):3,zone:h.profile.zone};
+  const local=rules.localTime(now,h.profile.zone),quiet=window.quiet;
   const [agentMemory,weather,cards,info,reminders,recent]=await Promise.all([
-    memory.list(now),require('./weather-context').build(now,{household:h}),api.newsCards(device,now),
+    memory.list(now),require('./weather-context').build(now,{household:h}),api.newsCards(null,now),
     db.all('SELECT id,text,start_time,end_time FROM info_items'),
-    db.all('SELECT id,name,content,start_date,start_time,end_time,repeat FROM timed_reminders WHERE enabled=1 AND (device_ids=\'[]\' OR EXISTS(SELECT 1 FROM json_each(device_ids) WHERE value=?))',device),
-    db.all('SELECT n.id,n.created,n.payload,d.result,d.claimed FROM pig_narration n LEFT JOIN pig_narration_delivery d ON d.id=n.id WHERE n.device=? AND n.component=? ORDER BY n.created DESC LIMIT 8',device,bound.id)
+    db.all('SELECT id,name,content,start_date,start_time,end_time,repeat FROM timed_reminders WHERE enabled=1'),
+    db.all("SELECT n.id,n.created,n.payload,(SELECT result FROM pig_shared_delivery d WHERE d.id=n.id ORDER BY claimed DESC LIMIT 1) AS result,(SELECT max(claimed) FROM pig_shared_delivery d WHERE d.id=n.id) AS claimed FROM pig_narration n WHERE n.device='*' AND n.component='*' ORDER BY n.created DESC LIMIT 8")
   ]);
   const plans=h.plans.filter(v=>!v.end||v.end>=local.day);
   const input={clock:{now:memory.clock(now,h.profile.zone),...local,zone:h.profile.zone,calendar:calendar(local.day),
@@ -39,10 +46,11 @@ async function context(device,component,now){
     news:cards.slice(0,60),newsCoverage:{total:cards.length,included:Math.min(60,cards.length)},
     info:info.filter(r=>!r.end_time||Date.parse(r.end_time)>now),
     reminders:reminders.filter(r=>r.repeat!=='none'||!r.start_date||r.start_date>=local.day),
-    recent:recent.map(r=>({...r,payload:JSON.parse(r.payload)})),preferences:{...preferences,quiet,greetingMinutes:await interval()}};
+    recent:recent.map(r=>({...r,payload:JSON.parse(r.payload)})),preferences:{...preferences,shared:true,quiet,greetingMinutes:window.minutes,
+      quietEnabled:globalSettings.quietEnabled,quietFrom:globalSettings.quietFrom,quietTo:globalSettings.quietTo}};
   const {clock,recent:ignored,...facts}=input;
-  const key=p.hash(JSON.stringify([savedPrompt.prompt,savedPrompt.revision,local.day,stable(facts),agentMemory.map(m=>now>=m.starts)]));
-  return {input,key,systemPrompt:savedPrompt.prompt,component:bound.id,preferences:{...preferences,sound:preferences.enabled&&preferences.sound&&!quiet},quiet};
+  const key=p.hash(JSON.stringify([savedPrompt.prompt,savedPrompt.revision,local.day,window.slot,stable(facts),agentMemory.map(m=>now>=m.starts)]));
+  return {input,key,systemPrompt:savedPrompt.prompt,component:bound.id,preferences,quiet,window};
 }
 function validate(value,ctx,now){
   const d=value;
@@ -60,15 +68,16 @@ function validate(value,ctx,now){
   }
   const review=Date.parse(d.nextReviewAt),expires=Date.parse(d.validUntil);
   if(![d.nextReviewAt,d.validUntil].every(v=>typeof v==='string'&&/(Z|[+-]\d\d:\d\d)$/.test(v))||!Number.isFinite(review)||!Number.isFinite(expires)||review<=now||expires<=now)throw p.fault('模型气泡有效期无效',502);
-  const expiry=Math.min(expires,now+Math.max(30,ctx.input.preferences.greetingMinutes)*60000,...ctx.input.agentMemory.filter(m=>d.references.includes(m.id)&&m.expires).map(m=>m.expires),
+  const expiry=Math.min(expires,ctx.window.boundary,now+Math.max(30,ctx.input.preferences.greetingMinutes)*60000,...ctx.input.agentMemory.filter(m=>d.references.includes(m.id)&&m.expires).map(m=>m.expires),
     ...ctx.input.news.filter(m=>d.references.includes(m.id)&&m.expires).map(m=>m.expires),
     ...ctx.input.info.filter(m=>d.references.includes(m.id)&&m.end_time).map(m=>Date.parse(m.end_time)).filter(Number.isFinite));
   return {payload:{speech:d.speech.trim(),intent:d.intent,urgency:d.urgency,action:d.action,references:d.references,reason:d.reason.slice(0,1000)},
     review:Math.min(now+ctx.input.preferences.greetingMinutes*60000,expiry),expires:expiry};
 }
 async function decide(device,component,now=Date.now()){
-  const ctx=await context(device,component,now),slot=device+':'+ctx.component;
-  const old=await db.one('SELECT * FROM pig_narration WHERE device=? AND component=? ORDER BY created DESC,rowid DESC LIMIT 1',device,ctx.component);
+  const ctx=await context(device,component,now),slot='shared';
+  if(ctx.window.paused)return {paused:true,ctx};
+  const old=await db.one("SELECT * FROM pig_narration WHERE device='*' AND component='*' ORDER BY created DESC,rowid DESC LIMIT 1");
   if(old&&old.context===ctx.key&&old.review>now&&old.expires>now)return {row:old,ctx};
   if(retries.get(slot)?.key===ctx.key&&retries.get(slot).until>now)throw p.fault('模型暂不可用，稍后重试',503);
   const settings=await api.settings();
@@ -85,9 +94,10 @@ async function decide(device,component,now=Date.now()){
     // Changes during the model call (including cancellation/expiry) must invalidate the generated sentence.
     const latest=await context(device,ctx.component,decidedAt);
     if(latest.key!==ctx.key||d.expires<=decidedAt)throw p.fault('上下文已变化，正在重新判断',409);
-    const row={id:randomUUID(),device,component:ctx.component,created:now,context:ctx.key,payload:JSON.stringify(d.payload),review:d.review,expires:d.expires};
+    const row={id:randomUUID(),device:'*',component:'*',created:now,context:ctx.key,payload:JSON.stringify(d.payload),review:d.review,expires:d.expires};
     await db.run('INSERT INTO pig_narration VALUES(?,?,?,?,?,?,?,?)',...Object.values(row));
     await db.run("UPDATE pig_chat_audit SET status='ok',finished=?,reply=?,turn_id=? WHERE attempt=?",Date.now(),d.payload.speech,row.id,auditId);
+    api.notify([]);
     return {row,ctx};
   }catch(e){
     await db.run("UPDATE pig_chat_audit SET status='failed',finished=?,error=?,model_response=CASE WHEN ?!='' THEN ? ELSE model_response END WHERE attempt=?",Date.now(),e.status?e.message:'生成失败',e.rawResponse||'',e.rawResponse||'',auditId);
@@ -100,23 +110,31 @@ async function decide(device,component,now=Date.now()){
   }
 }
 async function feed(device,component,now=Date.now()){
-  const slot=device+':'+component;
+  const bound=await api.boundPig(device,component);if(!bound.id)throw p.fault('猪猪组件未绑定',403);
+  const config=await schedule.get(),window=schedule.state(config,now);
+  const preferences={...bound.prefs,quiet:window.quiet,sound:bound.prefs.enabled&&bound.prefs.sound&&!window.quiet&&!window.paused};
+  if(window.paused)return {paused:true,componentId:bound.id,nextReviewAt:window.boundary,preferences};
+  const slot='shared';
   if(!flights.has(slot))flights.set(slot,decide(device,component,now).finally(()=>flights.delete(slot)));
-  const {row,ctx}=await flights.get(slot),d=JSON.parse(row.payload);
-  return {id:row.id,componentId:row.component,speech:d.speech,action:d.action,intent:d.intent,urgency:d.urgency,
-    validUntil:row.expires,nextReviewAt:row.review,preferences:ctx.preferences};
+  const {row,ctx,paused}=await flights.get(slot);
+  if(paused)return {paused:true,componentId:bound.id,nextReviewAt:ctx.window.boundary,preferences:{...preferences,sound:false}};
+  const d=JSON.parse(row.payload);
+  return {id:row.id,componentId:bound.id,speech:d.speech,action:d.action,intent:d.intent,urgency:d.urgency,
+    validUntil:row.expires,nextReviewAt:row.review,preferences};
 }
 async function claim(device,component,id,now=Date.now()){
   const ctx=await context(device,component,now);
-  const row=await db.one('SELECT * FROM pig_narration WHERE id=? AND device=? AND component=?',id,device,ctx.component);
-  if(!row||row.expires<=now||row.context!==ctx.key)throw p.fault('气泡已经失效',409);
-  const changed=await db.run("INSERT OR IGNORE INTO pig_narration_delivery VALUES(?,?,'claimed')",id,now);
-  return {accepted:!!changed,sound:ctx.preferences.sound};
+  const checkedAt=Math.max(now,Date.now()),current=schedule.state(await schedule.get(),checkedAt);
+  const row=await db.one("SELECT * FROM pig_narration WHERE id=? AND device='*' AND component='*'",id);
+  if(!row||current.paused||current.quiet!==ctx.quiet||current.slot!==ctx.window.slot||current.minutes!==ctx.window.minutes||row.expires<=checkedAt||row.context!==ctx.key)throw p.fault('气泡已经失效',409);
+  const changed=await db.run("INSERT OR IGNORE INTO pig_shared_delivery VALUES(?,?,?,?,'claimed')",id,device,component,now);
+  const bound=await api.boundPig(device,component);
+  return {accepted:!!changed,sound:bound.prefs.enabled&&bound.prefs.sound&&!ctx.quiet};
 }
 async function result(device,component,id,status){
   if(!['subtitle','spoken','interrupted'].includes(status))throw p.fault('无效播放结果');
   await api.boundPig(device,component);
-  await db.run("UPDATE pig_narration_delivery SET result=? WHERE id=? AND EXISTS(SELECT 1 FROM pig_narration n WHERE n.id=? AND n.device=? AND n.component=?)",status,id,id,device,component);
+  await db.run('UPDATE pig_shared_delivery SET result=? WHERE id=? AND device=? AND component=?',status,id,device,component);
   return {ok:true};
 }
 module.exports={install,prompt,interval,context,validate,feed,claim,result};

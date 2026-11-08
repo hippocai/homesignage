@@ -3,17 +3,23 @@
     <header>
       <div>
         <h2>猪猪伙伴</h2>
-        <p>维护家庭记忆、聊天和系统操作记录。提醒类型、声音及免打扰请在画面编辑器的猪猪组件中设置。</p>
+        <p>管理全家共享的猪猪气泡、免打扰、家庭记忆和聊天。每个组件的外观、字号和声音仍可在画面编辑器设置。</p>
       </div>
       <img :src="'/client/assets/peach-pig.svg#wave'" alt="桃桃猪" />
     </header>
     <el-alert v-if="error" :title="error" type="error" @close="error = ''" />
     <HouseholdAgent />
     <el-card><h3>气泡生成设置</h3>
-      <el-form label-width="180px"><el-form-item label="问候生成间隔（分钟）">
-        <el-input-number v-model="greetingMinutes" :min="1" :max="1440" :step="1" :precision="0" aria-label="问候生成间隔（分钟）" />
-      </el-form-item></el-form>
-      <p>默认5分钟，最少1分钟。屏幕在线时按间隔重新生成；记忆、天气、新闻或系统事项变化及旧话语到期时提前重新判断。每次模型请求与返回均记录在聊天审计中。</p>
+      <p>所有猪猪组件共享同一条气泡，只生成一次。以下时段使用家庭时区 {{ generation.zone }}。</p>
+      <el-form label-width="150px">
+        <el-form-item label="启用免打扰"><el-switch v-model="generation.quietEnabled" aria-label="启用免打扰" /></el-form-item>
+        <el-form-item label="免打扰时段"><input type="time" v-model="generation.quietFrom" aria-label="免打扰开始" /> 至 <input type="time" v-model="generation.quietTo" aria-label="免打扰结束" /></el-form-item>
+      </el-form>
+      <p>免打扰可跨午夜，期间不朗读或主动提醒；开始与结束相同表示不设置静默时段。是否生成陪伴话语由下方时段控制。</p>
+      <div class="generation-slots"><label v-for="(label,index) in slotLabels" :key="index" class="generation-slot">
+        <span>{{label}}</span><el-input-number v-model="generation.greetingSchedule[index]" :min="0" :max="120" :step="1" :precision="0" :aria-label="label+'生成间隔（分钟）'" /><span>分钟</span>
+      </label></div>
+      <p>每天12个两小时时段，0为暂停更新，1–120为生成间隔（分钟）。暂停期间不调用气泡模型；跨时段重新判断，过期内容不再播报。启用时段内，记忆、天气、新闻或系统事项变化可提前更新。</p>
       <el-button type="primary" :loading="saving" @click="saveGeneration">保存生成设置</el-button>
     </el-card>
     <PigPromptSettings />
@@ -26,8 +32,9 @@ import api from '../api/index.js';
 import HouseholdAgent from '../components/HouseholdAgent.vue';
 import PigPromptSettings from '../components/PigPromptSettings.vue';
 const error = ref(''),
-  greetingMinutes = ref(5),
+  generation = ref({greetingSchedule:Array(12).fill(5),quietEnabled:true,quietFrom:'22:00',quietTo:'07:00',zone:'Asia/Shanghai'}),
   saving = ref(false);
+const slotLabels=Array.from({length:12},(_,i)=>String(i*2).padStart(2,'0')+':00–'+String(i*2+2).padStart(2,'0')+':00');
 async function call(method, url, body) {
   try {
     error.value = '';
@@ -41,14 +48,15 @@ async function call(method, url, body) {
 async function saveGeneration() {
   saving.value = true;
   try {
-    await call('put', '/companion/settings', { greetingMinutes:greetingMinutes.value });
+    const {greetingSchedule,quietEnabled,quietFrom,quietTo}=generation.value;
+    generation.value=await call('put', '/companion/settings', {greetingSchedule,quietEnabled,quietFrom,quietTo});
     ElMessage.success('气泡生成设置已保存');
   } catch {} finally {
     saving.value = false;
   }
 }
 onMounted(async () => {
-  greetingMinutes.value = (await call('get','/companion/settings')).greetingMinutes;
+  generation.value = await call('get','/companion/settings');
 });
 </script>
 <style scoped>
@@ -73,6 +81,7 @@ onMounted(async () => {
 .companion-admin h3 {
   margin-bottom: 14px;
 }
+.generation-slots{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:12px}.generation-slot{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.generation-slot>span:first-child{min-width:100px}
 .el-form {
   max-width: 640px;
   margin: 16px 0;

@@ -12,8 +12,9 @@ var briefingRuntime = (function () {
   function renderCards(cards){components.filter(function(c){return c.type==='headlines';}).forEach(function(c){HomeBriefing.cards(c.el,c.cfg,cards,Date.now());});}
   function show(comp,d,token){
     if(token!==sequence||comp!==currentPig()||busy()||document.hidden)return;
+    if(d.paused){if(voice&&shown)receipt(shown,'interrupted');stop();clearTimeout(expiry);shown=null;status(comp,'当前时段已暂停更新。');return;}
     if(d.validUntil<=Date.now())return;
-    if(shown&&shown.id===d.id)return;
+    if(shown&&shown.id===d.id){if(!d.preferences.sound)stop();return;}
     if(voice&&shown)receipt(shown,'interrupted');stop();clearTimeout(expiry);shown=d;
     HomeBriefing.pig(comp.el,comp.cfg,d.speech,d.action);
     expiry=setTimeout(function(){stop();shown=null;status(comp,'正在请模型重新判断…');sync();},Math.max(1,d.validUntil-Date.now()));

@@ -149,9 +149,9 @@ async function patchSettings(fields) {
   await db.run(`INSERT INTO settings(key,value) VALUES('briefing.settings',?)
     ON CONFLICT(key) DO UPDATE SET value=json_patch(settings.value,excluded.value),updated_at=CURRENT_TIMESTAMP`,JSON.stringify(fields));
 }
-router.get('/companion/settings', handle(async () => ({familyAI:(await api.settings()).familyAI,greetingMinutes:await require('../services/briefing/narrator').interval()})));
+router.get('/companion/settings', handle(async () => ({familyAI:(await api.settings()).familyAI,...await require('../services/briefing/narration-settings').get(),greetingMinutes:await require('../services/briefing/narrator').interval()})));
 router.get('/companion/agent/memory',handle(async()=>{const memory=require('../services/briefing/agent-memory'),entries=await memory.list();return {entries,text:memory.format(entries),file:'data/pig-agent-memory.md',audit:await db.all('SELECT * FROM pig_memory_audit ORDER BY id DESC LIMIT 50')};}));
-router.get('/companion/agent/narrations',handle(async()=>({items:(await db.all('SELECT n.*,d.result,d.claimed FROM pig_narration n LEFT JOIN pig_narration_delivery d ON n.id=d.id ORDER BY n.created DESC LIMIT 30')).map(r=>({...r,payload:JSON.parse(r.payload)}))})));
+router.get('/companion/agent/narrations',handle(async()=>({items:(await db.all('SELECT n.*,coalesce((SELECT result FROM pig_shared_delivery s WHERE s.id=n.id ORDER BY claimed DESC LIMIT 1),d.result) AS result,coalesce((SELECT max(claimed) FROM pig_shared_delivery s WHERE s.id=n.id),d.claimed) AS claimed FROM pig_narration n LEFT JOIN pig_narration_delivery d ON n.id=d.id ORDER BY n.created DESC LIMIT 30')).map(r=>({...r,payload:JSON.parse(r.payload)}))})));
 router.get('/companion/agent/narration-prompt',handle(()=>require('../services/briefing/narration-prompt').get()));
 router.put('/companion/agent/narration-prompt',handle(r=>require('../services/briefing/narration-prompt').save(r.body)));
 router.get('/companion/agent/weather',handle(async()=>{
@@ -159,13 +159,12 @@ router.get('/companion/agent/weather',handle(async()=>{
   return {status:require('../services/briefing/weather-agent').status(),weather:await require('../services/briefing/weather-context').build(Date.now(),{household:h})};
 }));
 router.put('/companion/settings', handle(async r => {
-  if(r.body.greetingMinutes!==undefined)rules.int(r.body.greetingMinutes,1,1440,'问候生成间隔（分钟）');
   if(r.body.familyAI!==undefined&&typeof r.body.familyAI!=='boolean')throw p.fault('请输入家庭提醒润色开关');
-  if(r.body.greetingMinutes===undefined&&r.body.familyAI===undefined)throw p.fault('请提供设置');
+  if(!['greetingMinutes','greetingSchedule','quietEnabled','quietFrom','quietTo','familyAI'].some(k=>r.body[k]!==undefined))throw p.fault('请提供设置');
+  const settings=await require('../services/briefing/narration-settings').save(r.body);
   if(r.body.familyAI!==undefined)await patchSettings({familyAI:r.body.familyAI});
-  if(r.body.greetingMinutes!==undefined)await db.run("INSERT INTO settings(key,value) VALUES('pig.greetingMinutes',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",JSON.stringify(r.body.greetingMinutes));
   api.notify([]);
-  return {familyAI:(await api.settings()).familyAI,greetingMinutes:await require('../services/briefing/narrator').interval()};
+  return {familyAI:(await api.settings()).familyAI,...settings,greetingMinutes:await require('../services/briefing/narrator').interval()};
 }));
 router.get(
   '/companion/rules/:id',

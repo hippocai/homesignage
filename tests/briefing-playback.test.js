@@ -57,3 +57,8 @@ test('隐藏页面及系统定时提示期间不争用声音',async()=>{
   const f=setup();f.ctx.document.hidden=true;f.runtime.sync();await flush();expect(f.claims()).toBe(0);
   f.ctx.document.hidden=false;f.ctx.reminderPool={r:{}};f.runtime.sync();await flush();expect(f.claims()).toBe(0);
 });
+test('暂停时段停止语音并显示暂停状态，不领取；恢复时显示共享决策',async()=>{
+  const f=setup({sound:true});f.runtime.sync();await flush();f.data.paused=true;f.runtime.sync();await flush();
+  expect(f.cancel).toHaveBeenCalled();expect(f.renderer.pig.mock.calls.at(-1)[2]).toBe('当前时段已暂停更新。');expect(f.claims()).toBe(1);
+  f.data.paused=false;f.data.id='shared-next';f.runtime.sync();await flush();expect(f.claims()).toBe(2);expect(f.renderer.pig.mock.calls.at(-1)[2]).toBe(f.data.speech);
+});

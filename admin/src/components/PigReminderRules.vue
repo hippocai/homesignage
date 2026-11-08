@@ -5,9 +5,7 @@
           ><el-slider v-model="value.volume" :step="0.1" :max="1" style="width: 200px"
         /></el-form-item>
         <el-form-item label="时区"><el-input v-model="value.zone" /></el-form-item>
-        <el-form-item label="免打扰时段"
-          ><input type="time" v-model="value.quietFrom" /> 至 <input type="time" v-model="value.quietTo"
-        /></el-form-item>
+        <p>免打扰与分时生成频率在「猪猪伙伴」全局设置中配置。所有组件共享气泡；提醒类型按已绑定组件启用类型的并集生成，本组件的声音与音量独立生效。</p>
         <el-form-item label="建议提醒间隔（分钟）"
           ><el-input-number v-model="value.gap" :min="0" :max="240"
         /></el-form-item>

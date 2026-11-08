@@ -262,9 +262,9 @@ module.exports = function extend(spec) {
     obj({prompt:{...str,minLength:1,maxLength:20000},reset:bool,revision:{...num,minimum:0}},['revision']),
     '保存传prompt；恢复默认传reset=true。必须提交读取到的revision，过期版本409。保存后通知屏幕，旧决策失效，进行中的旧prompt结果不可发布；新生成与审计使用新prompt。无需重启，不改家庭资料或独立记忆。');
   path('get','/companion/agent/narrations','查看最近30条模型气泡决策与展示回执',obj({items:list({type:'object',additionalProperties:true})}));
-  const narration=obj({id:str,componentId:str,speech:str,intent:str,urgency:str,action:str,validUntil:num,nextReviewAt:num,preferences:rules});
+  const narration=obj({id:str,componentId:str,paused:bool,speech:str,intent:str,urgency:str,action:str,validUntil:num,nextReviewAt:num,preferences:rules});
   path('get','/devices/{id}/narration','取得模型生成的气泡，包括普通问候',narration,null,
-    '30秒轮询；按猪猪设置greetingMinutes（1–1440整数分钟，默认5）定期重新生成。上下文变化或话语到期会提前重新判断。模型决定话题和提醒，代码校验权限、有效期与引用。请求prompt、上下文、原始返回及失败状态写入聊天审计。模型失败或预算用尽返回错误，不使用固定问候替代。');
+    '全部猪猪组件共享一个模型决策和id。按家庭时区的greetingSchedule当前两小时时段生成，0返回paused=true且不调用气泡模型；1–120为分钟间隔。时段边界、上下文变化或话语到期会重新判断。30秒轮询兜底，新共享话语通过briefing-updated通知所有屏幕。免打扰来自全局设置，声音/音量独立。每次真实模型请求完整审计；同屏多个组件只领取一次朗读权，不同屏幕各自回执。');
   spec.paths['/devices/{id}/narration'].get.parameters.push({in:'query',name:'componentId',required:true,schema:str});
   path('post','/devices/{id}/narration/{event}/claim','校验最新上下文并领取朗读权',obj({accepted:bool,sound:bool}),obj({componentId:str},['componentId']));
   path('post','/devices/{id}/narration/{event}/result','记录气泡实际展示/朗读/中断',obj({ok:bool}),obj({componentId:str,result:choice('subtitle','spoken','interrupted')},['componentId','result']));
@@ -296,9 +296,10 @@ module.exports = function extend(spec) {
   path('get','/companion/agent/impacts','读取当前家庭生活影响和判断状态',obj({status:str,
     items:list(obj({id:str,title:str,source:str,url:str,speech:str,until:num,repeatable:bool}))}));
   path('get', '/devices/{id}/news', '读取本设备已发布且有效的资讯列表', obj({cards:list(event)}));
-  const pigSettings=obj({familyAI:{...bool,deprecated:true},greetingMinutes:{...num,minimum:1,maximum:1440,default:5}});
+  const pigSettings=obj({familyAI:{...bool,deprecated:true},greetingMinutes:{...num,minimum:0,maximum:120,deprecated:true,description:'读取为当前时段值；旧客户端写入1–120时填充全部时段'},
+    greetingSchedule:{type:'array',minItems:12,maxItems:12,items:{...num,minimum:0,maximum:120},description:'索引0为00–02时，依次至22–24时。0暂停气泡生成，其他值为分钟。'},quietEnabled:bool,quietFrom:str,quietTo:str,zone:{...str,readOnly:true,description:'家庭时区'}});
   path('get', '/companion/settings', '读取猪猪设置', pigSettings);
-  path('put', '/companion/settings', '保存猪猪设置；分钟间隔必须为1–1440整数', pigSettings,pigSettings);
+  path('put', '/companion/settings', '保存全局免打扰及12时段生成设置；每段0–120整数', pigSettings,pigSettings);
   path('put', '/companion/rules/{id}', '已停用，返回 410；改用场景组件接口保存 config.reminders', rules, rules);
   spec.paths['/companion/rules/{id}'].put.deprecated=true;
   delete spec.paths['/companion/rules/{id}'].put.responses[200];

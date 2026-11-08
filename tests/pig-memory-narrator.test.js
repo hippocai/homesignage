@@ -15,7 +15,7 @@ beforeEach(async()=>{
   now=Date.now();
   for(const table of ['pig_narration_delivery','pig_narration','pig_agent_memory','pig_memory_audit','pig_chat_audit','pig_conversation','briefing_usage','info_items','timed_reminders'])await db.run('DELETE FROM '+table);
   await db.run("UPDATE pig_household SET revision=0,profile=?,plans='[]'",JSON.stringify({memory:'常住苏州；早上8点出门',zone:'Asia/Shanghai'}));
-  await db.run("DELETE FROM settings WHERE key='pig.greetingMinutes'");
+  await db.run("DELETE FROM settings WHERE key IN ('pig.greetingMinutes','pig.narrationSettings')");
   await setRules(component,{enabled:true,cold:true,city:'苏州',family:true,news:true,quietFrom:'00:00',quietTo:'00:00'});
   jest.spyOn(weather,'build').mockResolvedValue({status:'available',observations:[{city:'苏州',tempC:8}],future:[{daily:{items:[{date:'明天',low:3}]},hourly:{items:[{hour:8,rain:70}]},alerts:{status:'fresh',items:[]}}]});
   jest.spyOn(api,'newsCards').mockResolvedValue([{id:'news-test',expires:now+3600000,payload:{title:'苏州道路施工',source:'测试'}}]);

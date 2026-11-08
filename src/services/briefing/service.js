@@ -457,11 +457,11 @@ async function syncFamily(id) {
 async function newsCards(deviceId, now = Date.now()) {
   const rows = await db.all(`SELECT * FROM briefing_events
     WHERE state='published' AND kind IN ('news','ranking') AND starts<=? AND expires>?
-      AND (targets='[]' OR EXISTS(SELECT 1 FROM json_each(targets) WHERE value=?))
-    ORDER BY json_extract(payload,'$.important') DESC,updated DESC`, now, now, deviceId);
+      AND (? IS NULL OR targets='[]' OR EXISTS(SELECT 1 FROM json_each(targets) WHERE value=?))
+    ORDER BY json_extract(payload,'$.important') DESC,updated DESC`, now, now, deviceId??null,deviceId??null);
   const policy = await settings();
   const cards = await filterEvents(rows.map(unpack),policy);
-  if (!cards.length) return cards;
+  if (!cards.length || deviceId==null) return cards;
   const components = await db.all(`SELECT DISTINCT c.id,c.config FROM components c
     JOIN device_scenes ds ON ds.scene_id=c.scene_id WHERE ds.device_id=? AND ds.enabled=1 AND c.type='headlines'`, deviceId);
   for (const {id,config} of components) {

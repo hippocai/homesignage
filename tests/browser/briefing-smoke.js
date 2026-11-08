@@ -193,10 +193,20 @@ async function main() {
       return {tokens:20,data:{speech:item?item.text:'模型生成的家庭问候',intent:item?'reminder':'greeting',urgency:item?'important':'normal',action:item?'scarf':'idle',
         references:item?[item.id]:[],reason:'浏览器验收',nextReviewAt:new Date(Date.now()+300000).toISOString(),validUntil:new Date(Date.now()+600000).toISOString()}};
     };
-    await page.getByRole('spinbutton',{name:'问候生成间隔（分钟）'}).fill('3');
+    const timeSlot=page.getByRole('spinbutton',{name:'00:00–02:00生成间隔（分钟）'});
+    await timeSlot.fill('3');
+    await page.getByRole('spinbutton',{name:'02:00–04:00生成间隔（分钟）'}).fill('0');
+    await page.getByRole('spinbutton',{name:'22:00–24:00生成间隔（分钟）'}).fill('120');
+    await page.getByLabel('免打扰开始',{exact:true}).fill('22:30');
+    await page.getByLabel('免打扰结束',{exact:true}).fill('06:30');
     await page.getByRole('button',{name:'保存生成设置'}).click();
     await page.getByText('气泡生成设置已保存',{exact:true}).waitFor();
-    assert.equal((await api('GET','/companion/settings')).greetingMinutes,3);
+    const generationSettings=await api('GET','/companion/settings');
+    assert.equal(generationSettings.greetingSchedule.length,12);
+    assert.equal(generationSettings.greetingSchedule[0],3);assert.equal(generationSettings.greetingSchedule[1],0);assert.equal(generationSettings.greetingSchedule[11],120);
+    assert.equal(generationSettings.quietFrom,'22:30');assert.equal(generationSettings.quietTo,'06:30');
+    // The display part of this test must run regardless of local clock time.
+    await api('PUT','/companion/settings',{greetingSchedule:Array(12).fill(3),quietEnabled:false});
     const originalPrompt=await api('GET','/companion/agent/narration-prompt');
     const customPrompt=originalPrompt.prompt+'\n浏览器测试：请使用亲切简短的语气。';
     await page.getByRole('textbox',{name:'气泡 System prompt',exact:true}).fill(customPrompt);
