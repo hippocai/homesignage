@@ -10,7 +10,43 @@
   function pigFontSize(value) {
     return Number.isFinite(value) ? Math.max(16, Math.min(72, Math.round(value))) : 28;
   }
+  var pigBubbles = new WeakMap();
+  function disposePig(host) {
+    var dispose = pigBubbles.get(host);
+    if (dispose) { dispose(); pigBubbles.delete(host); }
+  }
+  function scrollBubble(host, viewport, text) {
+    var distance = -1, connected = false;
+    function fit() {
+      if (!host.isConnected) { if (connected) disposePig(host); return; }
+      connected = true;
+      var height = viewport.clientHeight;
+      var overflow = height > 0 ? Math.max(0, text.scrollHeight - height) : 0;
+      // Ignore rounding at the last pixel; never shrink the font or stretch the bubble.
+      var next = overflow > 1 ? overflow : 0;
+      if (next === distance) return;
+      distance = next;
+      text.style.animation = 'none';
+      text.style.setProperty('--pig-scroll-distance', -distance + 'px');
+      if (distance) {
+        // Hold at both ends, moving at at most 12 px/s so the whole sentence is readable.
+        void text.offsetHeight;
+        text.style.animation = 'pig-bubble-scroll ' + Math.max(20, distance / 12 / .8) + 's linear infinite';
+      }
+    }
+    var resize = root.ResizeObserver && new root.ResizeObserver(fit);
+    if (resize) { resize.observe(viewport); resize.observe(text); }
+    // Also covers early iOS 13 without ResizeObserver, late fonts and detached scene nodes.
+    var timer = root.setInterval(fit, 1000);
+    pigBubbles.set(host, function () {
+      root.clearInterval(timer);
+      if (resize) resize.disconnect();
+      text.style.animation = 'none';
+    });
+    fit();
+  }
   function pig(host, cfg, line, action) {
+    disposePig(host);
     host.textContent = '';
     var stage = node('div', 'pig-stage'),
       img = node('img', 'pig-portrait');
@@ -34,11 +70,15 @@
       stage.appendChild(canvas);
       model.setPose(pose);
     } else useIllustration();
-    var bubble = node('div', line ? 'pig-bubble' : 'pig-bubble pig-greeting',
-      line || '气泡预览：实际话语由模型结合家庭情况生成。');
+    var bubble = node('div', line ? 'pig-bubble' : 'pig-bubble pig-greeting');
+    var viewport = node('div', 'pig-bubble-viewport');
+    var text = node('div', 'pig-bubble-text', line || '气泡预览：实际话语由模型结合家庭情况生成。');
+    viewport.appendChild(text);
+    bubble.appendChild(viewport);
     bubble.style.fontSize = pigFontSize(cfg.fontSize) + 'px';
     stage.appendChild(bubble);
     host.appendChild(stage);
+    scrollBubble(host, viewport, text);
   }
   function newsConfig(cfg) {
     const words = Array.isArray(cfg.keywords) ? cfg.keywords : String(cfg.theme || '').split(/[,，、\n]/);
@@ -150,5 +190,5 @@
     const carousel = carousels.get(host);
     if (carousel) { carousel.dispose(); carousels.delete(host); }
   }
-  root.HomeBriefing = { pig, pigFontSize, cards, disposeCards, newsConfig };
+  root.HomeBriefing = { pig, disposePig, pigFontSize, cards, disposeCards, newsConfig };
 })(typeof window === 'undefined' ? globalThis : window);

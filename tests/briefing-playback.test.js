@@ -3,7 +3,7 @@ const source=fs.readFileSync(path.join(__dirname,'../client/js/briefing-runtime.
 const flush=()=>new Promise(r=>setImmediate(r));
 function setup({sound=false,unlocked=true,blocked=false,delayClaim=false}={}){
   const el={dataset:{componentId:'pig'}},data={id:'decision',componentId:'pig',speech:'出门记得拿红包哦。',action:'wave',validUntil:Date.now()+300000,preferences:{sound,volume:0.4}};
-  const timers=new Map(),results=[],renderer={pig:jest.fn(),cards:jest.fn(),disposeCards:jest.fn()};
+  const timers=new Map(),results=[],renderer={pig:jest.fn(),cards:jest.fn(),disposeCards:jest.fn(),disposePig:jest.fn()};
   let voice,resolveClaim,claims=0,fail=false;
   const speak=jest.fn(v=>{voice=v;}),cancel=jest.fn();
   const ctx={window:{speechSynthesis:{speak,cancel},SpeechSynthesisUtterance:true},SpeechSynthesisUtterance:class{constructor(text){this.text=text;}},Date,Promise,
@@ -44,6 +44,7 @@ test('紧急插播和非当前场景不领取',async()=>{
 test('领取途中卸载，迟到响应不会发声',async()=>{
   const f=setup({sound:true,delayClaim:true});f.runtime.sync();await flush();f.runtime.reset();f.confirmClaim();await flush();
   expect(f.speak).not.toHaveBeenCalled();expect(f.results).toEqual(['interrupted']);
+  expect(f.renderer.disposePig).toHaveBeenCalledTimes(1);
 });
 test('模型失败清除旧提醒，显示明确状态而非伪造问候',async()=>{
   const f=setup({sound:true});f.runtime.sync();await flush();f.fail();f.runtime.sync();await flush();

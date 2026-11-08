@@ -70,9 +70,11 @@
   max-width: 100%;
 }
 .pig-bubble {
+  display: flex;
+  flex-direction: column;
   min-width: 0;
   max-height: 92%;
-  overflow: auto;
+  overflow: hidden;
   box-sizing: border-box;
   background: #fff4dc;
   color: #523d41;
@@ -82,4 +84,13 @@
   font-family: system-ui, sans-serif;
   font-weight: 600;
   line-height: 1.35;
+}
+.pig-bubble-viewport {
+  min-height: 0;
+  overflow: hidden;
+}
+.pig-bubble-text { flex-shrink: 0; }
+@keyframes pig-bubble-scroll {
+  0%, 10% { transform: translateY(0); }
+  90%, 100% { transform: translateY(var(--pig-scroll-distance)); }
 }

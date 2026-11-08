@@ -8,8 +8,11 @@ const scripts = ['pig-3d.js', 'pig-greetings.js', 'briefing.js'].map(file =>
 
 function setup(getContext) {
   function element(tag) {
+    let text = '';
     return {
       tag, style: {}, children: [], setAttribute: jest.fn(), getContext,
+      get textContent() { return text + this.children.map(child => child.textContent).join(''); },
+      set textContent(value) { text = value; this.children = []; },
       appendChild(child) { this.children.push(child); child.parentNode = this; },
       replaceChild(child, previous) {
         this.children[this.children.indexOf(previous)] = child;
@@ -18,7 +21,7 @@ function setup(getContext) {
       }
     };
   }
-  const window = {}, context = vm.createContext({window, document: {createElement: element}});
+  const window = {setInterval:jest.fn(),clearInterval:jest.fn()}, context = vm.createContext({window, document: {createElement: element}});
   scripts.forEach(source => vm.runInContext(source, context));
   const host = element('div');
   function show(config, line, action) {

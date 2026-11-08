@@ -17,7 +17,7 @@ const samples = [
   id: 'sample-' + i, kind, expires:Infinity,
   payload: {title,topic,summary,source:'预览样例',rank:kind === 'ranking' ? i : null}
 }));
-onBeforeUnmount(() => window.HomeBriefing.disposeCards(host.value));
+onBeforeUnmount(() => { window.HomeBriefing.disposeCards(host.value); window.HomeBriefing.disposePig(host.value); });
 onMounted(() =>
   watchEffect(() => {
     const cfg = { ...props.config };

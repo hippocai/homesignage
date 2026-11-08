@@ -40,7 +40,7 @@ var briefingRuntime = (function () {
       if(token===sequence&&comp===currentPig()){stop();shown=null;clearTimeout(expiry);status(comp,'模型暂不可用，正在等待重试。');}
     });
   }
-  function reset(){sequence++;stop();clearInterval(poll);clearTimeout(expiry);poll=null;shown=null;components.forEach(function(c){if(c.type==='headlines')HomeBriefing.disposeCards(c.el);});components=[];}
+  function reset(){sequence++;stop();clearInterval(poll);clearTimeout(expiry);poll=null;shown=null;components.forEach(function(c){if(c.type==='headlines')HomeBriefing.disposeCards(c.el);else if(c.type==='companion')HomeBriefing.disposePig(c.el);});components=[];}
   function mount(el,cfg,type){var c={el:el,cfg:cfg,type:type};components.push(c);if(type==='companion')status(c,'正在请模型结合家庭情况想一想…');else HomeBriefing.cards(el,cfg,[],Date.now());if(!poll){poll=setInterval(sync,30000);setTimeout(sync,0);}}
   function interrupt(){sequence++;stop();if(shown)receipt(shown,'interrupted');shown=null;clearTimeout(expiry);status(currentPig(),'正在显示系统优先提示。');}
   function scene(){interrupt();sync();}
