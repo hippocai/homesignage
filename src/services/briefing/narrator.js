@@ -33,7 +33,7 @@ async function context(device,component,now){
     db.all('SELECT n.id,n.created,n.payload,d.result,d.claimed FROM pig_narration n LEFT JOIN pig_narration_delivery d ON d.id=n.id WHERE n.device=? AND n.component=? ORDER BY n.created DESC LIMIT 8',device,bound.id)
   ]);
   const plans=h.plans.filter(v=>!v.end||v.end>=local.day);
-  const input={clock:{now:new Date(now).toISOString(),...local,zone:h.profile.zone,calendar:calendar(local.day),
+  const input={clock:{now:memory.clock(now,h.profile.zone),...local,zone:h.profile.zone,calendar:calendar(local.day),
     lunar:new Intl.DateTimeFormat('zh-CN-u-ca-chinese',{timeZone:h.profile.zone,dateStyle:'full'}).format(now)},
     profile:{memory:h.profile.memory},plans,agentMemory:memory.context(agentMemory,now,h.profile.zone),weather,
     news:cards.slice(0,60),newsCoverage:{total:cards.length,included:Math.min(60,cards.length)},
@@ -71,7 +71,10 @@ async function decide(device,component,now=Date.now()){
   const old=await db.one('SELECT * FROM pig_narration WHERE device=? AND component=? ORDER BY created DESC,rowid DESC LIMIT 1',device,ctx.component);
   if(old&&old.context===ctx.key&&old.review>now&&old.expires>now)return {row:old,ctx};
   if(retries.get(slot)>now)throw p.fault('模型暂不可用，稍后重试',503);
-  const settings=await api.settings(),messages=[{role:'system',content:prompt()},{role:'user',content:JSON.stringify(ctx.input)}];
+  const settings=await api.settings();
+  let correction='';
+  for(let attempt=0;attempt<2;attempt++){
+  const messages=[{role:'system',content:prompt()+correction},{role:'user',content:JSON.stringify(ctx.input)}];
   const auditId=randomUUID();
   await db.run(`INSERT INTO pig_chat_audit(attempt,created,scope,actor,ip,turn_id,message,kind,system_prompt,model_context,model)
     VALUES(?,?,'system:narration','猪猪气泡','',?,'自动生成气泡','narration',?,?,?)`,auditId,now,auditId,messages[0].content,messages[1].content,settings.provider+'/'+settings.model);
@@ -86,7 +89,15 @@ async function decide(device,component,now=Date.now()){
     await db.run('INSERT INTO pig_narration VALUES(?,?,?,?,?,?,?,?)',...Object.values(row));
     await db.run("UPDATE pig_chat_audit SET status='ok',finished=?,reply=?,turn_id=? WHERE attempt=?",Date.now(),d.payload.speech,row.id,auditId);
     return {row,ctx};
-  }catch(e){await db.run("UPDATE pig_chat_audit SET status='failed',finished=?,error=?,model_response=CASE WHEN ?!='' THEN ? ELSE model_response END WHERE attempt=?",Date.now(),e.status?e.message:'生成失败',e.rawResponse||'',e.rawResponse||'',auditId);if(e.status!==409)retries.set(slot,now+(e.status===429?15:2)*60000);throw e;}
+  }catch(e){
+    await db.run("UPDATE pig_chat_audit SET status='failed',finished=?,error=?,model_response=CASE WHEN ?!='' THEN ? ELSE model_response END WHERE attempt=?",Date.now(),e.status?e.message:'生成失败',e.rawResponse||'',e.rawResponse||'',auditId);
+    if(attempt===0&&e.status===502){
+      correction='\n【本次重试校验反馈】上次输出未能通过校验：'+e.message+'。当前家庭当地时间为 '+ctx.input.clock.now+'。请重新生成完整JSON，所有时间必须晚于此刻，保持正确的当地日期和时区偏移。nextReviewAt与validUntil不能是过去；只引用本上下文实际提供的编号，并遵守免打扰及功能开关。';
+      continue;
+    }
+    if(e.status!==409)retries.set(slot,now+(e.status===429?15:2)*60000);throw e;
+  }
+  }
 }
 async function feed(device,component,now=Date.now()){
   const slot=device+':'+component;

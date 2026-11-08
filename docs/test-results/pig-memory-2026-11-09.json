@@ -1,9 +1,19 @@
 {
   "date": "2026-11-09",
-  "applicationCommit": "6a0c2d9",
-  "unitTests": {"suites": 32, "passed": 456, "failed": 0},
-  "targetedRegressionAfterReferenceFix": {"passed": 16, "failed": 0},
-  "browser": {"chromium": "passed", "webkit": "passed"},
+  "applicationCommit": "see Git history: local-time narration retry fix",
+  "unitTests": {
+    "suites": 32,
+    "passed": 457,
+    "failed": 0
+  },
+  "targetedRegressionAfterReferenceFix": {
+    "passed": 17,
+    "failed": 0
+  },
+  "browser": {
+    "chromium": "passed",
+    "webkit": "passed"
+  },
   "realModel": {
     "model": "glm-5.3-flash",
     "isolation": "in-memory database; synthetic family and controlled weather",
@@ -27,12 +37,17 @@
     "actualPromptAndResponseAudited": true,
     "actualSystemPromptFilter": "passed",
     "displayRefreshCommands": 2,
-    "contextCounts": {"familyCharacters": 167, "weatherCities": 4, "news": 38},
+    "contextCounts": {
+      "familyCharacters": 167,
+      "weatherCities": 4,
+      "news": 38
+    },
     "testRemindersOrMemoriesInserted": 0
   },
   "resolvedFindings": [
     "Model skipped a still-valid, never-announced memory; added readable local times and explicit unfulfilled-task guidance.",
     "Relative time update drifted across UTC/local time; apply explicit minute offsets against the original record.",
-    "Production model referenced supplied clock and profile.memory fields; normalize these documented references without allowing unknown references."
+    "Production model referenced supplied clock and profile.memory fields; normalize these documented references without allowing unknown references.",
+    "Cross-midnight model output sometimes used a past date; provide local-offset clock and retry validation once, with separate complete audit for each attempt."
   ]
 }

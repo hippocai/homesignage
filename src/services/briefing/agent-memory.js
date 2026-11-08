@@ -105,4 +105,4 @@ function clock(ms,zone){
   return day+'T'+time+':00'+(offset>=0?'+':'-')+pad(Math.floor(Math.abs(offset)/60))+':'+pad(Math.abs(offset)%60);
 }
 function context(rows,now,zone='Asia/Shanghai'){return rows.map(r=>({...r,startAt:clock(r.starts,zone),expiresAt:r.expires?clock(r.expires,zone):null,state:now>=r.starts?'active':'upcoming'}));}
-module.exports={install,file,project,prune,list,onlyMemory,prepare,prompt,context};
+module.exports={install,file,project,prune,list,onlyMemory,prepare,prompt,context,clock};

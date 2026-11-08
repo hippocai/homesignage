@@ -148,6 +148,16 @@ test('无效JSON保留模型原始返回和失败状态，不发布气泡',async
   await expect(narrator.feed('memory-screen',other,now)).rejects.toMatchObject({status:502});
   expect(await db.one("SELECT status,model_response FROM pig_chat_audit WHERE kind='narration'")).toEqual({status:'failed',model_response:'not-json response'});
   expect(await db.all('SELECT * FROM pig_narration')).toHaveLength(0);
+  expect(await db.all("SELECT id FROM pig_chat_audit WHERE kind='narration'")).toHaveLength(2);
+});
+test('跨午夜失效时间只重试一次，每次实际prompt和返回分别审计',async()=>{
+  const other=await bindPig('memory-screen','retry-time-scene');await setRules(other,{enabled:true,quietFrom:'00:00',quietTo:'00:00'});
+  const mock=model(decision({intent:'greeting',references:[]}));
+  mock.mockResolvedValueOnce({data:decision({validUntil:new Date(now-1000).toISOString()}),tokens:10});
+  const d=await narrator.feed('memory-screen',other,now);expect(d.speech).toBeTruthy();expect(mock).toHaveBeenCalledTimes(2);
+  const rows=await db.all("SELECT status,system_prompt,model_context FROM pig_chat_audit WHERE kind='narration' ORDER BY id");
+  expect(rows.map(r=>r.status)).toEqual(['failed','ok']);expect(rows[1].system_prompt).toContain('本次重试校验反馈');
+  expect(JSON.parse(rows[0].model_context).clock.now).toMatch(/\+08:00$/);
 });
 test('模型气泡设备接口拒绝错误密钥及未绑定组件',async()=>{
   const url='/api/v1/devices/memory-screen/narration?componentId=';
