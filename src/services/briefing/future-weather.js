@@ -76,7 +76,7 @@ async function get(location,now=Date.now()){
     const point=await resolve(location,cfg);
     const [daily,hourly,alerts]=await Promise.all(['days','hours','alerts'].map(k=>section(k,location,point,cfg,now)));
     const superseded=new Set(alerts.items.flatMap(x=>x.supersedes));
-    return {city:location.city,region:point.region,daily:{...daily,items:daily.items.filter(x=>Date.parse(x.end)>now)},
+    return {city:location.city,region:point.region,locationKey:p.hash(point.latitude+','+point.longitude),daily:{...daily,items:daily.items.filter(x=>Date.parse(x.end)>now)},
       hourly:{...hourly,items:hourly.items.filter(x=>Date.parse(x.time)>=now-3600000)},
       alerts:{...alerts,items:alerts.items.filter(x=>Date.parse(x.end)>now && !superseded.has(x.id))}};
   }catch{return {city:location.city,daily:{...unavailable},hourly:{...unavailable},alerts:{...unavailable}};}

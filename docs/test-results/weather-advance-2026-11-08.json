@@ -1,5 +1,5 @@
 {
-  "runAt": "2026-11-08T15:41:40.350Z",
+  "runAt": "2026-11-08T15:51:39.141Z",
   "database": "disposable copy",
   "checks": [
     {
@@ -30,28 +30,28 @@
     {
       "name": "real-household-analysis",
       "passed": true,
-      "generated": 2
+      "generated": 6
     },
     {
       "name": "glm-commute-and-trip",
       "passed": true,
       "tasks": [
         {
-          "id": "f1f8798a-92ed-439e-9e8f-a7da019cfc09",
+          "id": "22996ee7-a4a8-47e9-aa3a-b391169219e0",
           "scope": "weather-test-trip",
           "officialId": "fixture-official",
           "starts": 1794180600000,
           "expires": 1794181200000
         },
         {
-          "id": "e8219fca-4daa-47ff-b979-f64c6b24261c",
+          "id": "cb3f4743-800e-4483-a409-3278e55a846b",
           "scope": "memory",
           "officialId": null,
           "starts": 1794180600000,
           "expires": 1794187800000
         },
         {
-          "id": "00abf049-4dc5-4a7f-9194-61f51fd53ce7",
+          "id": "5d06b85d-3f57-49b8-aa83-9f22b8926b2f",
           "scope": "memory",
           "officialId": null,
           "starts": 1794180600000,
@@ -79,28 +79,28 @@
   "syntheticModelOutput": {
     "reminders": [
       {
-        "id": "alert:85e666eb242936241fcace9d1c1c9efb5615c6c1f67f02267ba707bf09c4ec4a",
+        "id": "alert:fixture-official",
         "scope": "weather-test-trip",
         "basis": "2026-11-09到2026-11-10去北京市旅游，在户外步行游览。",
-        "advice": "北京已发布大风橙色预警，明天白天户外步行注意防风保暖，避开临时搭建物、广告牌等。",
-        "start": "2026-11-08T23:30:00.000Z",
-        "until": "2026-11-09T02:00:00.000Z"
+        "advice": "北京已发布大风橙色预警，明天白天户外步行游览时注意避开临时搭建物和高空坠物风险，建议调整路线或时段。",
+        "start": "2026-11-08T23:30:00Z",
+        "until": "2026-11-09T10:00:00Z"
       },
       {
         "id": "cold:苏州:2026-11-09",
         "scope": "memory",
         "basis": "常住江苏苏州市，每天早上8点骑车经过青禾路上班。",
-        "advice": "苏州今天最高温较昨日下降10℃、最低6℃，早上骑车上班注意添衣保暖防风。",
-        "start": "2026-11-08T23:30:00.000Z",
-        "until": "2026-11-09T01:30:00.000Z"
+        "advice": "苏州明天最高温降至12℃、最低6℃，较前一天下降10℃，早上骑车上班注意添衣保暖防风。",
+        "start": "2026-11-08T23:30:00Z",
+        "until": "2026-11-09T16:00:00Z"
       },
       {
         "id": "rain:苏州:2026-11-09",
         "scope": "memory",
         "basis": "每天早上8点骑车经过青禾路上班。",
-        "advice": "今早8点左右苏州降水概率约90%，骑车通勤建议带雨具、注意路滑。",
-        "start": "2026-11-08T23:30:00.000Z",
-        "until": "2026-11-09T01:00:00.000Z"
+        "advice": "预报明早8点左右降水概率90%、可能有3mm降雨，骑车上班请带雨具并注意路滑。",
+        "start": "2026-11-08T23:30:00Z",
+        "until": "2026-11-09T01:00:00Z"
       }
     ]
   },

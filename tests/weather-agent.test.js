@@ -37,6 +37,13 @@ test('不变风险不重复调用模型，不重建记录、不增加播报版�
   await analyze();const before=await events();await analyze(now+60000);
   expect(model).toHaveBeenCalledTimes(1);const after=await events();expect(after.map(x=>[x.id,x.edition,x.version])).toEqual(before.map(x=>[x.id,x.edition,x.version]));
 });
+test('同一城市的不同写法按实际地点去重，不重复生成同一天风险',async()=>{
+  const first={...bundle,locationKey:'same-place'},alias={...bundle,city:'江苏/苏州市',locationKey:'same-place',scopes:['memory']};
+  await agent.analyzeComponent(component,['weather-screen'],d,household,[first,alias],now);
+  expect(await events()).toHaveLength(2);
+  const input=JSON.parse(model.mock.calls[0][1][1].content);
+  expect(input.candidates).toHaveLength(2);expect(input.candidates[0].affectedCities).toEqual(['苏州','江苏/苏州市']);
+});
 test('官方预警更新原记录；解除后不能继续领取旧播报',async()=>{
   const warning={id:'official-1',issuer:'苏州市气象台',event:'大风',title:'大风黄色预警',description:'预计阵风增强',issued:iso(now-60000),onset:iso(now+3600000),start:iso(now),end:iso(now+86400000),messageType:'alert',severity:'moderate',color:'yellow',supersedes:[]};
   bundle.daily=section([]);bundle.hourly=section([]);bundle.alerts=section([warning]);await analyze();const [old]=await events();

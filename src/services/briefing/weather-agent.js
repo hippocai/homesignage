@@ -5,7 +5,7 @@ const HOUR=3600000;
 const contextKey=(h,d)=>p.hash(JSON.stringify([h.profile,h.plans,d]));
 const fresh=(section,now,maxAge)=>section?.status==='fresh' && now-Date.parse(section.fetchedAt)<maxAge;
 function candidates(bundle,d,now){
-  const rows=[],city=bundle.city;
+  const rows=[],city=bundle.city,locationKey=bundle.locationKey||city;
   const add=(id,kind,start,end,evidence,section,extra={})=>{
     if(!Number.isFinite(start) || !Number.isFinite(end) || end<=now)return;
     rows.push({id,kind,city,start,end,evidence,scopes:[...new Set([...(city===d.city?['memory']:[]),...(bundle.scopes||[])])],source:kind==='official'?extra.issuer||'官方气象部门':'QWeather天气预报',
@@ -13,7 +13,7 @@ function candidates(bundle,d,now){
   };
   if(fresh(bundle.alerts,now,10*60000))for(const a of bundle.alerts.items){
     if(a.messageType==='cancel')continue;
-    const id='alert:'+p.hash([city,a.issuer,a.event,a.onset.slice(0,10)].join('|'));
+    const id='alert:'+a.id;
     add(id,'official',Date.parse(a.onset),Date.parse(a.end),a.title+'。'+a.description,bundle.alerts,
       {issuer:a.issuer,officialId:a.id,officialTitle:a.title,severity:a.severity,color:a.color,issued:a.issued,officialInstruction:a.instruction,supersedes:a.supersedes});
   }
@@ -21,7 +21,7 @@ function candidates(bundle,d,now){
     const prev=bundle.daily.items[i-1],day=bundle.daily.items[i];
     const drop=Math.round((prev.highC-day.highC)*10)/10;
     if(Date.parse(day.start)!==Date.parse(prev.end) || drop<d.threshold)continue;
-    add('cold:'+city+':'+day.start.slice(0,10),'cold',Date.parse(day.start),Date.parse(day.end),
+    add('cold:'+locationKey+':'+day.start.slice(0,10),'cold',Date.parse(day.start),Date.parse(day.end),
       city+' '+day.start.slice(0,10)+'最高温预报'+day.highC+'℃，比前一天预报下降'+drop+'℃；最低'+day.lowC+'℃。',bundle.daily,{drop});
   }
   if(fresh(bundle.hourly,now,2*HOUR)){
@@ -31,7 +31,7 @@ function candidates(bundle,d,now){
       const risks=[];
       if(h.rainPercent>=60 && h.rainMm>=0.5)risks.push('rain');
       if(h.gustMs>=10.8 || h.windMs>=10.8)risks.push('wind');
-      for(const kind of risks){const id=kind+':'+city+':'+h.time.slice(0,10);if(!groups.has(id))groups.set(id,{kind,hours:[]});groups.get(id).hours.push(h);}
+      for(const kind of risks){const id=kind+':'+locationKey+':'+h.time.slice(0,10);if(!groups.has(id))groups.set(id,{kind,hours:[]});groups.get(id).hours.push(h);}
     }
     for(const [id,{kind,hours}] of groups){
       const times=hours.map(h=>Date.parse(h.time));
@@ -65,10 +65,16 @@ function validate(choice,c,h,d,now){
 }
 async function analyzeComponent(component,devices,d,h,bundles,now){
   const api=require('./service'),settings=await api.settings(),ctx=contextKey(h,d);
-  const all=bundles.flatMap(b=>candidates(b,d,now)).filter(c=>c.scopes.length);
+  const unique=new Map();
+  for(const c of bundles.flatMap(b=>candidates(b,d,now)).filter(c=>c.scopes.length)){
+    const previous=unique.get(c.id);
+    if(previous){previous.scopes=[...new Set([...previous.scopes,...c.scopes])];previous.affectedCities=[...new Set([...previous.affectedCities,c.city])];}
+    else unique.set(c.id,{...c,affectedCities:[c.city]});
+  }
+  const all=[...unique.values()];
   const existing=await db.all("SELECT * FROM briefing_events WHERE kind='weather' AND json_extract(payload,'$.weatherAgent')=1 AND json_extract(payload,'$.component')=?",component);
-  for(const c of all)if(c.supersedes?.length){
-    const prior=existing.map(v=>JSON.parse(v.payload)).find(v=>c.supersedes.includes(v.officialId));
+  for(const c of all)if(c.officialId){
+    const prior=existing.map(v=>JSON.parse(v.payload)).find(v=>v.officialId===c.officialId || c.supersedes?.includes(v.officialId));
     if(prior)c.id=prior.candidateId;
   }
   const selected=all.sort((a,b)=>(a.kind==='official'?0:1)-(b.kind==='official'?0:1)||a.start-b.start).slice(0,40);
