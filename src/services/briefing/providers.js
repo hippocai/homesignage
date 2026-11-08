@@ -352,10 +352,10 @@ async function jsonCompletion(settings, messages, maxTokens) {
     throw error;
   }
   try {
-    return {data:JSON.parse(b.choices[0].message.content), tokens:Number(b.usage?.total_tokens) || 0};
+    return {data:JSON.parse(b.choices[0].message.content), raw:b.choices[0].message.content,tokens:Number(b.usage?.total_tokens) || 0};
   } catch {
     throw Object.assign(fault('模型未返回有效 JSON', 502), {
-      code:'MODEL_JSON_FORMAT', tokens:b.usage?.total_tokens
+      code:'MODEL_JSON_FORMAT', tokens:b.usage?.total_tokens,rawResponse:typeof b.choices?.[0]?.message?.content==='string'?b.choices[0].message.content:''
     });
   }
 }

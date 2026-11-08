@@ -9,15 +9,13 @@
     </header>
     <el-alert v-if="error" :title="error" type="error" @close="error = ''" />
     <HouseholdAgent />
-    <el-card
-      ><h3>家庭事项</h3>
-      <el-switch
-        v-if="familyAI !== null"
-        v-model="familyAI"
-        active-text="允许使用模型润色家庭提醒"
-        :disabled="saving"
-        @change="saveFamily"
-    /></el-card>
+    <el-card><h3>气泡生成设置</h3>
+      <el-form label-width="180px"><el-form-item label="问候生成间隔（分钟）">
+        <el-input-number v-model="greetingMinutes" :min="1" :max="1440" :step="1" :precision="0" aria-label="问候生成间隔（分钟）" />
+      </el-form-item></el-form>
+      <p>默认5分钟，最少1分钟。屏幕在线时按间隔重新生成；记忆、天气、新闻或系统事项变化及旧话语到期时提前重新判断。每次模型请求与返回均记录在聊天审计中。</p>
+      <el-button type="primary" :loading="saving" @click="saveGeneration">保存生成设置</el-button>
+    </el-card>
   </main>
 </template>
 <script setup>
@@ -26,7 +24,7 @@ import { ElMessage } from 'element-plus';
 import api from '../api/index.js';
 import HouseholdAgent from '../components/HouseholdAgent.vue';
 const error = ref(''),
-  familyAI = ref(null),
+  greetingMinutes = ref(5),
   saving = ref(false);
 async function call(method, url, body) {
   try {
@@ -38,18 +36,17 @@ async function call(method, url, body) {
     throw e;
   }
 }
-async function saveFamily(value) {
+async function saveGeneration() {
   saving.value = true;
   try {
-    await call('put', '/companion/settings', { familyAI: value });
-  } catch {
-    familyAI.value = !value;
-  } finally {
+    await call('put', '/companion/settings', { greetingMinutes:greetingMinutes.value });
+    ElMessage.success('气泡生成设置已保存');
+  } catch {} finally {
     saving.value = false;
   }
 }
 onMounted(async () => {
-  familyAI.value = (await call('get','/companion/settings')).familyAI;
+  greetingMinutes.value = (await call('get','/companion/settings')).greetingMinutes;
 });
 </script>
 <style scoped>

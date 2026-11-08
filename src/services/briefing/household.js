@@ -6,6 +6,7 @@ const rules = require('./rules');
 const control=require('./actions');
 const records=require('./owned-records');
 const weatherContext=require('./weather-context');
+const agentMemory=require('./agent-memory');
 
 const defaults = { members:null, home:'', work:'', route:'', hours:'', zone:'Asia/Shanghai' };
 async function household() {
@@ -97,7 +98,7 @@ function validDay(value) {
 }
 async function askChat(settings, input) {
   for (let attempt=0; attempt<2; attempt++) {
-    const prompt=attempt===0 ? chatPrompt : chatPrompt+' 上一次回答格式不完整。请重新回答原消息，使用顶层对象。普通对话示例：{"reply":"你好！","add":[],"remove":[],"actions":[]}。';
+    const prompt=chatPrompt+agentMemory.prompt+(attempt===0?'':' 上一次回答格式不完整，请重新返回完整 JSON 对象。');
     let data;
     try { data=await ask(settings,prompt,input); }
     catch(error) {
@@ -108,7 +109,7 @@ async function askChat(settings, input) {
     if (!data || typeof data.reply!=='string' || !data.reply.trim()) continue;
     const add=data.add ?? [], remove=data.remove ?? [], actions=data.actions ?? [];
     if (Array.isArray(add) && add.length<=6 && Array.isArray(remove) && Array.isArray(actions)) {
-      return {reply:data.reply, add, remove, actions};
+      return {reply:data.reply, add, remove, actions,memoryActions:data.memoryActions??[]};
     }
   }
   throw p.fault('猪猪这次没能整理好答复，请重新发送。这条消息没有修改计划或提醒。',502);
@@ -138,17 +139,20 @@ async function chat(input, now=Date.now(), actor={scope:'admin',name:'后台',ip
   const saved = await savedTurn();
   if (saved) return saved;
   const h = await household(), settings = await api.settings(), ctx = context(h,settings,now);
+  const memoryRows=await agentMemory.list(now,actor.scope);
+  const memoryOnly=agentMemory.onlyMemory(message);
+  const memoryRequest=memoryOnly||/记忆|记住|记着/.test(message)||(memoryRows.length>0&&!/系统|信息列表|定时/.test(message));
   const visiblePlans=guest ? ctx.plans.filter(plan=>plan.owner===actor.scope) : ctx.plans;
   const requestedMode=records.requestMode(message);
   const readProfileOrWeather=requestedMode==='view' && /(?:基础|基本|家庭)(?:资料|信息)|记忆|天气|气温|降温|穿衣|路况/.test(message) &&
     !/信息列表|定时提示|定时提醒|我创建|我设置/.test(message);
   const readNews=/新闻|资讯|报道|热搜/.test(message) && !/信息列表|我的提醒|我创建|我设置/.test(message) &&
     requestedMode!=='update' && requestedMode!=='cancel';
-  const mode=readNews || readProfileOrWeather?null:requestedMode;
+  const mode=readNews || readProfileOrWeather || memoryRequest?null:requestedMode;
   const tools=!readNews && !readProfileOrWeather && (Boolean(mode) || control.intent(message));
   const ownedRecords=mode?await records.owned(actor.scope):[];
   const recentIds=mode?await records.recentIds(actor.scope):[];
-  const listing=mode==='view'?records.list(ownedRecords,message,now,h.profile.zone,recentIds):null;
+  const listing=mode==='view'&&!memoryRequest?records.list(ownedRecords,message,now,h.profile.zone,recentIds):null;
   let liveContext={};
   if(!listing) {
     const [entries,weather]=await Promise.all([news(now,settings),weatherContext.build(now,{household:h,plans:visiblePlans})]);
@@ -160,10 +164,12 @@ async function chat(input, now=Date.now(), actor={scope:'admin',name:'后台',ip
   const response = listing?{reply:listing.reply,add:[],remove:[]}:await askChat(settings,{today:ctx.day,now:new Date(now).toISOString(),tools,mode,
     ownedRecords:ownedRecords.map(row=>({id:row.id,type:row.type,text:row.text,window:records.display(row,h.profile.zone)})),
     recentRecordIds:recentIds,
+    agentMemory:agentMemory.context(memoryRows,now,h.profile.zone),
     profile:{memory:h.profile.memory,zone:h.profile.zone},plans:visiblePlans,
     history:(await history(6,actor.scope)).map(({message,reply})=>({message,reply})),
     ...liveContext,message});
-  if(mode){response.add=[];response.remove=[];}
+  if(mode||memoryOnly){response.add=[];response.remove=[];}
+  const memoryActions=agentMemory.prepare(response.memoryActions??[],message,memoryRows,now);
   if (response.remove.some(id=>!visiblePlans.some(plan=>plan.id===id))) throw p.fault('计划已变化，请重新发送',409);
   const plans = ctx.plans.filter(plan=>!response.remove.includes(plan.id));
   for (const plan of response.add) {
@@ -174,24 +180,29 @@ async function chat(input, now=Date.now(), actor={scope:'admin',name:'后台',ip
       plans.push({id:randomUUID(),text,start,end,...(guest?{owner:actor.scope}:{})});
   }
   if (plans.length>40) throw p.fault('有效计划最多 40 条，请先移除已结束的计划');
-  const actions=listing?listing.actions:await control.prepare(tools?response.actions:[],message,now,h.profile.zone,{mode,rows:ownedRecords,recent:recentIds});
+  if(memoryActions.length&&response.actions?.length)throw p.fault('不能同时保存独立记忆和系统提醒，请明确选择一种方式',502);
+  const actions=memoryOnly?[]:listing?listing.actions:await control.prepare(tools?response.actions:[],message,now,h.profile.zone,{mode,rows:ownedRecords,recent:recentIds});
   const plain=response.reply.trim().slice(0,1800);
-  const reply=listing?listing.reply:actions.length?actions.map(a=>a.receipt).join('\n'):
+  const reply=memoryActions.length?memoryActions.map(a=>a.op==='forget'?'已从猪猪自己的记忆中删除这条事项。':
+    (a.op==='update'?'已更新':'已记入')+'猪猪自己的记忆：'+a.text+'。'+(a.expires?'到 '+new Date(a.expires).toLocaleString('zh-CN',{timeZone:h.profile.zone,hour12:false})+' 自动删除。':'长期保留。')+'未创建系统定时提示或信息列表。').join('\n'):
+    listing?listing.reply:actions.length?actions.map(a=>a.receipt).join('\n'):
+    memoryRequest&&/已.{0,8}(记住|记下|记入|保存|更新|删除|取消)/.test(plain)?'本次没有更改猪猪的独立记忆，请补充要记住的内容和有效时间。':
     mode && /已[经为帮你您\s]*(?:删除|取消|撤销|撤下|修改|更新|更改|推迟|提前|调整)/.test(plain)
       ? '本次未更改系统记录。请提供要操作的编号和具体修改要求。':
     /(?:已[经为帮你您\s]*(?:安排|创建|设[置定]|添加|发布).{0,24}(?:提醒|提示|信息)|(?:会|将会)在.{0,20}提醒你)/.test(plain)
       ? '目前没有创建定时提示或信息。请告诉我希望显示的内容和具体时间。'
       :plain+(mode?'\n本次未更改系统记录。':tools?'\n本条消息未创建定时提示或信息。':'');
   // The records, successful receipt, plans and conversation commit together, or none do.
-  const ok = await db.run(`INSERT INTO pig_conversation(id,created,message,reply,next_plans,scope,actions)
-    SELECT ?,?,?,?,?,?,? FROM pig_household WHERE id=1 AND revision=? AND NOT EXISTS(SELECT 1 FROM pig_conversation WHERE id=?)`,
-    id,now,message,reply,JSON.stringify(mode?h.plans:plans),actor.scope,JSON.stringify(actions),h.revision,id).catch(e=>{
+  const ok = await db.run(`INSERT INTO pig_conversation(id,created,message,reply,next_plans,scope,actions,memory_actions)
+    SELECT ?,?,?,?,?,?,?,? FROM pig_household WHERE id=1 AND revision=? AND NOT EXISTS(SELECT 1 FROM pig_conversation WHERE id=?)`,
+    id,now,message,reply,JSON.stringify(mode||memoryOnly||memoryActions.length?h.plans:plans),actor.scope,JSON.stringify(actions),JSON.stringify(memoryActions),h.revision,id).catch(e=>{
       if(e.message.includes('pig_record_conflict')) throw p.fault('记录刚被修改或取消，请重新查看后再操作。',409);
+      if(e.message.includes('pig_memory_conflict')) throw p.fault('记忆刚被修改或到期，请重新查看后再操作。',409);
       throw e;
     });
   const turn = await savedTurn();
   if (!turn) throw p.fault('家庭资料或对话刚刚更新，请重新发送',409);
-  if (ok && !listing) {await control.activate(actions);api.notify([]);}
+  if (ok && !listing) {if(memoryActions.length)await agentMemory.project();await control.activate(actions);api.notify([]);}
   return turn;
   }
 }

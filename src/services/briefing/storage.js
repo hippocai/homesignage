@@ -91,6 +91,9 @@ CREATE UNIQUE INDEX IF NOT EXISTS one_companion_per_scene ON components(scene_id
 const exec = (sql) => new Promise((resolve, reject) => db.exec(sql, (e) => (e ? reject(e) : resolve())));
 async function init() {
   await exec(schema);
+  const auditColumns=await all('PRAGMA table_info(pig_chat_audit)');
+  for(const [name,definition] of [['kind',"TEXT NOT NULL DEFAULT 'chat'"],['system_prompt',"TEXT NOT NULL DEFAULT ''"],['model_context',"TEXT NOT NULL DEFAULT ''"],['model_response',"TEXT NOT NULL DEFAULT ''"],['model',"TEXT NOT NULL DEFAULT ''"]])
+    if(!auditColumns.some(c=>c.name===name))await run('ALTER TABLE pig_chat_audit ADD COLUMN '+name+' '+definition);
   await exec(require('./ranking-schema'));
   if (!(await all('PRAGMA table_info(briefing_sources)')).some(c=>c.name==='topic_policy')) {
     await run('ALTER TABLE briefing_sources ADD COLUMN topic_policy TEXT');
@@ -98,6 +101,9 @@ async function init() {
   const turns = await all('PRAGMA table_info(pig_conversation)');
   if (!turns.some(c=>c.name==='scope')) await run("ALTER TABLE pig_conversation ADD COLUMN scope TEXT NOT NULL DEFAULT 'admin'");
   if (!turns.some(c=>c.name==='actions')) await run("ALTER TABLE pig_conversation ADD COLUMN actions TEXT NOT NULL DEFAULT '[]'");
+  if (!turns.some(c=>c.name==='memory_actions')) await run("ALTER TABLE pig_conversation ADD COLUMN memory_actions TEXT NOT NULL DEFAULT '[]'");
+  await require('./agent-memory').install(exec);
+  await require('./narrator').install(exec);
   if (!(await all('PRAGMA table_info(timed_reminders)')).some(c=>c.name==='start_date')) await run('ALTER TABLE timed_reminders ADD COLUMN start_date TEXT');
   await require('./record-schema')({one,exec});
   await run('CREATE INDEX IF NOT EXISTS pig_turn_scope ON pig_conversation(scope,created)');

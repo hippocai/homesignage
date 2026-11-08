@@ -35,7 +35,7 @@
       model.setPose(pose);
     } else useIllustration();
     var bubble = node('div', line ? 'pig-bubble' : 'pig-bubble pig-greeting',
-      line || root.HomePigGreetings.greeting(cfg));
+      line || '气泡预览：实际话语由模型结合家庭情况生成。');
     bubble.style.fontSize = pigFontSize(cfg.fontSize) + 'px';
     stage.appendChild(bubble);
     host.appendChild(stage);

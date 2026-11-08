@@ -22,11 +22,14 @@ module.exports = async function checkCoreDisplay({browser,page,api,url,errors}) 
   const notice = await api('POST','/info-items',{text:'基础屏公告验收',type:'info'});
   await api('PUT','/devices/'+device.id+'/scenes',{scenes:[{sceneId:scene.id,duration:60}]});
   const display = await browser.newPage({viewport:{width:1200,height:720}});
-  await display.route('**/api/v1/devices/*/briefing*',route=>route.fulfill({json:{data:{
+  await display.route('**/api/v1/devices/*/news',route=>route.fulfill({json:{data:{
     tasks:[],active:[],preferences:{enabled:true},cards:['第一条资讯','第二条资讯'].map((title,i)=>({
       id:'test-'+i,kind:'news',expires:Date.now()+60000,payload:{title,source:'测试来源',summary:'测试简述'}
     }))
   }}}));
+  await display.route('**/api/v1/devices/*/narration?**',route=>route.fulfill({json:{data:{id:'model-fixture',componentId:'fixture',speech:'模型问候验收',action:'wave',validUntil:Date.now()+60000,preferences:{sound:false}}}}));
+  await display.route('**/api/v1/devices/*/narration/*/claim',route=>route.fulfill({json:{data:{accepted:true,sound:false}}}));
+  await display.route('**/api/v1/devices/*/narration/*/result',route=>route.fulfill({json:{data:{ok:true}}}));
   display.on('pageerror',e=>errors.push(e.message));
   await display.route('**/api/v1/weather?**',route=>route.fulfill({json:{data:{city:'Beijing',tempC:19,tempF:66,icon:'☀',description:'晴'},fetchedAt:Date.now()}}));
   await display.route('**/api/v1/stocks?**',route=>route.fulfill({json:{data:{
@@ -41,7 +44,7 @@ module.exports = async function checkCoreDisplay({browser,page,api,url,errors}) 
     await display.locator('.stock-component').getByText('123.45',{exact:true}).waitFor();
     await display.locator('.stock-chart svg path').waitFor();
     await display.locator('.pig-portrait').waitFor();
-    assert.ok(await display.locator('.pig-greeting').innerText());
+    await display.locator('.pig-bubble').filter({hasText:'模型问候验收'}).waitFor();
     await display.getByText('第一条资讯',{exact:true}).waitFor();
     await display.getByText('第二条资讯',{exact:true}).waitFor();
     await display.locator('.info-list-component').getByText(notice.text,{exact:true}).first().waitFor();

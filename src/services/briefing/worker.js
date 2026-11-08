@@ -117,20 +117,16 @@ async function tick() {
   if (running) return;
   running = true;
   try {
-    const advancedWeather=!!await require('../../dao/settingsDao').get('weather.qweather.apiKey');
-    for (const { device,component,config } of await db.all(
-      "SELECT ds.device_id AS device,c.id AS component,c.config FROM device_scenes ds JOIN components c ON ds.scene_id=c.scene_id WHERE ds.enabled=1 AND c.type='companion' AND json_extract(c.config,'$.reminders.cold')=1"
-    )) {
-      try {
-        if(!advancedWeather)await weather(device,rules.component(JSON.parse(config).reminders),Date.now(),component);
-      } catch (e) {
-        logger.warn('Weather briefing unavailable', { reason: e.message });
-      }
-    }
+    await require('./agent-memory').prune();
     for (const { item } of await db.all('SELECT item FROM briefing_info')) await api.syncFamily(item);
     collectDue().catch((e) => logger.warn('News scheduler unavailable', { reason: e.message }));
-    void analyzeDue();
-    void analyzeWeather();
+    // Collect context; the narrator chooses topics instead of threshold rules.
+    if(!weatherAnalyzing && Date.now()>=weatherDue){
+      weatherAnalyzing=true;
+      require('./household').household().then(h=>require('./weather-destinations').discover(h))
+        .catch(e=>logger.warn('Weather location discovery postponed',{status:e.status||500}))
+        .finally(()=>{weatherAnalyzing=false;weatherDue=Date.now()+5*60000;});
+    }
     await db.run('DELETE FROM briefing_claims WHERE claimed<?', Date.now() - 30 * 86400000);
     await db.run('DELETE FROM briefing_events WHERE expires<?', Date.now() - 30 * 86400000);
     await db.run('DELETE FROM briefing_history WHERE at<?', Date.now() - 30 * 86400000);
@@ -142,6 +138,7 @@ async function tick() {
   }
 }
 function start() {
+  require('./agent-memory').prune().then(()=>require('./agent-memory').project()).catch(e=>logger.error('Agent memory file unavailable',{reason:e.message}));
   const run = () => tick().catch((e) => logger.error('Briefing worker failed', { reason: e.message }));
   run();
   const t = setInterval(run, 30000);

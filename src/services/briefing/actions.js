@@ -190,4 +190,4 @@ async function activate(actions) {
     try {await next;} finally {if(pendingTimers.get(action.id)===next) pendingTimers.delete(action.id);}
   }
 }
-module.exports={intent,prepare,activate};
+module.exports={intent,prepare,activate,minuteShift};

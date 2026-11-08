@@ -8,13 +8,13 @@
         <el-form-item label="免打扰时段"
           ><input type="time" v-model="value.quietFrom" /> 至 <input type="time" v-model="value.quietTo"
         /></el-form-item>
-        <el-form-item label="最短间隔（分钟）"
+        <el-form-item label="建议提醒间隔（分钟）"
           ><el-input-number v-model="value.gap" :min="0" :max="240"
         /></el-form-item>
         <el-form-item label="同一事项间隔">
           <el-input-number v-model="value.repeatMinutes" :min="1" :max="1440" /> 分钟
         </el-form-item>
-        <el-form-item label="每条最多提醒">
+        <el-form-item label="建议提醒次数">
           <el-input-number v-model="value.maxPlays" :min="1" :max="12" /> 次（含首次）
         </el-form-item>
         <el-form-item label="提醒类型">
@@ -26,14 +26,11 @@
           ><el-form-item label="城市"
             ><el-input v-model.trim="value.city" maxlength="80" placeholder="例如：深圳市" />
             <small>同名城市可填写「省份/城市」，例如「辽宁/朝阳市」。</small></el-form-item>
-          <el-form-item label="温差（℃）"
-            ><el-input-number v-model="value.threshold" :min="1" :max="30"
-          /></el-form-item>
           <el-form-item label="日常出门时段"
             ><input type="time" v-model="value.from" /> 至
             <input type="time" v-model="value.to" /></el-form-item
           ><el-form-item label="仅周一至周五"><el-switch v-model="value.weekdays" /></el-form-item>
-          <p>配置和风天气后，结合家庭资料、计划、未来7天及48小时预报和官方预警提前提醒。日常预报提前24小时，旅行可提前72小时；官方预警不受出门时段限制，仍遵守免打扰。未配置和风天气时沿用同城两天晨间预报的降温提醒。</p></template
+          <p>每句话均由模型结合家庭资料、猪猪独立记忆、天气、新闻和系统事项决定。出门时段、间隔和次数作为偏好交给模型，不再使用固定温差或提前量筛选。免打扰期间只显示陪伴话语，不朗读。临时记忆到期自动删除。</p></template
         >
         <el-button @click="preview">预览提醒</el-button><p v-if="sample">{{ sample }}</p>
         <el-button v-if="sample && value.sound && value.enabled" link @click="listen">本机试听</el-button></details></template>

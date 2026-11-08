@@ -79,10 +79,15 @@ scoped.post('/messages',limit(12),run(async req=>{
 async function audit(query) {
   const before=query.before===undefined?Number.MAX_SAFE_INTEGER:Number(query.before);
   if(!Number.isSafeInteger(before) || before<1) throw fault('无效审计分页');
-  const rows=await db.all(`SELECT a.id,a.created,a.finished,a.actor,a.scope,a.ip,a.message,a.reply,a.status,a.error,
-    CASE WHEN a.status='ok' THEN c.actions END AS actions FROM pig_chat_audit a LEFT JOIN pig_conversation c ON a.turn_id=c.id
-    WHERE a.id<? ORDER BY a.id DESC LIMIT 31`,before);
-  for(const row of rows) row.actions=JSON.parse(row.actions || '[]');
-  return {items:rows.slice(0,30),next:rows.length>30?rows[29].id:null};
+  const type=query.type||'all',scope=query.scope||'';
+  if(!['all','chat','narration','system_prompt','model_context','model_response'].includes(type)||typeof scope!=='string'||scope.length>200)throw fault('无效审计筛选');
+  const kind=['system_prompt','model_context','model_response'].includes(type)?'narration':type;
+  const rows=await db.all(`SELECT a.id,a.created,a.finished,a.actor,a.scope,a.ip,a.message,a.reply,a.status,a.error,a.kind,a.system_prompt,a.model_context,a.model_response,a.model,
+    CASE WHEN a.status='ok' THEN c.actions END AS actions,CASE WHEN a.status='ok' THEN c.memory_actions END AS memoryActions FROM pig_chat_audit a LEFT JOIN pig_conversation c ON a.turn_id=c.id
+    WHERE a.id<? AND (?='all' OR a.kind=?) AND (?='' OR a.scope=?) ORDER BY a.id DESC LIMIT 31`,before,kind,kind,scope,scope);
+  for(const row of rows) {row.actions=JSON.parse(row.actions || '[]');row.memoryActions=JSON.parse(row.memoryActions || '[]');}
+  for(const row of rows)if(['system_prompt','model_context','model_response'].includes(type))for(const field of ['system_prompt','model_context','model_response','message','reply'])if(field!==type)delete row[field];
+  const users=await db.all("SELECT scope,max(actor) AS actor FROM pig_chat_audit WHERE kind='chat' GROUP BY scope ORDER BY actor");
+  return {items:rows.slice(0,30),next:rows.length>30?rows[29].id:null,users};
 }
 module.exports={router,shareLinks,audit};

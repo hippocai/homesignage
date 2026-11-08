@@ -186,6 +186,17 @@ async function main() {
       await guest.close();await guest2.close();
     }
     assert.equal(await page.getByRole('heading',{name:'设备提醒'}).count(),0);
+    if(!live)providers.jsonCompletion=async(_settings,messages)=>{
+      const input=JSON.parse(messages[1].content);
+      if(!input.clock)return {tokens:5,data:{}};
+      const item=input.info[0];
+      return {tokens:20,data:{speech:item?item.text:'模型生成的家庭问候',intent:item?'reminder':'greeting',urgency:item?'important':'normal',action:item?'scarf':'idle',
+        references:item?[item.id]:[],reason:'浏览器验收',nextReviewAt:new Date(Date.now()+300000).toISOString(),validUntil:new Date(Date.now()+600000).toISOString()}};
+    };
+    await page.getByRole('spinbutton',{name:'问候生成间隔（分钟）'}).fill('3');
+    await page.getByRole('button',{name:'保存生成设置'}).click();
+    await page.getByText('气泡生成设置已保存',{exact:true}).waitFor();
+    assert.equal((await api('GET','/companion/settings')).greetingMinutes,3);
     await page.goto(url + '/admin/scenes/' + scene.id + '/edit');
     await page.locator('img.pig-portrait').first().waitFor();
     await page.locator('.preview-component .news-sheet').getByText(title, { exact: true }).first().waitFor();
@@ -279,7 +290,7 @@ async function main() {
     assert.equal(await demo.locator('.news-kind').innerText(),'热搜');
     await demo.evaluate(el=>{el.updateFeed([]);HomeBriefing.disposeCards(el);el.remove();});
     const bubble = screen.locator('.pig-stage .pig-bubble');
-    const idleBubble = screen.locator('.pig-stage .pig-greeting');
+    const idleBubble = screen.locator('.pig-stage .pig-bubble');
     await idleBubble.waitFor();
     assert.equal(await idleBubble.evaluate(el=>getComputedStyle(el).fontSize),'32px');
     const portrait = screen.locator('canvas.pig-portrait');
@@ -319,7 +330,7 @@ async function main() {
     await fallback.goto(url + '/client/?deviceId=' + device.id + '&deviceKey=' + device.device_key);
     await fallback.locator('img.pig-portrait[src$="bunny.svg#idle"]').waitFor();
     assert.ok(await fallback.locator('img.pig-portrait').evaluate(img => img.decode().then(()=>img.naturalWidth > 0)));
-    await fallback.locator('.pig-stage .pig-greeting').waitFor();
+    await fallback.locator('.pig-stage .pig-bubble').waitFor();
     await fallback.close();
     const item = await api('POST', '/info-items', {
       type: 'urgent',
@@ -340,7 +351,7 @@ async function main() {
     await api('DELETE', '/reminders/emergency/' + alarm.id);
     await screen.reload();
     await screen.getByText(title, { exact: true }).first().waitFor();
-    assert.equal((await api('GET', '/news/events/' + item.id)).deliveries[0].result, 'interrupted');
+    assert.ok((await api('GET','/companion/agent/narrations')).items.some(n=>n.result==='interrupted'));
     for (let i = 0; i < 100; i++)
       await screen.evaluate(() => {
         applyConfig(currentConfig);
@@ -352,14 +363,13 @@ async function main() {
     await api('DELETE','/scenes/'+scene.id+'/components/'+news.id);
     await screen.locator('.news-sheet').waitFor({state:'detached'});
     await idleBubble.waitFor();
-    if (!live) {
-      providers.jsonCompletion = async () => ({tokens:20,data:{impacts:[
-        {id,basis:'青禾路',evidence:title,advice:'出门前看看绕行路线。',repeat:false}
-      ]}});
-      await require('../../src/services/briefing/household').analyze();
-      await bubble.filter({hasText:'出门前看看绕行路线。'}).waitFor();
-      await idleBubble.waitFor();
-    }
+    const modelAudit=await api('GET','/companion/agent/audit?type=system_prompt');
+    assert.ok(modelAudit.items.length&&modelAudit.items[0].system_prompt.includes('猪猪伙伴'));
+    await page.goto(url+'/admin/companion');
+    await page.getByRole('tab',{name:'聊天审计'}).click();
+    await page.getByRole('combobox',{name:'审计信息类型'}).locator('xpath=ancestor::div[contains(@class,"el-select__wrapper")]').click();
+    await page.getByRole('option',{name:'仅 System prompt',exact:true}).click();
+    await page.locator('.audit pre').first().filter({hasText:'猪猪伙伴'}).waitFor();
     await api('DELETE','/scenes/'+scene.id+'/components/'+pig.id);
     await api('POST','/scenes/'+scene.id+'/components',{type:'headlines',position:news.position,config:news.config});
     await screen.locator('.news-sheet').getByText(title,{exact:true}).first().waitFor();

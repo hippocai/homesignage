@@ -253,6 +253,17 @@ module.exports = function extend(spec) {
   const turn=obj({id:str,message:str,reply:str,created:num});
   const household=obj({profile,plans:list(plan),revision:num});
   path('get','/companion/agent','家庭资料、已记计划及最近 40 次对话',obj({...household.properties,history:list(turn)}));
+  const memoryEntry=obj({id:str,scope:str,text:str,starts:num,expires:{...num,nullable:true},revision:num,created:num});
+  path('get','/companion/agent/memory','查看猪猪独立记忆及最近50条记忆审计',obj({entries:list(memoryEntry),file:str,audit:list({type:'object',additionalProperties:true})}),null,
+    '独立于家庭资料、系统定时提示和信息列表。通过聊天新增修改删除，当前访客只能管理自己写入的记忆；屏幕以家庭共享上下文读取。到期在读取/30秒后台扫描/启动时清理，审计保留。data/pig-agent-memory.md 是自动重建的可读镜像。');
+  path('get','/companion/agent/narration-prompt','读取实际气泡system prompt',obj({prompt:str}));
+  path('get','/companion/agent/narrations','查看最近30条模型气泡决策与展示回执',obj({items:list({type:'object',additionalProperties:true})}));
+  const narration=obj({id:str,componentId:str,speech:str,intent:str,urgency:str,action:str,validUntil:num,nextReviewAt:num,preferences:rules});
+  path('get','/devices/{id}/narration','取得模型生成的气泡，包括普通问候',narration,null,
+    '30秒轮询；按猪猪设置greetingMinutes（1–1440整数分钟，默认5）定期重新生成。上下文变化或话语到期会提前重新判断。模型决定话题和提醒，代码校验权限、有效期与引用。请求prompt、上下文、原始返回及失败状态写入聊天审计。模型失败或预算用尽返回错误，不使用固定问候替代。');
+  spec.paths['/devices/{id}/narration'].get.parameters.push({in:'query',name:'componentId',required:true,schema:str});
+  path('post','/devices/{id}/narration/{event}/claim','校验最新上下文并领取朗读权',obj({accepted:bool,sound:bool}),obj({componentId:str},['componentId']));
+  path('post','/devices/{id}/narration/{event}/result','记录气泡实际展示/朗读/中断',obj({ok:bool}),obj({componentId:str,result:choice('subtitle','spoken','interrupted')},['componentId','result']));
   path('put','/companion/agent/profile','保存家庭资料，版本变化时返回 409',household,obj({profile,revision:num},['profile','revision']));
   path('post','/companion/agent/messages','与猪猪对话，回复和计划一起保存；同一 requestId 可重试',turn,obj({message:str,requestId:str},['message','requestId']));
   const contextDescription='调用聊天模型时完整传入已保存的 profile.memory、当前会话历史及可见计划；同时提供已启用屏幕场景中的天气城市（最多4个观测城市和4个降温城市，含来源、获取时间和过期/缺失状态）、降温预报，以及最多60条当前有效且符合兴趣设置的资讯，优先已判断的家庭影响，超限明确标记覆盖范围。天气请求最多等待2.5秒，缺失时不编造。天气和资讯是每轮的临时上下文，不写入长期家庭记忆。查询自建系统记录由数据库直接返回，不调用模型。';
@@ -264,9 +275,10 @@ module.exports = function extend(spec) {
   const recordSnapshot=obj({text:str,start:str,end:str,targets:ids});
   const systemAction=obj({id:str,type:choice('info','reminder'),op:choice('create','view','update','cancel'),
     text:str,start:str,end:str,targets:ids,receipt:str,before:recordSnapshot,after:{...recordSnapshot,nullable:true}});
-  const auditRow=obj({id:num,created:num,finished:{...num,nullable:true},scope:str,actor:str,ip:str,message:str,reply:str,status:choice('pending','ok','failed'),error:str,actions:list(systemAction)});
-  path('get','/companion/agent/audit','管理员查看聊天审计记录，按最新发送排序',obj({items:list(auditRow),next:{...num,nullable:true}}));
+  const auditRow=obj({id:num,created:num,finished:{...num,nullable:true},scope:str,actor:str,ip:str,message:str,reply:str,status:choice('pending','ok','failed'),error:str,actions:list(systemAction),kind:choice('chat','narration'),system_prompt:str,model_context:str,model_response:str,model:str,memoryActions:list({type:'object',additionalProperties:true})});
+  path('get','/companion/agent/audit','管理员查看用户聊天与气泡模型完整审计，支持筛选',obj({items:list(auditRow),next:{...num,nullable:true},users:list(obj({scope:str,actor:str}))}));
   spec.paths['/companion/agent/audit'].get.parameters.push({in:'query',name:'before',schema:num,description:'传上页 next，最多返回 30 条'});
+  spec.paths['/companion/agent/audit'].get.parameters.push({in:'query',name:'type',schema:choice('all','chat','narration','system_prompt','model_context','model_response'),description:'只看指定信息；字段类型仅返回选定字段与元数据。'},{in:'query',name:'scope',schema:str,description:'精确会话编号，admin或访客scope；system:narration为自动气泡。昵称不用于授权或隔离。'});
   path('post','/pig-chat/session','建立或恢复聊天访客会话',obj({alias:str,history:list(turn)}),null,
     '从独立页面 /pig-chat 同源调用；响应设置 30 天 HttpOnly、SameSite=Strict 的 pig_guest Cookie，只返回本会话的最近 40 次成功对话。');
   spec.paths['/pig-chat/session'].post.security=[];
@@ -280,8 +292,9 @@ module.exports = function extend(spec) {
   path('get','/companion/agent/impacts','读取当前家庭生活影响和判断状态',obj({status:str,
     items:list(obj({id:str,title:str,source:str,url:str,speech:str,until:num,repeatable:bool}))}));
   path('get', '/devices/{id}/news', '读取本设备已发布且有效的资讯列表', obj({cards:list(event)}));
-  path('get', '/companion/settings', '读取家庭提醒设置', obj({familyAI:bool}));
-  path('put', '/companion/settings', '保存家庭提醒设置', obj({familyAI:bool}), obj({familyAI:bool},['familyAI']));
+  const pigSettings=obj({familyAI:{...bool,deprecated:true},greetingMinutes:{...num,minimum:1,maximum:1440,default:5}});
+  path('get', '/companion/settings', '读取猪猪设置', pigSettings);
+  path('put', '/companion/settings', '保存猪猪设置；分钟间隔必须为1–1440整数', pigSettings,pigSettings);
   path('put', '/companion/rules/{id}', '已停用，返回 410；改用场景组件接口保存 config.reminders', rules, rules);
   spec.paths['/companion/rules/{id}'].put.deprecated=true;
   delete spec.paths['/companion/rules/{id}'].put.responses[200];
@@ -310,6 +323,7 @@ module.exports = function extend(spec) {
     '启动、重连和收到 briefing-updated 后读取，60 秒兜底同步。'
   );
   spec.paths['/devices/{id}/briefing'].get.parameters.push({name:'componentId',in:'query',schema:str,description:'当前场景中的猪猪组件；不属于该屏幕的组件返回 403。旧客户端省略且有多个组件时只返回卡片。'});
+  spec.paths['/devices/{id}/briefing'].get.deprecated=true;
   path(
     'post',
     '/devices/{id}/deliveries/{event}/claim',
