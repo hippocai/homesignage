@@ -19,7 +19,7 @@
       <div class="generation-slots"><label v-for="(label,index) in slotLabels" :key="index" class="generation-slot">
         <span>{{label}}</span><el-input-number v-model="generation.greetingSchedule[index]" :min="0" :max="120" :step="1" :precision="0" :aria-label="label+'生成间隔（分钟）'" /><span>分钟</span>
       </label></div>
-      <p>每天12个两小时时段，0为暂停更新，1–120为两轮自动生成的最小间隔（分钟）。天气、新闻、资料变化和话语到期均不会提前生成；失效话语停止展示，等到下次生成。切换时段按新间隔计算，不重置上次生成时间。</p>
+      <p>每天12个两小时时段，0为暂停更新，1–120为两轮自动生成的最小间隔（分钟）。天气、新闻、资料变化和话语到期均不会提前生成。普通问候保留到新话语生成后替换；提醒到期、修改或取消后撤下。暂停生成或更新失败时也保留已有普通问候。切换时段不重置上次生成时间。</p>
       <el-button type="primary" :loading="saving" @click="saveGeneration">保存生成设置</el-button>
     </el-card>
     <PigPromptSettings />

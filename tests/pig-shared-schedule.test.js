@@ -75,7 +75,7 @@ test('0时段不采集气泡上下文、不调用模型；资料变化和prompt�
 test('10点停止、12点恢复；时段边界截断旧话语，120分钟不会越过时段',async()=>{
   const slots=Array(12).fill(120);slots[5]=0;await schedule.save({greetingSchedule:slots});
   const t=Date.parse('2030-01-02T09:59:00+08:00'),stop=Date.parse('2030-01-02T10:00:00+08:00'),resume=Date.parse('2030-01-02T12:00:00+08:00');
-  const first=await narrator.feed('shared-a',a,t);expect(first.validUntil).toBe(stop);expect(first.nextReviewAt).toBe(t+120*60000);
+  const first=await narrator.feed('shared-a',a,t);expect(first.validUntil).toBe(t+120*60000);expect(first.nextReviewAt).toBe(t+120*60000);
   expect(await narrator.feed('shared-b',b,stop)).toMatchObject({paused:true});
   await expect(narrator.claim('shared-a',a,first.id,stop)).rejects.toMatchObject({status:409});
   const next=await narrator.feed('shared-b',b,resume);expect(next.id).not.toBe(first.id);expect(model).toHaveBeenCalledTimes(2);

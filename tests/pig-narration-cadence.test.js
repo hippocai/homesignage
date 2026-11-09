@@ -40,8 +40,19 @@ test('30分钟内60次多屏轮询，天气/新闻/家庭资料变化不会提�
   expect(next[0].id).not.toBe(first.id);expect(next[1].id).toBe(next[0].id);expect(model).toHaveBeenCalledTimes(2);
   expect((await db.all("SELECT created FROM pig_chat_audit WHERE kind='narration' ORDER BY id")).map(r=>r.created)).toEqual([now,now+1800000]);
 });
-test('模型给出1分钟有效期也不缩短30分钟间隔，过期期间无话语、不领取、不调用模型',async()=>{
+test.each(['greeting','companion'])('%s即使模型只给1分钟有效期也显示到30分钟更新，不额外调用',async intent=>{
+  const original=model.getMockImplementation();model.mockImplementation(async(...args)=>{const r=await original(...args);r.data.validUntil=r.data.nextReviewAt;r.data.intent=intent;r.data.references=['clock','profile','weather'];return r;});
+  const first=await narrator.feed('cadence-a',a,now);
+  expect(first).toMatchObject({retainUntilReplaced:true,validUntil:now+1800000,nextReviewAt:now+1800000});
+  await db.run('UPDATE pig_household SET profile=?',JSON.stringify({memory:'家庭资料修改了',zone:'Asia/Shanghai'}));
+  for(const offset of [60000,120000,299000,1799999])expect(await narrator.feed('cadence-b',b,now+offset)).toMatchObject({id:first.id,retainUntilReplaced:true});
+  expect(await narrator.claim('cadence-b',b,first.id,now+60000)).toMatchObject({accepted:true});
+  expect(model).toHaveBeenCalledTimes(1);const next=await narrator.feed('cadence-a',a,now+1800000);expect(next.id).not.toBe(first.id);expect(model).toHaveBeenCalledTimes(2);
+  await expect(narrator.claim('cadence-a',a,first.id,now+1800001)).rejects.toMatchObject({status:409});
+});
+test('真实提醒1分钟到期仍撤下，但不缩短30分钟生成间隔',async()=>{
   const original=model.getMockImplementation();model.mockImplementation(async(...args)=>{const r=await original(...args);r.data.validUntil=r.data.nextReviewAt;return r;});
+  const current=model.getMockImplementation();model.mockImplementation(async(...args)=>{const r=await current(...args);r.data.intent='reminder';r.data.references=['profile'];return r;});
   const first=await narrator.feed('cadence-a',a,now);
   expect(first.validUntil).toBe(now+60000);expect(first.nextReviewAt).toBe(now+1800000);
   for(const offset of [60000,120000,299000,1799999])expect(await narrator.feed('cadence-b',b,now+offset)).toMatchObject({waiting:true,nextReviewAt:now+1800000});
@@ -72,8 +83,8 @@ test('跨两小时时段与午夜不重置30分钟计时',async()=>{
   for(const start of ['2030-01-02T09:59:00+08:00','2030-01-02T23:59:00+08:00']){
     await db.run('DELETE FROM pig_chat_audit');await db.run('DELETE FROM pig_narration');
     const t=Date.parse(start),count=model.mock.calls.length;
-    await narrator.feed('cadence-a',a,t);
-    expect(await narrator.feed('cadence-b',b,t+60000)).toMatchObject({waiting:true,nextReviewAt:t+1800000});
+    const first=await narrator.feed('cadence-a',a,t);
+    expect(await narrator.feed('cadence-b',b,t+60000)).toMatchObject({id:first.id,retainUntilReplaced:true,nextReviewAt:t+1800000});
     expect(model).toHaveBeenCalledTimes(count+1);
     expect((await narrator.feed('cadence-a',a,t+1800000)).id).toBeTruthy();expect(model).toHaveBeenCalledTimes(count+2);
   }
@@ -81,10 +92,39 @@ test('跨两小时时段与午夜不重置30分钟计时',async()=>{
 test('时段0暂停后恢复、配置修改均以上次调用时间计算新间隔',async()=>{
   const t=Date.parse('2030-01-02T09:59:00+08:00');await narrator.feed('cadence-a',a,t);
   await schedule.save({greetingSchedule:Array(12).fill(0)});expect(await narrator.feed('cadence-b',b,t+60000)).toMatchObject({paused:true});
-  await schedule.save({greetingSchedule:Array(12).fill(30)});expect(await narrator.feed('cadence-b',b,t+120000)).toMatchObject({waiting:true,nextReviewAt:t+1800000});
-  await schedule.save({greetingSchedule:Array(12).fill(60)});expect(await narrator.feed('cadence-b',b,t+1800000)).toMatchObject({waiting:true,nextReviewAt:t+3600000});
+  await schedule.save({greetingSchedule:Array(12).fill(30)});expect(await narrator.feed('cadence-b',b,t+120000)).toMatchObject({retainUntilReplaced:true,nextReviewAt:t+1800000});
+  await schedule.save({greetingSchedule:Array(12).fill(60)});expect(await narrator.feed('cadence-b',b,t+1800000)).toMatchObject({retainUntilReplaced:true,nextReviewAt:t+3600000});
   expect(model).toHaveBeenCalledTimes(1);
   await schedule.save({greetingSchedule:Array(12).fill(15)});expect((await narrator.feed('cadence-b',b,t+1800000)).id).toBeTruthy();expect(model).toHaveBeenCalledTimes(2);
+});
+test('旧版已过期普通问候、重启和0暂停仍复用；暂停不取上下文、不调用、不朗读',async()=>{
+  const first=await narrator.feed('cadence-a',a,now);
+  await db.run('UPDATE pig_narration SET expires=? WHERE id=?',now+1000,first.id);
+  const file=path.resolve(__dirname,'../src/services/briefing/narrator.js'),resolve=createRequire(file),fresh={exports:{}};
+  new Function('require','module','exports',fs.readFileSync(file,'utf8'))(id=>require(resolve.resolve(id)),fresh,fresh.exports);
+  expect(await fresh.exports.feed('cadence-b',b,now+60000)).toMatchObject({id:first.id,retainUntilReplaced:true});
+  await schedule.save({greetingSchedule:Array(12).fill(0)});weather.build.mockClear();api.newsCards.mockClear();
+  expect(await fresh.exports.feed('cadence-b',b,now+120000)).toMatchObject({id:first.id,paused:true,retainUntilReplaced:true,preferences:{sound:false}});
+  expect(weather.build).not.toHaveBeenCalled();expect(api.newsCards).not.toHaveBeenCalled();expect(model).toHaveBeenCalledTimes(1);
+});
+test('请求途中切换为0暂停也保留普通问候，不闪现暂停占位文字',async()=>{
+  const first=await narrator.feed('cadence-a',a,now),config=await schedule.get();
+  jest.spyOn(schedule,'get').mockResolvedValueOnce(config).mockResolvedValue({...config,greetingSchedule:Array(12).fill(0)});
+  expect(await narrator.feed('cadence-b',b,now+60000)).toMatchObject({id:first.id,paused:true,retainUntilReplaced:true,preferences:{sound:false}});
+  expect(model).toHaveBeenCalledTimes(1);
+});
+test('到点生成失败仍保留普通问候，下一轮前不重试；成功后换成新话语',async()=>{
+  const first=await narrator.feed('cadence-a',a,now);
+  model.mockRejectedValueOnce(provider.fault('服务超时',503));
+  expect(await narrator.feed('cadence-a',a,now+1800000)).toMatchObject({id:first.id,retainUntilReplaced:true,nextReviewAt:now+3600000,preferences:{sound:false}});
+  expect(await narrator.feed('cadence-b',b,now+1801000)).toMatchObject({id:first.id});expect(model).toHaveBeenCalledTimes(2);
+  const next=await narrator.feed('cadence-b',b,now+3600000);expect(next.id).not.toBe(first.id);expect(model).toHaveBeenCalledTimes(3);
+});
+test('引用具体事项的陪伴话语不能误当普通问候延长；到期或取消就撤下',async()=>{
+  await db.run("INSERT INTO info_items(id,text,end_time) VALUES('expiry','出门拿证件',?)",new Date(now+60000).toISOString());
+  const original=model.getMockImplementation();model.mockImplementation(async(...args)=>{const r=await original(...args);r.data.intent='companion';r.data.references=['expiry'];return r;});
+  const first=await narrator.feed('cadence-a',a,now);expect(first.retainUntilReplaced).toBe(false);expect(first.validUntil).toBe(now+60000);
+  expect(await narrator.feed('cadence-b',b,now+60000)).toMatchObject({waiting:true});expect(model).toHaveBeenCalledTimes(1);
 });
 test('失败、天气变化和重新加载服务模块不能绕过数据库中的30分钟计时',async()=>{
   model.mockRejectedValueOnce(provider.fault('服务超时',503));

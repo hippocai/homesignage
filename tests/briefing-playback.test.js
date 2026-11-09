@@ -72,3 +72,31 @@ test('暂停时段停止语音并显示暂停状态，不领取；恢复时显�
   expect(f.cancel).toHaveBeenCalled();expect(f.renderer.pig.mock.calls.at(-1)[2]).toBe('当前时段已暂停更新。');expect(f.claims()).toBe(1);
   f.data.paused=false;f.data.id='shared-next';f.runtime.sync();await flush();expect(f.claims()).toBe(2);expect(f.renderer.pig.mock.calls.at(-1)[2]).toBe(f.data.speech);
 });
+
+test('普通问候到更新时间先保留文字，收到新决策才替换，不闪现等待提示',async()=>{
+  const f=setup();f.data.retainUntilReplaced=true;f.data.validUntil=Date.now()+1000;f.data.nextReviewAt=Date.now()+300000;
+  f.runtime.sync();await flush();const renders=f.renderer.pig.mock.calls.length;
+  const timer=[...f.timers.values()].find(t=>t.ms>290000);expect(timer).toBeTruthy();timer.fn();
+  expect(f.renderer.pig).toHaveBeenCalledTimes(renders);await flush();expect(f.claims()).toBe(1);
+  f.data.id='replacement';f.data.speech='新的问候到了。';f.runtime.sync();await flush();
+  expect(f.renderer.pig.mock.calls.at(-1)[2]).toBe('新的问候到了。');expect(f.claims()).toBe(2);
+  expect(f.renderer.pig.mock.calls.some(c=>/等待|重新判断/.test(c[2]))).toBe(false);
+});
+test('同一普通问候延长更新时间只重设计时器，不重复渲染或朗读',async()=>{
+  const f=setup({sound:true});f.data.retainUntilReplaced=true;f.data.nextReviewAt=Date.now()+300000;f.runtime.sync();await flush();
+  f.data.nextReviewAt=Date.now()+3600000;f.runtime.sync();await flush();
+  expect([...f.timers.values()].some(t=>t.ms>3500000)).toBe(true);
+  expect([...f.timers.values()].some(t=>t.ms>290000&&t.ms<310000)).toBe(false);
+  expect(f.speak).toHaveBeenCalledTimes(1);expect(f.renderer.pig).toHaveBeenCalledTimes(2);
+});
+test('普通问候在接口失败和0暂停时继续显示，暂停不再次领取',async()=>{
+  const f=setup({sound:true});f.data.retainUntilReplaced=true;f.data.nextReviewAt=Date.now()+300000;f.runtime.sync();await flush();
+  f.data.paused=true;f.data.preferences.sound=false;f.runtime.sync();await flush();
+  expect(f.renderer.pig.mock.calls.at(-1)[2]).toBe(f.data.speech);expect(f.claims()).toBe(1);expect(f.cancel).toHaveBeenCalled();
+  f.fail();f.runtime.sync();await flush();expect(f.renderer.pig.mock.calls.at(-1)[2]).toBe(f.data.speech);
+});
+test('提醒到期立即移除，等待下一轮期间不保留已失效文字',async()=>{
+  const f=setup();f.runtime.sync();await flush();const timer=[...f.timers.values()].find(t=>t.ms>290000);
+  f.data.waiting=true;timer.fn();expect(f.renderer.pig.mock.calls.at(-1)[2]).not.toBe(f.data.speech);await flush();
+  expect(f.renderer.pig.mock.calls.at(-1)[2]).toBe('等待下一次问候更新。');expect(f.claims()).toBe(1);
+});

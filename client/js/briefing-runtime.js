@@ -10,15 +10,26 @@ var briefingRuntime = (function () {
   function stop(){if(voice&&window.speechSynthesis)window.speechSynthesis.cancel();voice=null;}
   function status(comp,text){if(comp)HomeBriefing.pig(comp.el,comp.cfg,text,'idle');}
   function renderCards(cards){components.filter(function(c){return c.type==='headlines';}).forEach(function(c){HomeBriefing.cards(c.el,c.cfg,cards,Date.now());});}
+  function scheduleExpiry(comp,d){
+    clearTimeout(expiry);expiry=null;
+    var due=d.retainUntilReplaced?d.nextReviewAt:d.validUntil;
+    if(d.paused||d.retainUntilReplaced&&due<=Date.now())return;
+    expiry=setTimeout(function(){
+      expiry=null;
+      if(!d.retainUntilReplaced){stop();shown=null;status(comp,'正在请模型重新判断…');}
+      sync();
+    },Math.max(1,due-Date.now()));
+  }
   function show(comp,d,token){
     if(token!==sequence||comp!==currentPig()||busy()||document.hidden)return;
-    if(d.paused){if(voice&&shown)receipt(shown,'interrupted');stop();clearTimeout(expiry);shown=null;status(comp,'当前时段已暂停更新。');return;}
+    if(d.paused&&!d.retainUntilReplaced){if(voice&&shown)receipt(shown,'interrupted');stop();clearTimeout(expiry);shown=null;status(comp,'当前时段已暂停更新。');return;}
     if(d.waiting){if(voice&&shown)receipt(shown,'interrupted');stop();clearTimeout(expiry);shown=null;status(comp,'等待下一次问候更新。');return;}
-    if(d.validUntil<=Date.now())return;
-    if(shown&&shown.id===d.id){if(!d.preferences.sound)stop();return;}
+    if(!d.retainUntilReplaced&&d.validUntil<=Date.now())return;
+    if(shown&&shown.id===d.id){if(!d.preferences.sound)stop();shown.nextReviewAt=d.nextReviewAt;shown.validUntil=d.validUntil;shown.paused=d.paused;scheduleExpiry(comp,shown);return;}
     if(voice&&shown)receipt(shown,'interrupted');stop();clearTimeout(expiry);shown=d;
     HomeBriefing.pig(comp.el,comp.cfg,d.speech,d.action);
-    expiry=setTimeout(function(){stop();shown=null;status(comp,'正在请模型重新判断…');sync();},Math.max(1,d.validUntil-Date.now()));
+    scheduleExpiry(comp,d);
+    if(d.paused)return;
     req('/narration/'+encodeURIComponent(d.id)+'/claim',{componentId:d.componentId}).then(function(claim){
       if(token!==sequence||comp!==currentPig()||busy()||document.hidden||shown!==d){if(claim.accepted)receipt(d,'interrupted');return;}
       if(!claim.accepted)return;
@@ -29,7 +40,7 @@ var briefingRuntime = (function () {
         v.onerror=function(){if(voice===v)voice=null;};
         window.speechSynthesis.speak(v);
       }
-    }).catch(function(){if(shown===d){shown=null;stop();status(comp,'上下文已更新，等待模型重新判断…');}});
+    }).catch(function(){if(shown===d){stop();if(!d.retainUntilReplaced){shown=null;status(comp,'上下文已更新，等待模型重新判断…');}}});
   }
   function sync(){
     if(!components.length||!deviceKey)return;
@@ -38,7 +49,7 @@ var briefingRuntime = (function () {
     if(!comp||busy()||document.hidden)return;
     var id=comp.el.dataset&&comp.el.dataset.componentId;
     req('/narration?componentId='+encodeURIComponent(id||'')).then(function(d){show(comp,d,token);}).catch(function(){
-      if(token===sequence&&comp===currentPig()){stop();shown=null;clearTimeout(expiry);status(comp,'模型暂不可用，正在等待重试。');}
+      if(token===sequence&&comp===currentPig()){stop();clearTimeout(expiry);if(!shown||!shown.retainUntilReplaced){shown=null;status(comp,'模型暂不可用，正在等待重试。');}}
     });
   }
   function reset(){sequence++;stop();clearInterval(poll);clearTimeout(expiry);poll=null;shown=null;components.forEach(function(c){if(c.type==='headlines')HomeBriefing.disposeCards(c.el);else if(c.type==='companion')HomeBriefing.disposePig(c.el);});components=[];}
