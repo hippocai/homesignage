@@ -3,6 +3,7 @@
     <h3>气泡 System prompt</h3>
     <p>决定猪猪如何结合家庭资料、独立记忆、天气和资讯说话。保存后直接生效，无需重启；下次生成使用新内容，不再等待原来的生成间隔。</p>
     <p>当前版本：{{ isDefault?'系统默认':'自定义' }}<span v-if="dirty"> · 有未保存修改</span>。请保留 JSON 输出格式要求，模型请求和返回会继续写入聊天审计。</p>
+    <p>字数上限在提示词中单独一行配置：<code>speechMaxChars: 40</code>。默认含标点、空格等不超过40个字符，可改为1–180；超限时让模型重新写短句，不直接截断。</p>
     <el-alert v-if="error" :title="error" type="error" :closable="false" />
     <el-input v-model="draft" type="textarea" :rows="16" maxlength="20000" show-word-limit
       aria-label="气泡 System prompt" :disabled="!ready || busy" />

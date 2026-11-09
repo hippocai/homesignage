@@ -208,7 +208,8 @@ async function main() {
     // The display part of this test must run regardless of local clock time.
     await api('PUT','/companion/settings',{greetingSchedule:Array(12).fill(3),quietEnabled:false});
     const originalPrompt=await api('GET','/companion/agent/narration-prompt');
-    const customPrompt=originalPrompt.prompt+'\n浏览器测试：请使用亲切简短的语气。';
+    assert.ok(originalPrompt.prompt.includes('speechMaxChars: 40'));
+    const customPrompt=originalPrompt.prompt.replace('speechMaxChars: 40','speechMaxChars: 50')+'\n浏览器测试：请使用亲切简短的语气。';
     await page.getByRole('textbox',{name:'气泡 System prompt',exact:true}).fill(customPrompt);
     await page.getByRole('button',{name:'保存 System prompt',exact:true}).click();
     await page.getByText('System prompt 已保存，立即生效',{exact:true}).waitFor();
@@ -361,11 +362,20 @@ async function main() {
     assert.ok(await fallback.locator('img.pig-portrait').evaluate(img => img.decode().then(()=>img.naturalWidth > 0)));
     await fallback.locator('.pig-stage .pig-bubble').waitFor();
     await fallback.close();
+    const beforeInfo=(await api('GET','/companion/agent/narrations')).items.length;
     const item = await api('POST', '/info-items', {
       type: 'urgent',
       text: '今天要降温，出门带件外套吧。',
       companion_targets: [device.id]
     });
+    await Promise.all([
+      screen.waitForResponse(r=>r.url().includes('/narration?')&&r.ok()),
+      screen.evaluate(()=>briefingRuntime.sync())
+    ]);
+    assert.equal((await api('GET','/companion/agent/narrations')).items.length,beforeInfo,'Info change must not generate early');
+    // Advance only the isolated test database's generation clock to the next configured slot.
+    await memoryDb.run("UPDATE pig_chat_audit SET created=created-180000 WHERE kind='narration'");
+    await screen.evaluate(()=>briefingRuntime.sync());
     await screen.getByText(item.text, { exact: true }).waitFor({ timeout: 5000 });
     assert.equal(await bubble.evaluate(el=>getComputedStyle(el).fontSize),'32px');
     if (process.env.BRIEFING_SCREENSHOT)

@@ -33,6 +33,15 @@ test('按音量朗读；结束回执且气泡继续显示',async()=>{
 test('同一模型决策轮询复用，不重复朗读或领取',async()=>{
   const f=setup({sound:true});f.runtime.sync();await flush();f.runtime.sync();await flush();
   expect(f.claims()).toBe(1);expect(f.speak).toHaveBeenCalledTimes(1);
+  expect(f.renderer.pig).toHaveBeenCalledTimes(2);
+});
+
+test('间隔未到且旧话语已失效时停音、停止展示并等待，不领取新话语',async()=>{
+  const f=setup({sound:true});f.runtime.sync();await flush();
+  f.data.waiting=true;f.runtime.sync();await flush();
+  expect(f.cancel).toHaveBeenCalled();expect(f.results.at(-1)).toBe('interrupted');
+  expect(f.renderer.pig.mock.calls.at(-1)[2]).toBe('等待下一次问候更新。');expect(f.claims()).toBe(1);
+  f.data.waiting=false;f.data.id='due-next';f.runtime.sync();await flush();expect(f.claims()).toBe(2);
 });
 test('未解锁声音时仅字幕',async()=>{
   const f=setup({sound:true,unlocked:false});f.runtime.sync();await flush();expect(f.speak).not.toHaveBeenCalled();expect(f.results).toEqual(['subtitle']);

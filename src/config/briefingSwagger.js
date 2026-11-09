@@ -260,11 +260,11 @@ module.exports = function extend(spec) {
   path('get','/companion/agent/narration-prompt','读取当前气泡system prompt、默认文本及版本',promptConfig);
   path('put','/companion/agent/narration-prompt','保存气泡system prompt或恢复默认，立即生效',promptConfig,
     obj({prompt:{...str,minLength:1,maxLength:20000},reset:bool,revision:{...num,minimum:0}},['revision']),
-    '保存传prompt；恢复默认传reset=true。必须提交读取到的revision，过期版本409。保存后通知屏幕，旧决策失效，进行中的旧prompt结果不可发布；新生成与审计使用新prompt。无需重启，不改家庭资料或独立记忆。');
+    '保存传prompt；恢复默认传reset=true。必须提交读取到的revision，过期版本409。prompt中单独一行speechMaxChars: 40配置话语字符上限（1–180，省略为40，含标点/空格等Unicode码点），超限拒绝发布并最多重写一次。保存后通知屏幕，旧决策失效；此显式操作可立即使用新prompt生成，暂停时段除外。无需重启，不改家庭资料或独立记忆。');
   path('get','/companion/agent/narrations','查看最近30条模型气泡决策与展示回执',obj({items:list({type:'object',additionalProperties:true})}));
-  const narration=obj({id:str,componentId:str,paused:bool,speech:str,intent:str,urgency:str,action:str,validUntil:num,nextReviewAt:num,preferences:rules});
+  const narration=obj({id:str,componentId:str,paused:bool,waiting:bool,speech:str,intent:str,urgency:str,action:str,validUntil:num,nextReviewAt:num,preferences:rules});
   path('get','/devices/{id}/narration','取得模型生成的气泡，包括普通问候',narration,null,
-    '全部猪猪组件共享一个模型决策和id。按家庭时区的greetingSchedule当前两小时时段生成，0返回paused=true且不调用气泡模型；1–120为分钟间隔。时段边界、上下文变化或话语到期会重新判断。30秒轮询兜底，新共享话语通过briefing-updated通知所有屏幕。免打扰来自全局设置，声音/音量独立。每次真实模型请求完整审计；同屏多个组件只领取一次朗读权，不同屏幕各自回执。');
+    '全部猪猪组件共享一个模型决策和id。0返回paused=true且不调用模型；1–120是两轮自动生成的最小分钟间隔，以数据库中上次生成尝试时间加当前时段间隔计算。上下文变化、失效、时段边界、失败及重启均不能提前触发；旧话语失效时返回waiting=true,nextReviewAt，无id/speech且不领取。有效话语复用。显式保存/恢复prompt可立即重新生成（0时段除外）。同轮格式校验最多重试一次，每次请求单独审计，只有合格话语发布。30秒轮询兜底，新话语通知所有屏幕。同屏多个组件只领取一次，不同屏幕各自回执。');
   spec.paths['/devices/{id}/narration'].get.parameters.push({in:'query',name:'componentId',required:true,schema:str});
   path('post','/devices/{id}/narration/{event}/claim','校验最新上下文并领取朗读权',obj({accepted:bool,sound:bool}),obj({componentId:str},['componentId']));
   path('post','/devices/{id}/narration/{event}/result','记录气泡实际展示/朗读/中断',obj({ok:bool}),obj({componentId:str,result:choice('subtitle','spoken','interrupted')},['componentId','result']));

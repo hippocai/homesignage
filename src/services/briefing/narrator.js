@@ -5,7 +5,7 @@ const promptSettings=require('./narration-prompt');
 const prompt=promptSettings.defaultPrompt;
 const schedule=require('./narration-settings');
 async function interval(now=Date.now()){return schedule.state(await schedule.get(),now).minutes;}
-const flights=new Map(),retries=new Map();
+const flights=new Map();
 async function install(exec){await exec(`
   CREATE TABLE IF NOT EXISTS pig_narration(id TEXT PRIMARY KEY,device TEXT,component TEXT,created INTEGER,context TEXT,payload TEXT,review INTEGER,expires INTEGER);
   CREATE INDEX IF NOT EXISTS pig_narration_clock ON pig_narration(device,component,created);
@@ -48,16 +48,19 @@ async function context(device,component,now){
     reminders:reminders.filter(r=>r.repeat!=='none'||!r.start_date||r.start_date>=local.day),
     recent:recent.map(r=>({...r,payload:JSON.parse(r.payload)})),preferences:{...preferences,shared:true,quiet,greetingMinutes:window.minutes,
       quietEnabled:globalSettings.quietEnabled,quietFrom:globalSettings.quietFrom,quietTo:globalSettings.quietTo}};
+  input.generationPolicy={promptKey:p.hash(savedPrompt.prompt+'\n'+savedPrompt.revision)};
   const {clock,recent:ignored,...facts}=input;
   const key=p.hash(JSON.stringify([savedPrompt.prompt,savedPrompt.revision,local.day,window.slot,stable(facts),agentMemory.map(m=>now>=m.starts)]));
   return {input,key,systemPrompt:savedPrompt.prompt,component:bound.id,preferences,quiet,window};
 }
 function validate(value,ctx,now){
   const d=value;
-  if(!d||typeof d.speech!=='string'||!d.speech.trim()||d.speech.length>180||
+  if(!d||typeof d.speech!=='string'||!d.speech.trim()||
     !['greeting','companion','reminder'].includes(d.intent)||!['normal','important','urgent'].includes(d.urgency)||
     !['idle','wave','scarf','point','serious'].includes(d.action)||!Array.isArray(d.references)||
     typeof d.reason!=='string'||!d.reason.trim())throw p.fault('模型气泡格式无效',502);
+  const limit=promptSettings.speechLimit(ctx.systemPrompt);
+  if(Array.from(d.speech).length>limit)throw p.fault('speech含标点共'+Array.from(d.speech).length+'个字符，超过speechMaxChars='+limit+'；请重新组织成一句完整短句，不要截断',502);
   d.references=d.references.map(id=>id==='profile.memory'?'profile':id==='clock.calendar'?'clock':id);
   const ids=new Set(['clock','profile','weather',...['plans','agentMemory','news','info','reminders'].flatMap(k=>ctx.input[k].map(v=>v.id))]);
   if(d.references.some(id=>!ids.has(id))||d.intent==='reminder'&&(!d.references.length||!ctx.preferences.enabled||ctx.quiet))throw p.fault('模型引用或提醒权限无效',502);
@@ -72,14 +75,46 @@ function validate(value,ctx,now){
     ...ctx.input.news.filter(m=>d.references.includes(m.id)&&m.expires).map(m=>m.expires),
     ...ctx.input.info.filter(m=>d.references.includes(m.id)&&m.end_time).map(m=>Date.parse(m.end_time)).filter(Number.isFinite));
   return {payload:{speech:d.speech.trim(),intent:d.intent,urgency:d.urgency,action:d.action,references:d.references,reason:d.reason.slice(0,1000)},
-    review:Math.min(now+ctx.input.preferences.greetingMinutes*60000,expiry),expires:expiry};
+    review:now+ctx.input.preferences.greetingMinutes*60000,expires:expiry};
+}
+function samePrompt(audit,ctx){
+  const previous=JSON.parse(audit.model_context||'{}');
+  return previous.generationPolicy?previous.generationPolicy.promptKey===ctx.input.generationPolicy.promptKey:
+    audit.system_prompt===ctx.systemPrompt||audit.system_prompt.startsWith(ctx.systemPrompt+'\n【本次重试校验反馈】');
+}
+function referencesCurrent(payload,previous,ctx){
+  // New unrelated news/weather must not invalidate a reusable sentence. Cancelled or edited
+  // referenced records must never remain on screen while waiting for the next generation.
+  if(payload.intent==='reminder'&&(!ctx.preferences.enabled||ctx.quiet))return false;
+  if(previous.generationPolicy&&previous.generationPolicy.promptKey!==ctx.input.generationPolicy.promptKey)return false;
+  return payload.references.every(id=>{
+    if(id==='clock')return previous.clock.day===ctx.input.clock.day;
+    if(id==='weather')return payload.intent!=='reminder'||ctx.preferences.cold;
+    if(id==='profile')return (payload.intent!=='reminder'||ctx.preferences.family)&&JSON.stringify(previous.profile)===JSON.stringify(ctx.input.profile);
+    for(const name of ['plans','agentMemory','news','info','reminders']){
+      const before=previous[name]?.find(v=>v.id===id),after=ctx.input[name].find(v=>v.id===id);
+      if(before)return !!after&&(payload.intent!=='reminder'||(name==='news'?ctx.preferences.news:ctx.preferences.family))&&JSON.stringify(stable(before))===JSON.stringify(stable(after));
+    }
+    return false;
+  });
+}
+async function reusable(row,ctx,now){
+  if(!row||row.expires<=now)return false;
+  const audit=await db.one("SELECT * FROM pig_chat_audit WHERE turn_id=? AND kind='narration' AND status='ok' ORDER BY id DESC LIMIT 1",row.id);
+  return !!audit&&samePrompt(audit,ctx)&&referencesCurrent(JSON.parse(row.payload),JSON.parse(audit.model_context),ctx);
 }
 async function decide(device,component,now=Date.now()){
-  const ctx=await context(device,component,now),slot='shared';
+  const ctx=await context(device,component,now);
   if(ctx.window.paused)return {paused:true,ctx};
   const old=await db.one("SELECT * FROM pig_narration WHERE device='*' AND component='*' ORDER BY created DESC,rowid DESC LIMIT 1");
-  if(old&&old.context===ctx.key&&old.review>now&&old.expires>now)return {row:old,ctx};
-  if(retries.get(slot)?.key===ctx.key&&retries.get(slot).until>now)throw p.fault('模型暂不可用，稍后重试',503);
+  // Audit is the durable generation clock, including failures and interrupted calls.
+  // Context changes, expiry, slot transitions and process restarts cannot reset it.
+  const last=await db.one("SELECT * FROM pig_chat_audit WHERE kind='narration' ORDER BY created DESC,id DESC LIMIT 1");
+  const due=last?last.created+ctx.window.minutes*60000:now;
+  if(last&&samePrompt(last,ctx)&&due>now){
+    if(await reusable(old,ctx,now))return {row:{...old,review:due},ctx};
+    return {waiting:true,nextReviewAt:due,ctx};
+  }
   const settings=await api.settings();
   let correction='';
   for(let attempt=0;attempt<2;attempt++){
@@ -91,9 +126,9 @@ async function decide(device,component,now=Date.now()){
     const result=await api.generate(settings,messages,(s,m)=>p.jsonCompletion(s,m,1600),Math.ceil(JSON.stringify(messages).length*1.2)+1600);
     await db.run('UPDATE pig_chat_audit SET model_response=? WHERE attempt=?',result.raw??JSON.stringify(result.data),auditId);
     const decidedAt=Math.max(now,Date.now()),d=validate(result.data,ctx,now);
-    // Changes during the model call (including cancellation/expiry) must invalidate the generated sentence.
+    // Reject changed referenced records, prompt revisions, cancellation and expiry during generation.
     const latest=await context(device,ctx.component,decidedAt);
-    if(latest.key!==ctx.key||d.expires<=decidedAt)throw p.fault('上下文已变化，正在重新判断',409);
+    if(latest.window.paused||latest.input.generationPolicy.promptKey!==ctx.input.generationPolicy.promptKey||!referencesCurrent(d.payload,ctx.input,latest)||d.expires<=decidedAt)throw p.fault('上下文已变化，等待下一次生成',409);
     const row={id:randomUUID(),device:'*',component:'*',created:now,context:ctx.key,payload:JSON.stringify(d.payload),review:d.review,expires:d.expires};
     await db.run('INSERT INTO pig_narration VALUES(?,?,?,?,?,?,?,?)',...Object.values(row));
     await db.run("UPDATE pig_chat_audit SET status='ok',finished=?,reply=?,turn_id=? WHERE attempt=?",Date.now(),d.payload.speech,row.id,auditId);
@@ -105,7 +140,7 @@ async function decide(device,component,now=Date.now()){
       correction='\n【本次重试校验反馈】上次输出未能通过校验：'+e.message+'。当前家庭当地时间为 '+ctx.input.clock.now+'。请重新生成完整JSON，所有时间必须晚于此刻，保持正确的当地日期和时区偏移。nextReviewAt与validUntil不能是过去；只引用本上下文实际提供的编号，并遵守免打扰及功能开关。';
       continue;
     }
-    if(e.status!==409)retries.set(slot,{key:ctx.key,until:now+(e.status===429?15:2)*60000});throw e;
+    throw e;
   }
   }
 }
@@ -116,8 +151,9 @@ async function feed(device,component,now=Date.now()){
   if(window.paused)return {paused:true,componentId:bound.id,nextReviewAt:window.boundary,preferences};
   const slot='shared';
   if(!flights.has(slot))flights.set(slot,decide(device,component,now).finally(()=>flights.delete(slot)));
-  const {row,ctx,paused}=await flights.get(slot);
+  const {row,ctx,paused,waiting,nextReviewAt}=await flights.get(slot);
   if(paused)return {paused:true,componentId:bound.id,nextReviewAt:ctx.window.boundary,preferences:{...preferences,sound:false}};
+  if(waiting)return {waiting:true,componentId:bound.id,nextReviewAt,preferences:{...preferences,sound:false}};
   const d=JSON.parse(row.payload);
   return {id:row.id,componentId:bound.id,speech:d.speech,action:d.action,intent:d.intent,urgency:d.urgency,
     validUntil:row.expires,nextReviewAt:row.review,preferences};
@@ -126,7 +162,7 @@ async function claim(device,component,id,now=Date.now()){
   const ctx=await context(device,component,now);
   const checkedAt=Math.max(now,Date.now()),current=schedule.state(await schedule.get(),checkedAt);
   const row=await db.one("SELECT * FROM pig_narration WHERE id=? AND device='*' AND component='*'",id);
-  if(!row||current.paused||current.quiet!==ctx.quiet||current.slot!==ctx.window.slot||current.minutes!==ctx.window.minutes||row.expires<=checkedAt||row.context!==ctx.key)throw p.fault('气泡已经失效',409);
+  if(current.paused||current.quiet!==ctx.quiet||current.slot!==ctx.window.slot||current.minutes!==ctx.window.minutes||!await reusable(row,ctx,checkedAt))throw p.fault('气泡已经失效',409);
   const changed=await db.run("INSERT OR IGNORE INTO pig_shared_delivery VALUES(?,?,?,?,'claimed')",id,device,component,now);
   const bound=await api.boundPig(device,component);
   return {accepted:!!changed,sound:bound.prefs.enabled&&bound.prefs.sound&&!ctx.quiet};

@@ -13,6 +13,7 @@ var briefingRuntime = (function () {
   function show(comp,d,token){
     if(token!==sequence||comp!==currentPig()||busy()||document.hidden)return;
     if(d.paused){if(voice&&shown)receipt(shown,'interrupted');stop();clearTimeout(expiry);shown=null;status(comp,'当前时段已暂停更新。');return;}
+    if(d.waiting){if(voice&&shown)receipt(shown,'interrupted');stop();clearTimeout(expiry);shown=null;status(comp,'等待下一次问候更新。');return;}
     if(d.validUntil<=Date.now())return;
     if(shown&&shown.id===d.id){if(!d.preferences.sound)stop();return;}
     if(voice&&shown)receipt(shown,'interrupted');stop();clearTimeout(expiry);shown=d;
