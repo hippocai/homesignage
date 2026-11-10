@@ -1,7 +1,7 @@
 const express = require('express');
 const path = require('node:path');
 const {randomBytes,randomUUID,createHash} = require('node:crypto');
-const ipaddr = require('ipaddr.js');
+const access = require('../services/briefing/chat-access');
 const rateLimit = require('express-rate-limit');
 const db = require('../services/briefing/storage');
 const agent = require('../services/briefing/household');
@@ -27,7 +27,7 @@ function guestAccess(req,res,next) {
   if (req.method==='GET' || req.method==='HEAD') return next();
   const origin=req.get('origin'), site=req.get('sec-fetch-site');
   if ((site && !['same-origin','none'].includes(site)) ||
-      (origin && origin!==requestOrigin(req) && origin!==configuredOrigin())) {
+      (origin && origin!==requestOrigin(req) && origin!==configuredOrigin() && !(req.get('x-forwarded-proto')==='https'&&origin==='https://'+req.get('host')))) {
     return res.status(403).json({error:'请从猪猪聊天页面发送消息'});
   }
   if (req.method==='POST' && !req.is('application/json')) {
@@ -41,7 +41,10 @@ function shareLinks(req) {
 }
 const router=express.Router();
 router.use(['/pig-chat','/api/v1/pig-chat'],guestAccess);
-router.get('/pig-chat',(req,res)=>res.sendFile(path.resolve(__dirname,'../../guest-chat/index.html')));
+router.get('/pig-chat',async(req,res,next)=>{try{
+  const allowed=await access.identify(req);
+  res.sendFile(path.resolve(__dirname,'../../guest-chat/'+(allowed?'index.html':'login.html')));
+}catch(e){next(e);}});
 router.use('/pig-chat/assets',express.static(path.resolve(__dirname,'../../guest-chat/assets')));
 router.use('/api/v1/pig-chat',express.json({limit:'16kb'}));
 const scoped=express.Router();
@@ -51,11 +54,27 @@ const run=fn=>async(req,res)=>{
   catch(e) {res.status(e.status || 500).json({error:e.status?e.message:'暂时无法处理这条消息'});}
 };
 const limit=(max)=>rateLimit({windowMs:60000,max,keyGenerator:req=>req.socket.remoteAddress,standardHeaders:true,legacyHeaders:false,message:{error:'消息太频繁，请稍后再试'}});
+const loginLimit=rateLimit({windowMs:15*60000,max:20,keyGenerator:req=>req.socket.remoteAddress,standardHeaders:true,legacyHeaders:false,message:{error:'登录尝试过于频繁，请15分钟后再试'}});
+scoped.post('/login',loginLimit,run(access.login));
+scoped.post('/logout',run(access.logout));
+scoped.use(async(req,res,next)=>{try{
+  if(!await access.identify(req))return res.status(401).json({error:'非家庭局域网访问，请先登录',code:'PIG_CHAT_LOGIN_REQUIRED'});
+  next();
+}catch(e){next(e);}});
 const cookieName='pig_guest', cookiePath='/api/v1/pig-chat', lifetime=30*86400000;
 const hash=value=>createHash('sha256').update(value).digest('hex');
 async function session(req) {
   const raw=(req.headers.cookie || '').match(/(?:^|;\s*)pig_guest=([a-f0-9]{64})(?:;|$)/)?.[1];
-  if(raw) return db.one('SELECT id FROM pig_guests WHERE token_hash=? AND expires>?',hash(raw),Date.now());
+  if(raw){
+    const visitor=await db.one('SELECT id,user_id FROM pig_guests WHERE token_hash=? AND expires>?',hash(raw),Date.now());
+    if(visitor&&(!visitor.user_id||visitor.user_id===req.pigUser?.id)){
+      if(req.pigUser&&!visitor.user_id){
+        await db.run('UPDATE pig_guests SET user_id=? WHERE id=? AND user_id IS NULL',req.pigUser.id,visitor.id);
+        return db.one('SELECT id,user_id FROM pig_guests WHERE id=? AND user_id=?',visitor.id,req.pigUser.id);
+      }
+      return visitor;
+    }
+  }
 }
 scoped.post('/session',limit(30),run(async(req,res)=>{
   let visitor=await session(req);
@@ -63,18 +82,18 @@ scoped.post('/session',limit(30),run(async(req,res)=>{
     const token=randomBytes(32).toString('hex');
     visitor={id:randomUUID()};
     await db.run('DELETE FROM pig_guests WHERE expires<=?',Date.now());
-    await db.run('INSERT INTO pig_guests VALUES(?,?,?)',visitor.id,hash(token),Date.now()+lifetime);
-    res.cookie(cookieName,token,{httpOnly:true,sameSite:'strict',secure:req.secure,path:cookiePath,maxAge:lifetime});
+    await db.run('INSERT INTO pig_guests(id,token_hash,expires,user_id) VALUES(?,?,?,?)',visitor.id,hash(token),Date.now()+lifetime,req.pigUser?.id||null);
+    res.cookie(cookieName,token,{httpOnly:true,sameSite:'strict',secure:req.secure||req.get('x-forwarded-proto')==='https',path:cookiePath,maxAge:lifetime});
   }
-  return {alias:'访客 '+visitor.id.slice(0,8),history:await agent.history(40,visitor.id)};
+  return {alias:req.pigUser?.username||'访客 '+visitor.id.slice(0,8),authenticated:!!req.pigUser,history:await agent.history(40,visitor.id)};
 }));
 scoped.post('/messages',limit(12),run(async req=>{
   const visitor=await session(req);
   if(!visitor) throw fault('访客会话已过期，请刷新聊天页面',401);
   const nickname=req.body?.nickname;
   if(nickname!=null && (typeof nickname!=='string' || nickname.length>32)) throw fault('称呼最多 32 个字符');
-  return agent.chat(req.body,Date.now(),{scope:visitor.id,name:nickname?.trim() || '访客 '+visitor.id.slice(0,8),
-    ip:ipaddr.process(req.socket.remoteAddress).toString()});
+  const name=req.pigUser?'账号 '+req.pigUser.username+(nickname?.trim()?'（'+nickname.trim()+'）':''):nickname?.trim()||'访客 '+visitor.id.slice(0,8);
+  return agent.chat(req.body,Date.now(),{scope:visitor.id,name,ip:access.address(req)});
 }));
 async function audit(query) {
   const before=query.before===undefined?Number.MAX_SAFE_INTEGER:Number(query.before);

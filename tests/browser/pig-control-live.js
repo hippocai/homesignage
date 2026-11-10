@@ -33,6 +33,7 @@ async function run() {
     }
   };
   const guest=request.agent(app);
+  await guest.post('/api/v1/pig-chat/login').send({username:'admin',password:'admin123'}).expect(200);
   await guest.post('/api/v1/pig-chat/session').send({}).expect(200);
   const visitor=(await db.one('SELECT id FROM pig_guests')).id;
   async function say(message,who='admin',requestId='live-'+(++sequence)) {

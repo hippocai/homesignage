@@ -12,6 +12,7 @@ const memory='# 家庭资料\n家庭人数：3人\n常住城市：苏州市\n通
 let app,token,captured,model,weatherMock;
 beforeAll(async()=>{app=await setupTestApp();token='Bearer '+await getAdminToken(app);});
 beforeEach(async()=>{
+  jest.spyOn(require('../src/services/briefing/chat-access'),'identify').mockImplementation(async req=>{req.pigLocal=true;req.pigUser=null;return true;});
   for(const table of ['pig_chat_audit','pig_conversation','pig_guests','briefing_events','briefing_weather','briefing_usage','components','device_scenes','devices','scenes'])await db.run('DELETE FROM '+table);
   await db.run('UPDATE pig_household SET profile=?,plans=\'[]\',revision=0',JSON.stringify({memory,zone:'Asia/Shanghai'}));
   await settings.set('briefing.settings',{dailyCalls:-1,dailyTokens:-1});

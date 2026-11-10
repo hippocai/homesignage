@@ -3,7 +3,7 @@
     <h3>猪猪家庭助手</h3>
     <el-alert v-if="error" :title="error" type="error" @close="error=''" />
     <div v-if="shareUrl" class="share">
-      <b>家庭聊天链接</b><small>任何能打开此链接的人都可以聊天，无需后台账号。</small>
+      <b>家庭聊天链接</b><small>通过192.168.10局域网地址直接访问可免登录，其他入口需要系统用户名和密码。</small>
       <div><a :href="shareUrl" target="_blank" rel="noopener">{{shareUrl}}</a>
         <el-button link @click="copyLink">复制链接</el-button></div>
     </div>

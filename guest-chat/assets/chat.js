@@ -5,6 +5,7 @@ async function call(endpoint,body) {
   const response=await fetch('/api/v1/pig-chat/'+endpoint,{method:'POST',headers:{'Content-Type':'application/json'},
     credentials:'same-origin',body:JSON.stringify(body)});
   const json=await response.json();
+  if(response.status===401&&json.code==='PIG_CHAT_LOGIN_REQUIRED'){ready=false;location.replace('/pig-chat');}
   if(!response.ok) throw Error(json.error || '暂时无法连接猪猪');
   return json.data;
 }
@@ -25,6 +26,7 @@ async function openSession(){
   try {
     const session=await call('session',{});
     turns=session.history;render();ready=true;
+    el('logout').hidden=!session.authenticated;
     el('status').textContent=session.alias+' · 仅显示本浏览器的对话';
   } catch(e){el('status').textContent=e.message;}
   button();
@@ -52,3 +54,6 @@ el('composer').addEventListener('submit',async e=>{
   finally{busy=false;button();}
 });
 openSession();
+el('logout').addEventListener('click',async()=>{
+  try{await call('logout',{});location.replace('/pig-chat');}catch(e){el('status').textContent=e.message;}
+});

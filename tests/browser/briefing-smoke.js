@@ -152,6 +152,7 @@ async function main() {
       await page.getByRole('button',{name:'取消跟进'}).waitFor({state:'detached'});
       const guest=await browser.newPage({viewport:{width:390,height:740}});
       await guest.goto(url+'/pig-chat');
+      await require('./pig-login')(guest);
       await guest.getByLabel('如何称呼你？').fill('爷爷');
       await guest.getByLabel('发给猪猪').fill('周三在家吃晚饭');
       await guest.getByRole('button',{name:'发送'}).click();
@@ -160,9 +161,10 @@ async function main() {
       await guest.getByText('周三在家吃晚饭',{exact:true}).waitFor();
       const guest2=await browser.newPage();
       await guest2.goto(url+'/pig-chat');
+      await require('./pig-login')(guest2);
       await guest2.getByText('还没有对话。',{exact:false}).waitFor();
       await page.getByRole('tab',{name:'聊天审计'}).click();
-      await page.getByText('爷爷',{exact:true}).waitFor();
+      await page.getByText('账号 admin（爷爷）',{exact:true}).waitFor();
       await page.getByText('周三在家吃晚饭',{exact:false}).waitFor();
       providers.jsonCompletion=async(_settings,messages)=>{
         const input=JSON.parse(messages[1].content);

@@ -69,6 +69,10 @@ END;
 CREATE TABLE IF NOT EXISTS pig_guests (
  id TEXT PRIMARY KEY, token_hash TEXT NOT NULL UNIQUE, expires INTEGER NOT NULL
 );
+CREATE TABLE IF NOT EXISTS pig_chat_logins (
+ token_hash TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ password_version TEXT NOT NULL, expires INTEGER NOT NULL
+);
 CREATE TABLE IF NOT EXISTS pig_chat_audit (
  id INTEGER PRIMARY KEY, attempt TEXT UNIQUE, created INTEGER NOT NULL, finished INTEGER, scope TEXT NOT NULL, actor TEXT NOT NULL,
  ip TEXT NOT NULL, turn_id TEXT NOT NULL, message TEXT NOT NULL, reply TEXT NOT NULL DEFAULT '',
@@ -91,6 +95,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS one_companion_per_scene ON components(scene_id
 const exec = (sql) => new Promise((resolve, reject) => db.exec(sql, (e) => (e ? reject(e) : resolve())));
 async function init() {
   await exec(schema);
+  if(!(await all('PRAGMA table_info(pig_guests)')).some(c=>c.name==='user_id'))await run('ALTER TABLE pig_guests ADD COLUMN user_id TEXT');
   const auditColumns=await all('PRAGMA table_info(pig_chat_audit)');
   for(const [name,definition] of [['kind',"TEXT NOT NULL DEFAULT 'chat'"],['system_prompt',"TEXT NOT NULL DEFAULT ''"],['model_context',"TEXT NOT NULL DEFAULT ''"],['model_response',"TEXT NOT NULL DEFAULT ''"],['model',"TEXT NOT NULL DEFAULT ''"]])
     if(!auditColumns.some(c=>c.name===name))await run('ALTER TABLE pig_chat_audit ADD COLUMN '+name+' '+definition);

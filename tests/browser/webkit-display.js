@@ -36,6 +36,11 @@ async function main() {
     });
     provider.jsonCompletion = async () => ({data:{reply:'收到问候',add:[],remove:[]},tokens:8});
     await guest.goto(url + '/pig-chat');
+    await guest.getByLabel('用户名',{exact:true}).fill('admin');
+    await guest.getByLabel('密码',{exact:true}).fill('wrong-password');
+    await guest.getByRole('button',{name:'登录并聊天'}).click();
+    await guest.getByText('用户名或密码错误',{exact:true}).waitFor();
+    await require('./pig-login')(guest);
     await guest.getByText(/仅显示本浏览器的对话/).waitFor();
     const input = guest.getByLabel('发给猪猪');
     await input.fill('你好猪猪');
@@ -45,6 +50,10 @@ async function main() {
     await guest.getByText('你好猪猪',{exact:true}).waitFor();
     const audit = await api('GET','/companion/agent/audit');
     assert.equal(audit.items[0].status,'ok');
+    assert.equal(audit.items[0].actor,'账号 admin');
+    await guest.getByRole('button',{name:'退出登录'}).click();
+    await guest.getByRole('button',{name:'登录并聊天'}).waitFor();
+    assert.equal(await guest.evaluate(async()=>{const r=await fetch('/api/v1/pig-chat/session',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});return r.status;}),401);
     assert.deepEqual(errors, []);
     console.log('PASS WebKit: shared scene, pig greeting, news rotation, stock chart, guest chat and audit');
   } finally {

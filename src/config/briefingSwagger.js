@@ -283,13 +283,19 @@ module.exports = function extend(spec) {
   path('get','/companion/agent/audit','管理员查看用户聊天与气泡模型完整审计，支持筛选',obj({items:list(auditRow),next:{...num,nullable:true},users:list(obj({scope:str,actor:str}))}));
   spec.paths['/companion/agent/audit'].get.parameters.push({in:'query',name:'before',schema:num,description:'传上页 next，最多返回 30 条'});
   spec.paths['/companion/agent/audit'].get.parameters.push({in:'query',name:'type',schema:choice('all','chat','narration','system_prompt','model_context','model_response'),description:'只看指定信息；字段类型仅返回选定字段与元数据。'},{in:'query',name:'scope',schema:str,description:'精确会话编号，admin或访客scope；system:narration为自动气泡。昵称不用于授权或隔离。'});
-  path('post','/pig-chat/session','建立或恢复聊天访客会话',obj({alias:str,history:list(turn)}),null,
-    '从独立页面 /pig-chat 同源调用；响应设置 30 天 HttpOnly、SameSite=Strict 的 pig_guest Cookie，只返回本会话的最近 40 次成功对话。');
-  spec.paths['/pig-chat/session'].post.security=[];
+  spec.components.securitySchemes.pigChatLogin={type:'apiKey',in:'cookie',name:'pig_chat_login',description:'非192.168.10局域网直连入口必须先登录；12小时HttpOnly会话，退出、密码修改和账号删除即失效。'};
+  path('post','/pig-chat/login','使用系统账号登录猪猪聊天',obj({username:str}),obj({username:{...str,maxLength:128},password:{...str,maxLength:1024,writeOnly:true}},['username','password']),
+    '同源JSON提交；正确账号密码后设置pig_chat_login Cookie。仅授权聊天，不授予后台JWT权限。20次/15分钟按实际连接地址限速，错误凭据统一401，限速429。');
+  spec.paths['/pig-chat/login'].post.security=[];
+  path('post','/pig-chat/logout','退出猪猪聊天并撤销本次登录会话',obj({ok:bool}),null,'同源JSON提交；清除登录和访客Cookie，保留聊天历史和审计。');
+  spec.paths['/pig-chat/logout'].post.security=[];
+  path('post','/pig-chat/session','建立或恢复聊天访客会话',obj({alias:str,authenticated:bool,history:list(turn)}),null,
+    '客户端实际IP属于192.168.10.0/24、Host为该网段IP且不含代理转发头时免登录；其他入口必须持有pig_chat_login，否则401和code=PIG_CHAT_LOGIN_REQUIRED。不信任X-Forwarded-For来授予免登录权限。响应设置30天HttpOnly、SameSite=Strict的pig_guest，只返回本会话最近40次成功对话。已登录访客绑定账号，换账号不能复用原访客Cookie读取他人历史。');
+  spec.paths['/pig-chat/session'].post.security=[{}, {pigChatLogin:[]}];
   path('post','/pig-chat/messages','访客发送消息（先审计，后调用模型）',turn,obj({message:{...str,maxLength:1600},requestId:{...str,maxLength:100},nickname:{...str,maxLength:32}},['message','requestId']),
-    '任何能打开分享页面的人都可同源发送消息。使用本会话 Cookie 可查看、原位修改或取消本会话创建的定时提示和信息。重复 requestId 返回已保存的回复。修改与取消的审计包含原 ID 与前后快照。“刚才那条”仅在近期操作唯一指向一条当前自建记录时可执行；正文引号内的“取消”“删除”作为内容保存。明确保持开始或结束时间时仅修改另一端。查询具体主题无匹配返回空结果。目标不明确返回 422，并发变化返回 409，模型连接失败最多重试一次。');
+    '每次请求都检查入口/登录权限，旧访客Cookie不能绕过外部登录。使用本会话Cookie可查看、原位修改或取消本会话创建的定时提示和信息。重复requestId返回已保存回复。登录用户审计包含真实账号及可选昵称。修改与取消审计包含原ID与前后快照。“刚才那条”仅在近期操作唯一指向一条当前自建记录时可执行；正文引号内的“取消”“删除”作为内容保存。明确保持开始或结束时间时仅修改另一端。查询具体主题无匹配返回空结果。目标不明确返回422，并发变化返回409，模型连接失败最多重试一次。');
   spec.components.securitySchemes.pigGuest={type:'apiKey',in:'cookie',name:'pig_guest'};
-  spec.paths['/pig-chat/messages'].post.security=[{pigGuest:[]}];
+  spec.paths['/pig-chat/messages'].post.security=[{pigGuest:[]},{pigGuest:[],pigChatLogin:[]}];
   spec.paths['/pig-chat/messages'].post.description+=' '+contextDescription;
   spec.paths['/pig-chat/messages'].post.description+=' weather.future按同一规则提供未来预报和官方预警；目的地仅使用共享记忆或本会话可见计划。';
   path('delete','/companion/agent/plans/{id}','取消计划并重新判断资讯影响',household);

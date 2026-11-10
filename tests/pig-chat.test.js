@@ -7,6 +7,8 @@ let app,admin;
 const base='/api/v1/pig-chat', manage='/api/v1/companion/agent';
 beforeAll(async()=>{app=await setupTestApp();admin='Bearer '+await getAdminToken(app);});
 beforeEach(async()=>{
+  // Existing agent/session tests exercise the anonymous LAN path; access boundaries have their own HTTP suite.
+  jest.spyOn(require('../src/services/briefing/chat-access'),'identify').mockImplementation(async req=>{req.pigLocal=true;req.pigUser=null;return true;});
   for(const table of ['pig_guests','pig_chat_audit','pig_conversation','briefing_usage']) await db.run('DELETE FROM '+table);
   await db.run("UPDATE pig_household SET revision=0,profile='{}',plans='[]'");
 });

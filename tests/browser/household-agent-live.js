@@ -19,11 +19,12 @@ async function run() {
   trip.setUTCDate(12);
   const day = trip.toISOString().slice(0,10);
   const guest=request.agent(app);
+  await guest.post('/api/v1/pig-chat/login').send({username:'admin',password:'admin123'}).expect(200);
   await guest.post('/api/v1/pig-chat/session').send({}).expect(200);
   const res=await guest.post('/api/v1/pig-chat/messages').send({requestId:'fixture',nickname:'测试家人',message:'我们下个月12日坐 MU5123 从上海虹桥机场去北京旅行，请帮我记住。'}).expect(200);
   assert.ok(res.body.data.reply);
   const audit=await db.one('SELECT actor,reply,status FROM pig_chat_audit');
-  assert.deepEqual(audit,{actor:'测试家人',reply:res.body.data.reply,status:'ok'});
+  assert.deepEqual(audit,{actor:'账号 admin（测试家人）',reply:res.body.data.reply,status:'ok'});
   const h=await agent.household();
   assert.ok(h.plans.some(v=>v.text.includes('MU5123') && v.start===day),'remember flight and relative date');
   const now=Date.now(), end=now+86400000;
