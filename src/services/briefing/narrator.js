@@ -6,9 +6,23 @@ const prompt=promptSettings.defaultPrompt;
 const schedule=require('./narration-settings');
 async function interval(now=Date.now()){return schedule.state(await schedule.get(),now).minutes;}
 const flights=new Map();
-function ordinary(payload){
+function ordinary(payload,input={}){
+  // News is context for ordinary companionship, not a scheduled household task.
+  // Feed TTL/rank refreshes and slot boundaries must not erase that sentence.
+  const allowed=new Set(['clock','profile','weather',...(input.news||[]).map(v=>v.id)]);
   return ['greeting','companion'].includes(payload.intent)&&payload.urgency==='normal'&&
-    payload.references.every(id=>['clock','profile','weather'].includes(id));
+    payload.references.every(id=>allowed.has(id));
+}
+const narrationAudit=row=>db.one("SELECT * FROM pig_chat_audit WHERE turn_id=? AND kind='narration' AND status='ok' ORDER BY id DESC LIMIT 1",row.id);
+async function canRetain(row){
+  if(!row)return false;
+  const payload=JSON.parse(row.payload);
+  if(ordinary(payload))return true;
+  if(!['greeting','companion'].includes(payload.intent)||payload.urgency!=='normal')return false;
+  // Read the original context so old rows survive upgrades without rewriting data.
+  // Never trust an unverified model flag or infer the type of a missing reference.
+  const audit=await narrationAudit(row);
+  return !!audit&&ordinary(payload,JSON.parse(audit.model_context||'{}'));
 }
 const latestRow=()=>db.one("SELECT * FROM pig_narration WHERE device='*' AND component='*' ORDER BY created DESC,rowid DESC LIMIT 1");
 async function install(exec){await exec(`
@@ -80,7 +94,7 @@ function validate(value,ctx,now){
     ...ctx.input.news.filter(m=>d.references.includes(m.id)&&m.expires).map(m=>m.expires),
     ...ctx.input.info.filter(m=>d.references.includes(m.id)&&m.end_time).map(m=>Date.parse(m.end_time)).filter(Number.isFinite));
   return {payload:{speech:d.speech.trim(),intent:d.intent,urgency:d.urgency,action:d.action,references:d.references,reason:d.reason.slice(0,1000)},
-    review:now+ctx.input.preferences.greetingMinutes*60000,expires:ordinary(d)?now+ctx.input.preferences.greetingMinutes*60000:expiry};
+    review:now+ctx.input.preferences.greetingMinutes*60000,expires:ordinary(d,ctx.input)?now+ctx.input.preferences.greetingMinutes*60000:expiry};
 }
 function samePrompt(audit,ctx){
   const previous=JSON.parse(audit.model_context||'{}');
@@ -92,7 +106,7 @@ function referencesCurrent(payload,previous,ctx){
   // referenced records must never remain on screen while waiting for the next generation.
   if(payload.intent==='reminder'&&(!ctx.preferences.enabled||ctx.quiet))return false;
   if(previous.generationPolicy&&previous.generationPolicy.promptKey!==ctx.input.generationPolicy.promptKey)return false;
-  if(ordinary(payload))return true;
+  if(ordinary(payload,previous))return true;
   return payload.references.every(id=>{
     if(id==='clock')return previous.clock.day===ctx.input.clock.day;
     if(id==='weather')return payload.intent!=='reminder'||ctx.preferences.cold;
@@ -105,9 +119,10 @@ function referencesCurrent(payload,previous,ctx){
   });
 }
 async function reusable(row,ctx,now){
-  if(!row||!ordinary(JSON.parse(row.payload))&&row.expires<=now)return false;
+  if(!row)return false;
   if((await latestRow())?.id!==row.id)return false;
-  const audit=await db.one("SELECT * FROM pig_chat_audit WHERE turn_id=? AND kind='narration' AND status='ok' ORDER BY id DESC LIMIT 1",row.id);
+  const audit=await narrationAudit(row);
+  if(!ordinary(JSON.parse(row.payload),JSON.parse(audit?.model_context||'{}'))&&row.expires<=now)return false;
   return !!audit&&samePrompt(audit,ctx)&&referencesCurrent(JSON.parse(row.payload),JSON.parse(audit.model_context),ctx);
 }
 async function decide(device,component,now=Date.now()){
@@ -120,7 +135,7 @@ async function decide(device,component,now=Date.now()){
   const due=last?last.created+ctx.window.minutes*60000:now;
   if(last&&samePrompt(last,ctx)&&due>now){
     if(await reusable(old,ctx,now))return {row:{...old,review:due},ctx};
-    if(old&&ordinary(JSON.parse(old.payload)))return {row:{...old,review:due},ctx,retained:true};
+    if(await canRetain(old))return {row:{...old,review:due},ctx,retained:true};
     return {waiting:true,nextReviewAt:due,ctx};
   }
   const settings=await api.settings();
@@ -156,15 +171,15 @@ async function feed(device,component,now=Date.now()){
   const bound=await api.boundPig(device,component);if(!bound.id)throw p.fault('猪猪组件未绑定',403);
   const config=await schedule.get(),window=schedule.state(config,now);
   const preferences={...bound.prefs,quiet:window.quiet,sound:bound.prefs.enabled&&bound.prefs.sound&&!window.quiet&&!window.paused};
-  function response(row,retained=false,paused=false){
-    const d=JSON.parse(row.payload),hold=ordinary(d);
+  async function response(row,retained=false,paused=false){
+    const d=JSON.parse(row.payload),hold=await canRetain(row);
     return {id:row.id,componentId:bound.id,speech:d.speech,action:d.action,intent:d.intent,urgency:d.urgency,
       retainUntilReplaced:hold,paused,validUntil:hold?row.review:row.expires,nextReviewAt:row.review,
       preferences:retained?{...preferences,sound:false}:preferences};
   }
   async function pausedResponse(boundary){
     const old=await latestRow();
-    if(old&&ordinary(JSON.parse(old.payload)))return response({...old,review:boundary},true,true);
+    if(await canRetain(old))return response({...old,review:boundary},true,true);
     return {paused:true,componentId:bound.id,nextReviewAt:boundary,preferences:{...preferences,sound:false}};
   }
   if(window.paused)return pausedResponse(window.boundary);
@@ -174,7 +189,7 @@ async function feed(device,component,now=Date.now()){
   try{decision=await flights.get(slot);}catch(e){
     // A failed scheduled replacement does not erase an ordinary greeting. Never extend a reminder.
     const old=await latestRow();
-    if(!old||!ordinary(JSON.parse(old.payload)))throw e;
+    if(!await canRetain(old))throw e;
     const last=await db.one("SELECT created FROM pig_chat_audit WHERE kind='narration' ORDER BY created DESC,id DESC LIMIT 1");
     return response({...old,review:(last?.created||now)+window.minutes*60000},true);
   }

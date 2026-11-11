@@ -126,6 +126,78 @@ test('引用具体事项的陪伴话语不能误当普通问候延长；到期�
   const first=await narrator.feed('cadence-a',a,now);expect(first.retainUntilReplaced).toBe(false);expect(first.validUntil).toBe(now+60000);
   expect(await narrator.feed('cadence-b',b,now+60000)).toMatchObject({waiting:true});expect(model).toHaveBeenCalledTimes(1);
 });
+
+test.each([['news','greeting'],['news','companion'],['ranking','greeting'],['ranking','companion']])('%s引用的普通%s跨时段、采集续期、热榜退出均保留到固定更新，不提前生成',async(kind,intent)=>{
+  now=Date.parse('2030-01-02T15:48:30+08:00');
+  await schedule.save({greetingSchedule:Array(12).fill(60)});
+  const news={id:'oil-news',kind,version:1,expires:now+1800000,payload:{title:'油价预计下调',rank:21}};
+  api.newsCards.mockResolvedValue([news]);
+  const original=model.getMockImplementation();model.mockImplementation(async(...args)=>{
+    const r=await original(...args);Object.assign(r.data,{intent,references:['oil-news','clock','profile'],speech:'明晚油价预计下调，可以留意一下。'});return r;
+  });
+  const first=await narrator.feed('cadence-a',a,now);
+  expect(first).toMatchObject({retainUntilReplaced:true,validUntil:now+3600000,nextReviewAt:now+3600000});
+  // Collection renews the cache before the slot boundary, then the item leaves the feed.
+  for(const offset of [60000,12*60000,31*60000,3599999]){
+    api.newsCards.mockResolvedValue(offset<1800000?[{...news,expires:now+3600000,payload:{...news.payload,rank:19}}]:[]);
+    for(const r of await Promise.all([narrator.feed('cadence-a',a,now+offset),narrator.feed('cadence-b',b,now+offset)]))
+      expect(r).toMatchObject({id:first.id,speech:first.speech,retainUntilReplaced:true,nextReviewAt:now+3600000});
+  }
+  expect(await narrator.claim('cadence-b',b,first.id,now+3599999)).toMatchObject({accepted:true});
+  expect(model).toHaveBeenCalledTimes(1);
+  api.newsCards.mockResolvedValue([{...news,expires:now+7200000}]);
+  const next=await narrator.feed('cadence-a',a,now+3600000);expect(next.id).not.toBe(first.id);expect(model).toHaveBeenCalledTimes(2);
+  await expect(narrator.claim('cadence-a',a,first.id,now+3600001)).rejects.toMatchObject({status:409});
+});
+
+test('旧版新闻陪伴从原审计识别，过期重启、0暂停与更新失败不清空，也不改写旧记录',async()=>{
+  api.newsCards.mockResolvedValue([{id:'legacy-news',expires:now+60000}]);
+  const original=model.getMockImplementation();model.mockImplementation(async(...args)=>{const r=await original(...args);Object.assign(r.data,{intent:'companion',references:['legacy-news']});return r;});
+  const first=await narrator.feed('cadence-a',a,now);
+  await db.run('UPDATE pig_narration SET expires=? WHERE id=?',now+1000,first.id);
+  const before=await db.one('SELECT * FROM pig_narration WHERE id=?',first.id);
+  const file=path.resolve(__dirname,'../src/services/briefing/narrator.js'),resolve=createRequire(file),fresh={exports:{}};
+  new Function('require','module','exports',fs.readFileSync(file,'utf8'))(id=>require(resolve.resolve(id)),fresh,fresh.exports);
+  api.newsCards.mockResolvedValue([]);
+  expect(await fresh.exports.feed('cadence-b',b,now+60000)).toMatchObject({id:first.id,retainUntilReplaced:true});
+  await schedule.save({greetingSchedule:Array(12).fill(0)});weather.build.mockClear();api.newsCards.mockClear();
+  expect(await fresh.exports.feed('cadence-b',b,now+120000)).toMatchObject({id:first.id,paused:true,retainUntilReplaced:true,preferences:{sound:false}});
+  expect(weather.build).not.toHaveBeenCalled();expect(api.newsCards).not.toHaveBeenCalled();
+  await schedule.save({greetingSchedule:Array(12).fill(30)});
+  model.mockRejectedValueOnce(provider.fault('服务超时',503));
+  expect(await fresh.exports.feed('cadence-a',a,now+1800000)).toMatchObject({id:first.id,retainUntilReplaced:true,preferences:{sound:false}});
+  expect(await fresh.exports.feed('cadence-b',b,now+1801000)).toMatchObject({id:first.id});
+  expect(model).toHaveBeenCalledTimes(2);
+  expect(await db.one('SELECT * FROM pig_narration WHERE id=?',first.id)).toEqual(before);
+});
+
+test.each([['reminder','normal'],['companion','important'],['greeting','urgent']])('新闻%s/%s仍按实际有效期撤下，不延长、不提前调用',async(intent,urgency)=>{
+  api.newsCards.mockResolvedValue([{id:'alert',expires:now+60000}]);
+  const original=model.getMockImplementation();model.mockImplementation(async(...args)=>{const r=await original(...args);Object.assign(r.data,{intent,urgency,references:['alert']});return r;});
+  const first=await narrator.feed('cadence-a',a,now);
+  expect(first).toMatchObject({retainUntilReplaced:false,validUntil:now+60000});
+  expect(await narrator.feed('cadence-b',b,now+60000)).toMatchObject({waiting:true});
+  await expect(narrator.claim('cadence-b',b,first.id,now+60000)).rejects.toMatchObject({status:409});expect(model).toHaveBeenCalledTimes(1);
+});
+
+test('陪伴同时引用新闻与家庭事项时仍检查取消，模型自带保留标志不能越权',async()=>{
+  api.newsCards.mockResolvedValue([{id:'news',expires:now+7200000}]);
+  await db.run("INSERT INTO info_items(id,text) VALUES('airport','明早去机场')");
+  const original=model.getMockImplementation();model.mockImplementation(async(...args)=>{const r=await original(...args);Object.assign(r.data,{intent:'companion',references:['news','airport'],retainUntilReplaced:true});return r;});
+  const first=await narrator.feed('cadence-a',a,now);expect(first.retainUntilReplaced).toBe(false);
+  await db.run("DELETE FROM info_items WHERE id='airport'");
+  expect(await narrator.feed('cadence-b',b,now+60000)).toMatchObject({waiting:true});
+  await expect(narrator.claim('cadence-b',b,first.id,now+60000)).rejects.toMatchObject({status:409});expect(model).toHaveBeenCalledTimes(1);
+});
+
+test('缺少原始成功审计的旧引用不能猜测为新闻而延长',async()=>{
+  api.newsCards.mockResolvedValue([{id:'unknown',expires:now+60000}]);
+  const original=model.getMockImplementation();model.mockImplementation(async(...args)=>{const r=await original(...args);r.data.references=['unknown'];return r;});
+  const first=await narrator.feed('cadence-a',a,now);
+  await db.run('UPDATE pig_narration SET expires=? WHERE id=?',now+1000,first.id);
+  await db.run("UPDATE pig_chat_audit SET model_context='{}' WHERE turn_id=?",first.id);
+  expect(await narrator.feed('cadence-b',b,now+60000)).toMatchObject({waiting:true});expect(model).toHaveBeenCalledTimes(1);
+});
 test('失败、天气变化和重新加载服务模块不能绕过数据库中的30分钟计时',async()=>{
   model.mockRejectedValueOnce(provider.fault('服务超时',503));
   await expect(narrator.feed('cadence-a',a,now)).rejects.toMatchObject({status:503});

@@ -42,6 +42,14 @@ async function check(browser,name){
     // Reload/rebuild during a paused period still receives the same retained greeting.
     await page.evaluate(()=>{briefingRuntime.reset();briefingRuntime.mount(document.getElementById('pig'),{appearance:'2d'},'companion');});
     await bubble.getByText('早安，今天也要开心呀。',{exact:true}).waitFor();assert.equal(await page.evaluate(()=>testState.claims),1);
+    // A news-based companion sentence receives the same retention contract, including old rows.
+    await page.evaluate(()=>{Object.assign(testState.data,{id:'news-companion',speech:'明晚油价预计下调，可以留意一下。',intent:'companion',paused:false,validUntil:Date.now()-1000,nextReviewAt:Date.now()+60000});briefingRuntime.sync();});
+    await bubble.getByText('明晚油价预计下调，可以留意一下。',{exact:true}).waitFor();
+    await page.waitForFunction(()=>testState.claims===2);
+    await page.evaluate(()=>briefingRuntime.sync());await page.waitForTimeout(100);
+    assert.equal(await bubble.innerText(),'明晚油价预计下调，可以留意一下。');
+    assert.equal(await page.evaluate(()=>testState.claims),2,'Retained news companion must not replay on polling');
+    assert.equal(await page.evaluate(()=>testState.changes.some(text=>/等待下一次|重新判断|暂不可用/.test(text))),false);
     await page.evaluate(()=>{Object.assign(testState.data,{id:'reminder',speech:'出门请带身份证。',intent:'reminder',retainUntilReplaced:false,paused:false,validUntil:Date.now()+1200});briefingRuntime.sync();});
     await bubble.getByText('出门请带身份证。',{exact:true}).waitFor();
     await page.evaluate(()=>{testState.data={waiting:true,preferences:{sound:false}};});
@@ -50,7 +58,7 @@ async function check(browser,name){
     await bubble.getByText('午后也记得休息一下。',{exact:true}).waitFor();
     assert.deepEqual(errors,[]);
     await page.evaluate(()=>briefingRuntime.reset());
-    console.log('PASS '+name+': short validity, pending generation, failure, same-ID polling, paused reload, expired reminder withdrawal, new greeting replacement');
+    console.log('PASS '+name+': short validity, pending generation, failure, same-ID polling, paused reload, news companion retention, expired reminder withdrawal, new greeting replacement');
   }finally{await page.close();}
 }
 (async()=>{for(const [name,type] of [['Chromium',chromium],['WebKit',webkit]]){
